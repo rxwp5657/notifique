@@ -1,0 +1,9 @@
+version: '3.9'
+
+services:
+  notifique:
+    image: notifique:v0.1.0
+    environment:
+      - GIN_MODE=release
+    ports:
+      - 8080:8080

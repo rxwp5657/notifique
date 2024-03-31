@@ -1,0 +1,205 @@
+openapi: 3.1.0
+info:
+  title: Notifique API Spec
+  version: 0.1.0
+paths:
+  /notifications:
+    get:
+      summary: Gets the user's notifications.
+      parameters:
+        - in: query
+          name: take
+          description: |
+            The number of notifications to take (used for pagination).
+          schema:
+            type: integer
+        - in: query
+          name: skip
+          description: |
+            Skips the top N newest notifications (used for pagination).
+          schema:
+            type: integer
+        - in: query
+          name: channels
+          description: |
+            Selects notifications whose delivery channel are at the very
+            least the ones specified here. To specify multiple channels
+            use the "channels=e-mail&channels=in-app" format.
+          schema:
+            type: array
+            uniqueItems: true
+            items:
+              $ref: '#/components/schemas/Channel'
+        - in: query
+          name: topics
+          description: |
+            Selects notifications whose topic is included in the array. To
+            specify multiple topics use the "topics=WARNING&topics=ERROR"
+            format.
+          schema:
+            type: array
+            uniqueItems: true
+            items:
+              $ref: '#/components/schemas/Topic'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationResponse'
+        "500":
+          description: |
+            Failed to retrieve the user's notifications.
+    post:
+      summary: Creates a new notification.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Notification'
+      responses:
+        "201":
+          description: Notification received and persisted.
+        "400":
+          description: |
+            Topic is not a string or doesn't comply with the specified constraints.
+        "500":
+          description: |
+            Failed to persist the notification. If a channel fails to deliver
+            a message it won't trigger an error.
+
+  /notifications/{id}/read:
+    put:
+      summary: Updates the notification's read status.
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+            format: uuid
+            required: true
+
+  /notifications/opt-in:
+    put:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              minItems: 1
+              uniqueItems: true
+              items:
+                $ref: '#/components/schemas/Channel'
+      description: |
+        Enables notifications of the supplied type through the
+        supplied channels for the user who made the request.
+
+  /notifications/opt-out:
+    put:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              minItems: 1
+              uniqueItems: true
+              items:
+                $ref: '#/components/schemas/Channel'
+      description: |
+        Disables notifications of the supplied type through the
+        supplied channels for the user who made the request.
+
+components:
+  schemas:
+
+    Topic:
+      type: string
+      minLength: 1
+      maxLength: 64
+      pattern: '[A-Za-z0-9@#$]*'
+
+    Channel:
+       type: string
+       enum:
+         - e-mail
+         - sms
+         - in-app
+
+    Notification:
+      type: object
+      properties:
+        title:
+          type: string
+          maxLength: 120
+        contents:
+          type: string
+          maxLength: 1024
+        image:
+          type: string
+          format: uri
+        topic:
+          $ref: '#/components/schemas/Topic'
+        recipients:
+          type: array
+          uniqueItems: true
+          description: array of user ids
+          items:
+            type: string
+        channels:
+           type: array
+           uniqueItems: true
+           description: array of delivery channels
+           items:
+            $ref: '#/components/schemas/Channel'
+      required:
+        - title
+        - contents
+        - topic
+
+    NotificationResponse:
+      type: object
+      properties:
+        title:
+          type: string
+        contents:
+          type: string
+        read_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        topic:
+          $ref: '#/components/schemas/Topic'
+        status:
+          type: string
+          enum:
+            - pending
+            - processing
+            - success
+            - failed
+        channels:
+           type: array
+           uniqueItems: true
+           description: array of delivery channels
+           items:
+            $ref: '#/components/schemas/Channel'
+      required:
+        - title
+        - contents
+        - topic
+        - created_at
+        - type
+
+  responses:
+
+    Notification:
+      description: Notification's contents for in-app display.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/NotificationResponse'
