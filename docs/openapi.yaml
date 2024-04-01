@@ -2,10 +2,15 @@ openapi: 3.1.0
 info:
   title: Notifique API Spec
   version: 0.1.0
+  license:
+    name: MIT
+    identifier: MIT License
 paths:
   /notifications:
     get:
-      summary: Gets the user's notifications.
+      summary: |
+        Gets the user's notifications (i.e., notifications that have the user
+        as a recipient).
       parameters:
         - in: query
           name: take
@@ -47,7 +52,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/NotificationResponse'
+                $ref: '#/components/schemas/UserNotification'
         "500":
           description: |
             Failed to retrieve the user's notifications.
@@ -69,6 +74,20 @@ paths:
           description: |
             Failed to persist the notification. If a channel fails to deliver
             a message it won't trigger an error.
+
+  /notifications/config:
+    get:
+      summary: Get the user's notification configuration
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserConfig'
+        "500":
+          description: |
+            Failed to retrieve the user's notification configuration.
 
   /notifications/{id}/read:
     put:
@@ -93,6 +112,16 @@ paths:
               uniqueItems: true
               items:
                 $ref: '#/components/schemas/Channel'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserConfig'
+        "500":
+          description: |
+            Failed to retrieve the user's notification configuration.
       description: |
         Enables notifications of the supplied type through the
         supplied channels for the user who made the request.
@@ -109,18 +138,29 @@ paths:
               uniqueItems: true
               items:
                 $ref: '#/components/schemas/Channel'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserConfig'
+        "500":
+          description: |
+            Failed to retrieve the user's notification configuration.
+
       description: |
         Disables notifications of the supplied type through the
         supplied channels for the user who made the request.
 
 components:
+
   schemas:
 
     Topic:
       type: string
       minLength: 1
       maxLength: 64
-      pattern: '[A-Za-z0-9@#$]*'
 
     Channel:
        type: string
@@ -160,9 +200,12 @@ components:
         - contents
         - topic
 
-    NotificationResponse:
+    UserNotificationResponse:
       type: object
       properties:
+        id:
+          type: string
+          format: uuid
         title:
           type: string
         contents:
@@ -175,13 +218,6 @@ components:
           format: date-time
         topic:
           $ref: '#/components/schemas/Topic'
-        status:
-          type: string
-          enum:
-            - pending
-            - processing
-            - success
-            - failed
         channels:
            type: array
            uniqueItems: true
@@ -189,17 +225,36 @@ components:
            items:
             $ref: '#/components/schemas/Channel'
       required:
+        - id
         - title
         - contents
         - topic
         - created_at
-        - type
+
+    UserConfig:
+      type: object
+      properties:
+        opt-in:
+          type: array
+          uniqueItems: true
+          description: |
+            The channels that can be used to deliver a notification
+            to the user.
+          items:
+            $ref: '#/components/schemas/Channel'
 
   responses:
 
-    Notification:
-      description: Notification's contents for in-app display.
+    UserNotification:
+      description: A user notification.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/NotificationResponse'
+            $ref: '#/components/schemas/UserNotificationResponse'
+
+    UserConfig:
+      description: User configuration on the notification system.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UserConfig'
