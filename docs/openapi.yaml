@@ -9,8 +9,7 @@ paths:
   /notifications:
     get:
       summary: |
-        Gets the user's notifications (i.e., notifications that have the user
-        as a recipient).
+        Gets the user's in-app notifications
       parameters:
         - in: query
           name: take
@@ -24,17 +23,6 @@ paths:
             Skips the top N newest notifications (used for pagination).
           schema:
             type: integer
-        - in: query
-          name: channels
-          description: |
-            Selects notifications whose delivery channel are at the very
-            least the ones specified here. To specify multiple channels
-            use the "channels=e-mail&channels=in-app" format.
-          schema:
-            type: array
-            uniqueItems: true
-            items:
-              $ref: '#/components/schemas/Channel'
         - in: query
           name: topics
           description: |
