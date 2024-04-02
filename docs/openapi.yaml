@@ -6,7 +6,7 @@ info:
     name: MIT
     identifier: MIT License
 paths:
-  /notifications:
+  /users/notifications:
     get:
       summary: |
         Gets the user's in-app notifications
@@ -44,6 +44,7 @@ paths:
         "500":
           description: |
             Failed to retrieve the user's notifications.
+  /notifications:
     post:
       summary: Creates a new notification.
       requestBody:
@@ -63,7 +64,7 @@ paths:
             Failed to persist the notification. If a channel fails to deliver
             a message it won't trigger an error.
 
-  /notifications/config:
+  /users/notifications/config:
     get:
       summary: Get the user's notification configuration
       responses:
@@ -77,7 +78,7 @@ paths:
           description: |
             Failed to retrieve the user's notification configuration.
 
-  /notifications/{id}/read:
+  /users/notifications/{id}/read:
     put:
       summary: Updates the notification's read status.
       parameters:
@@ -88,7 +89,7 @@ paths:
             format: uuid
             required: true
 
-  /notifications/opt-in:
+  /users/notifications/opt-in:
     put:
       requestBody:
         required: true
@@ -114,7 +115,7 @@ paths:
         Enables notifications of the supplied type through the
         supplied channels for the user who made the request.
 
-  /notifications/opt-out:
+  /users/notifications/opt-out:
     put:
       requestBody:
         required: true
