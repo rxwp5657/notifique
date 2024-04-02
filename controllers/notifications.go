@@ -13,17 +13,18 @@ import (
 
 type NotificationStorage interface {
 	SaveNotification(ctx context.Context, notification dto.NotificationReq) (string, error)
-	GetNotifications(ctx context.Context, filters dto.NotificationFilters) ([]dto.UserNotificationResp, error)
+	GetUserNotifications(ctx context.Context, filters dto.NotificationFilters) ([]dto.UserNotificationResp, error)
+	GetUserConfig(ctx context.Context, userId string) ([]dto.UserConfigResp, error)
 	SetReadStatus(ctx context.Context, userId, notificationId string) error
-	OptOut(ctx context.Context, userId string, channels []string) error
-	OptIn(ctx context.Context, userId string, channels []string) error
+	OptOut(ctx context.Context, userId string, channels []string) ([]dto.UserConfigResp, error)
+	OptIn(ctx context.Context, userId string, channels []string) ([]dto.UserConfigResp, error)
 }
 
 type NotificationController struct {
 	Storage NotificationStorage
 }
 
-func (nc NotificationController) GetNotifications(c *gin.Context) {
+func (nc NotificationController) GetUserNotifications(c *gin.Context) {
 	var filters dto.NotificationFilters
 
 	if err := c.ShouldBind(&filters); err != nil {
@@ -32,14 +33,25 @@ func (nc NotificationController) GetNotifications(c *gin.Context) {
 	}
 
 	filters.UserId = "1231"
-	notifications, err := nc.Storage.GetNotifications(c, filters)
+	notifications, err := nc.Storage.GetUserNotifications(c, filters)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, nil)
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
 	c.JSON(http.StatusOK, notifications)
+}
+
+func (nc NotificationController) GetUserConfig(c *gin.Context) {
+	cfg, err := nc.Storage.GetUserConfig(c, "1231")
+
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusOK, cfg)
 }
 
 func (nc NotificationController) CreateNotification(c *gin.Context) {
@@ -51,7 +63,7 @@ func (nc NotificationController) CreateNotification(c *gin.Context) {
 	}
 
 	if _, err := nc.Storage.SaveNotification(c, notification); err != nil {
-		c.JSON(http.StatusInternalServerError, nil)
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 
@@ -76,7 +88,7 @@ func (nc NotificationController) SetReadStatus(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		} else {
-			c.JSON(http.StatusInternalServerError, nil)
+			c.Status(http.StatusInternalServerError)
 			return
 		}
 	}
@@ -92,11 +104,14 @@ func (nc NotificationController) OptIn(c *gin.Context) {
 		return
 	}
 
-	if err := nc.Storage.OptIn(c, "1231", ch.Channels); err != nil {
-		c.JSON(http.StatusInternalServerError, nil)
+	userConf, err := nc.Storage.OptIn(c, "1231", ch.Channels)
+
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
 	}
 
-	c.Status(http.StatusOK)
+	c.JSON(http.StatusOK, userConf)
 }
 
 func (nc NotificationController) OptOut(c *gin.Context) {
@@ -107,9 +122,12 @@ func (nc NotificationController) OptOut(c *gin.Context) {
 		return
 	}
 
-	if err := nc.Storage.OptOut(c, "1231", ch.Channels); err != nil {
-		c.JSON(http.StatusInternalServerError, nil)
+	userConf, err := nc.Storage.OptOut(c, "1231", ch.Channels)
+
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
 	}
 
-	c.Status(http.StatusOK)
+	c.JSON(http.StatusOK, userConf)
 }

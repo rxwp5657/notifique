@@ -232,29 +232,15 @@ components:
         - created_at
 
     UserConfig:
-      type: object
-      properties:
-        opt-in:
-          type: array
-          uniqueItems: true
-          description: |
-            The channels that can be used to deliver a notification
-            to the user.
-          items:
+      type: array
+      uniqueItems: true
+      description: |
+        array of channels with a flag indicating if the user has the channel
+        enabled or not
+      items:
+        type: object
+        properties:
+          channel:
             $ref: '#/components/schemas/Channel'
-
-  responses:
-
-    UserNotification:
-      description: A user notification.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/UserNotificationResponse'
-
-    UserConfig:
-      description: User configuration on the notification system.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/UserConfig'
+          opted-in:
+            type: boolean

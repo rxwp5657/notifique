@@ -22,13 +22,16 @@ type notification struct {
 }
 
 type userConfig struct {
-	Id     string
 	Config map[string]bool
 }
 
 type InMemoryStorage struct {
 	notificationStore map[string]notification
 	userConfigStore   map[string]userConfig
+}
+
+func getAvailableChannels() []string {
+	return []string{"e-mail", "in-app", "sms"}
 }
 
 func (s *InMemoryStorage) SaveNotification(ctx context.Context, notificationReq dto.NotificationReq) (string, error) {
@@ -57,7 +60,7 @@ func (s *InMemoryStorage) SaveNotification(ctx context.Context, notificationReq 
 	return id, nil
 }
 
-func (s *InMemoryStorage) GetNotifications(ctx context.Context, filters dto.NotificationFilters) ([]dto.UserNotificationResp, error) {
+func (s *InMemoryStorage) GetUserNotifications(ctx context.Context, filters dto.NotificationFilters) ([]dto.UserNotificationResp, error) {
 
 	expectedTopics := make(map[string]struct{})
 	expectedChannels := make(map[string]struct{})
@@ -165,38 +168,77 @@ func (s *InMemoryStorage) SetReadStatus(ctx context.Context, userId, notificatio
 	return nil
 }
 
-func getUpdateOptConfig(usrCfg userConfig, channels []string, val bool) userConfig {
+func getInitialUserConfig() map[string]bool {
 
-	if usrCfg.Config == nil {
-		usrCfg.Config = make(map[string]bool)
+	config := make(map[string]bool)
+	availableChannels := getAvailableChannels()
+
+	for _, ac := range availableChannels {
+		config[ac] = true
+	}
+
+	return config
+}
+
+func getUpdatedOptConfig(cfg userConfig, channels []string, val bool) userConfig {
+
+	if cfg.Config == nil {
+		cfg.Config = getInitialUserConfig()
 	}
 
 	for _, channel := range channels {
-		usrCfg.Config[channel] = val
+		cfg.Config[channel] = val
 	}
 
-	return usrCfg
+	return cfg
 }
 
-func (s *InMemoryStorage) OptOut(ctx context.Context, userId string, channels []string) error {
+func makeUserConf(cfg *userConfig) []dto.UserConfigResp {
 
-	s.userConfigStore[userId] = getUpdateOptConfig(
-		s.userConfigStore[userId],
-		channels,
-		false,
-	)
-	return nil
+	config := make([]dto.UserConfigResp, 0)
+
+	for channel := range cfg.Config {
+		configResp := dto.UserConfigResp{
+			Channel: channel,
+			OptedIn: cfg.Config[channel],
+		}
+		config = append(config, configResp)
+	}
+
+	return config
 }
 
-func (s *InMemoryStorage) OptIn(ctx context.Context, userId string, channels []string) error {
+func (s *InMemoryStorage) updateOptConfg(userId string, channels []string, optIn bool) {
 
-	s.userConfigStore[userId] = getUpdateOptConfig(
-		s.userConfigStore[userId],
-		channels,
-		true,
-	)
+	cfg := getUpdatedOptConfig(s.userConfigStore[userId], channels, optIn)
+	s.userConfigStore[userId] = cfg
+}
 
-	return nil
+func (s *InMemoryStorage) OptOut(ctx context.Context, userId string, channels []string) ([]dto.UserConfigResp, error) {
+
+	s.updateOptConfg(userId, channels, false)
+	cfg := s.userConfigStore[userId]
+
+	return makeUserConf(&cfg), nil
+}
+
+func (s *InMemoryStorage) OptIn(ctx context.Context, userId string, channels []string) ([]dto.UserConfigResp, error) {
+
+	s.updateOptConfg(userId, channels, true)
+	cfg := s.userConfigStore[userId]
+
+	return makeUserConf(&cfg), nil
+}
+
+func (s *InMemoryStorage) GetUserConfig(ctx context.Context, userId string) ([]dto.UserConfigResp, error) {
+
+	if _, ok := s.userConfigStore[userId]; !ok {
+		s.userConfigStore[userId] = userConfig{getInitialUserConfig()}
+	}
+
+	cfg := s.userConfigStore[userId]
+
+	return makeUserConf(&cfg), nil
 }
 
 func MakeInMemoryStorage() InMemoryStorage {
