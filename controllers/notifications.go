@@ -24,6 +24,8 @@ type NotificationController struct {
 	Storage NotificationStorage
 }
 
+const userIdHeaderKey = "userId"
+
 func (nc NotificationController) GetUserNotifications(c *gin.Context) {
 	var filters dto.NotificationFilters
 
@@ -32,7 +34,7 @@ func (nc NotificationController) GetUserNotifications(c *gin.Context) {
 		return
 	}
 
-	filters.UserId = "1231"
+	filters.UserId = c.GetHeader(userIdHeaderKey)
 	notifications, err := nc.Storage.GetUserNotifications(c, filters)
 
 	if err != nil {
@@ -44,7 +46,8 @@ func (nc NotificationController) GetUserNotifications(c *gin.Context) {
 }
 
 func (nc NotificationController) GetUserConfig(c *gin.Context) {
-	cfg, err := nc.Storage.GetUserConfig(c, "1231")
+	userId := c.GetHeader(userIdHeaderKey)
+	cfg, err := nc.Storage.GetUserConfig(c, userId)
 
 	if err != nil {
 		c.Status(http.StatusInternalServerError)

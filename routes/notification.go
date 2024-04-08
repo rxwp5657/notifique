@@ -6,8 +6,9 @@ import (
 	c "github.com/notifique/controllers"
 )
 
-func SetupNotificationRoutes(r *gin.Engine, ns c.NotificationStorage) {
+func SetupRoutes(ns c.NotificationStorage) *gin.Engine {
 
+	r := gin.Default()
 	controller := c.NotificationController{Storage: ns}
 
 	v0 := r.Group("/v0")
@@ -20,4 +21,6 @@ func SetupNotificationRoutes(r *gin.Engine, ns c.NotificationStorage) {
 
 		v0.POST("/notifications", controller.CreateNotification)
 	}
+
+	return r
 }
