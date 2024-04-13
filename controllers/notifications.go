@@ -81,7 +81,8 @@ func (nc NotificationController) SetReadStatus(c *gin.Context) {
 		return
 	}
 
-	err := nc.Storage.SetReadStatus(c, "1231", n.NotificationId)
+	userId := c.GetHeader(userIdHeaderKey)
+	err := nc.Storage.SetReadStatus(c, userId, n.NotificationId)
 
 	if err != nil {
 		if errors.As(err, &internal.NotificationNotFound{}) {

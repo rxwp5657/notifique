@@ -3,15 +3,20 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/google/uuid"
 
 	"github.com/notifique/dto"
 	"github.com/notifique/internal"
 	"github.com/notifique/routes"
 	"github.com/stretchr/testify/assert"
 )
+
+const userId = "12345"
 
 func getStorage() internal.InMemoryStorage {
 	return internal.MakeInMemoryStorage()
@@ -20,8 +25,6 @@ func getStorage() internal.InMemoryStorage {
 func TestGetUserNotifications(t *testing.T) {
 	storage := getStorage()
 	router := routes.SetupRoutes(&storage)
-
-	userId := "12345"
 
 	testNofitication := dto.NotificationReq{
 		Title:      "Notification 1",
@@ -66,8 +69,6 @@ func TestGetUserConfiguration(t *testing.T) {
 	storage := getStorage()
 	router := routes.SetupRoutes(&storage)
 
-	userId := "12345"
-
 	expectedConfig := []dto.UserConfigResp{
 		{Channel: "e-mail", OptedIn: true},
 		{Channel: "sms", OptedIn: true},
@@ -89,4 +90,95 @@ func TestGetUserConfiguration(t *testing.T) {
 
 	assert.Equal(t, 200, w.Code)
 	assert.ElementsMatch(t, expectedConfig, userConfig)
+}
+
+func TestSetReadStatus(t *testing.T) {
+	storage := getStorage()
+	router := routes.SetupRoutes(&storage)
+
+	testNofitication := dto.NotificationReq{
+		Title:      "Notification 1",
+		Contents:   "Notification Contents 1",
+		Topic:      "Testing",
+		Recipients: []string{userId},
+		Channels:   []string{"in-app e-mail"},
+	}
+
+	ctx := context.Background()
+	notificationId, _ := storage.SaveNotification(ctx, testNofitication)
+
+	w := httptest.NewRecorder()
+
+	url := fmt.Sprintf("/v0/users/notifications/%s/read", notificationId)
+	req, _ := http.NewRequest("PUT", url, nil)
+	req.Header.Add("userId", userId)
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, 200, w.Code)
+}
+
+func TestSetReadStatusOnMissingNotification(t *testing.T) {
+	storage := getStorage()
+	router := routes.SetupRoutes(&storage)
+
+	notificationId := uuid.NewString()
+
+	errorTemplate := "Notification %v not found"
+	expectedError := fmt.Sprintf(errorTemplate, notificationId)
+
+	w := httptest.NewRecorder()
+
+	url := fmt.Sprintf("/v0/users/notifications/%s/read", notificationId)
+	req, _ := http.NewRequest("PUT", url, nil)
+	req.Header.Add("userId", userId)
+
+	router.ServeHTTP(w, req)
+
+	resp := make(map[string]string)
+
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.FailNow()
+	}
+
+	assert.Equal(t, 404, w.Code)
+	assert.Equal(t, expectedError, resp["error"])
+}
+
+func TestSetReadStatusOnMissingRecipient(t *testing.T) {
+	storage := getStorage()
+	router := routes.SetupRoutes(&storage)
+
+	badRecipient := "54321"
+
+	testNofitication := dto.NotificationReq{
+		Title:      "Notification 1",
+		Contents:   "Notification Contents 1",
+		Topic:      "Testing",
+		Recipients: []string{userId},
+		Channels:   []string{"in-app e-mail"},
+	}
+
+	ctx := context.Background()
+	notificationId, _ := storage.SaveNotification(ctx, testNofitication)
+
+	errorTemplate := "User %v doesn't have the notification with id %v"
+	expectedError := fmt.Sprintf(errorTemplate, badRecipient, notificationId)
+
+	w := httptest.NewRecorder()
+
+	url := fmt.Sprintf("/v0/users/notifications/%s/read", notificationId)
+	req, _ := http.NewRequest("PUT", url, nil)
+	req.Header.Add("userId", badRecipient)
+
+	router.ServeHTTP(w, req)
+
+	resp := make(map[string]string)
+
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.FailNow()
+	}
+
+	assert.Equal(t, 404, w.Code)
+	assert.Equal(t, expectedError, resp["error"])
 }
