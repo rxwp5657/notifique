@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -181,4 +182,69 @@ func TestSetReadStatusOnMissingRecipient(t *testing.T) {
 
 	assert.Equal(t, 404, w.Code)
 	assert.Equal(t, expectedError, resp["error"])
+}
+
+func TestOptIn(t *testing.T) {
+	storage := getStorage()
+	router := routes.SetupRoutes(&storage)
+
+	expectedConfig := []dto.UserConfigResp{
+		{Channel: "e-mail", OptedIn: true},
+		{Channel: "sms", OptedIn: true},
+		{Channel: "in-app", OptedIn: true},
+	}
+
+	ctx := context.Background()
+	storage.OptOut(ctx, userId, []string{"e-mail"})
+
+	w := httptest.NewRecorder()
+
+	channelsReq := dto.ChannelsReq{Channels: []string{"e-mail"}}
+	marshalled, _ := json.Marshal(channelsReq)
+	reader := bytes.NewReader(marshalled)
+
+	req, _ := http.NewRequest("PUT", "/v0/users/notifications/opt-in", reader)
+	req.Header.Add("userId", userId)
+
+	router.ServeHTTP(w, req)
+
+	userConfig := make([]dto.UserConfigResp, 0)
+
+	if err := json.Unmarshal(w.Body.Bytes(), &userConfig); err != nil {
+		t.FailNow()
+	}
+
+	assert.Equal(t, 200, w.Code)
+	assert.ElementsMatch(t, expectedConfig, userConfig)
+}
+
+func TestOptOut(t *testing.T) {
+	storage := getStorage()
+	router := routes.SetupRoutes(&storage)
+
+	expectedConfig := []dto.UserConfigResp{
+		{Channel: "e-mail", OptedIn: true},
+		{Channel: "sms", OptedIn: false},
+		{Channel: "in-app", OptedIn: true},
+	}
+
+	w := httptest.NewRecorder()
+
+	channelsReq := dto.ChannelsReq{Channels: []string{"sms"}}
+	marshalled, _ := json.Marshal(channelsReq)
+	reader := bytes.NewReader(marshalled)
+
+	req, _ := http.NewRequest("PUT", "/v0/users/notifications/opt-out", reader)
+	req.Header.Add("userId", userId)
+
+	router.ServeHTTP(w, req)
+
+	userConfig := make([]dto.UserConfigResp, 0)
+
+	if err := json.Unmarshal(w.Body.Bytes(), &userConfig); err != nil {
+		t.FailNow()
+	}
+
+	assert.Equal(t, 200, w.Code)
+	assert.ElementsMatch(t, expectedConfig, userConfig)
 }

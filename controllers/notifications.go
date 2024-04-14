@@ -108,7 +108,8 @@ func (nc NotificationController) OptIn(c *gin.Context) {
 		return
 	}
 
-	userConf, err := nc.Storage.OptIn(c, "1231", ch.Channels)
+	userId := c.GetHeader(userIdHeaderKey)
+	userConf, err := nc.Storage.OptIn(c, userId, ch.Channels)
 
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
@@ -126,7 +127,8 @@ func (nc NotificationController) OptOut(c *gin.Context) {
 		return
 	}
 
-	userConf, err := nc.Storage.OptOut(c, "1231", ch.Channels)
+	userId := c.GetHeader(userIdHeaderKey)
+	userConf, err := nc.Storage.OptOut(c, userId, ch.Channels)
 
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
