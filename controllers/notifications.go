@@ -13,11 +13,10 @@ import (
 
 type NotificationStorage interface {
 	SaveNotification(ctx context.Context, notification dto.NotificationReq) (string, error)
-	GetUserNotifications(ctx context.Context, filters dto.NotificationFilters) ([]dto.UserNotificationResp, error)
-	GetUserConfig(ctx context.Context, userId string) ([]dto.UserConfigResp, error)
+	GetUserNotifications(ctx context.Context, filters dto.UserNotificationFilters) ([]dto.UserNotification, error)
+	GetUserConfig(ctx context.Context, userId string) ([]dto.ChannelConfig, error)
 	SetReadStatus(ctx context.Context, userId, notificationId string) error
-	OptOut(ctx context.Context, userId string, channels []string) ([]dto.UserConfigResp, error)
-	OptIn(ctx context.Context, userId string, channels []string) ([]dto.UserConfigResp, error)
+	UpdateUserConfig(ctx context.Context, userId string, config dto.UserConfig) error
 }
 
 type NotificationController struct {
@@ -27,7 +26,7 @@ type NotificationController struct {
 const userIdHeaderKey = "userId"
 
 func (nc NotificationController) GetUserNotifications(c *gin.Context) {
-	var filters dto.NotificationFilters
+	var filters dto.UserNotificationFilters
 
 	if err := c.ShouldBind(&filters); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -88,9 +87,6 @@ func (nc NotificationController) SetReadStatus(c *gin.Context) {
 		if errors.As(err, &internal.NotificationNotFound{}) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
-		} else if errors.As(err, &internal.RecipientNotFound{}) {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-			return
 		} else {
 			c.Status(http.StatusInternalServerError)
 			return
@@ -100,40 +96,14 @@ func (nc NotificationController) SetReadStatus(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-func (nc NotificationController) OptIn(c *gin.Context) {
-	var ch dto.ChannelsReq
+func (nc NotificationController) UpdateUserConfig(c *gin.Context) {
 
-	if err := c.ShouldBindJSON(&ch); err != nil {
+	var userConfig dto.UserConfig
+
+	if err := c.ShouldBindJSON(&userConfig); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	userId := c.GetHeader(userIdHeaderKey)
-	userConf, err := nc.Storage.OptIn(c, userId, ch.Channels)
-
-	if err != nil {
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-
-	c.JSON(http.StatusOK, userConf)
-}
-
-func (nc NotificationController) OptOut(c *gin.Context) {
-	var ch dto.ChannelsReq
-
-	if err := c.ShouldBindJSON(&ch); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	userId := c.GetHeader(userIdHeaderKey)
-	userConf, err := nc.Storage.OptOut(c, userId, ch.Channels)
-
-	if err != nil {
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-
-	c.JSON(http.StatusOK, userConf)
+	c.Status(http.StatusOK)
 }

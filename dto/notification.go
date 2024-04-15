@@ -9,14 +9,6 @@ type NotificationReq struct {
 	Channels   []string `json:"channels" binding:"unique,dive,oneof=e-mail sms in-app"`
 }
 
-type NotificationFilters struct {
-	UserId   string
-	Take     *int     `form:"take" binding:"omitempty,min=0"`
-	Skip     *int     `form:"skip" binding:"omitempty,min=0"`
-	Topics   []string `form:"topics" binding:"unique"`
-	Channels []string `form:"types" binding:"unique,dive,oneof=e-mail sms in-app"`
-}
-
 type NotificationUriParams struct {
 	NotificationId string `uri:"id" binding:"required,uuid"`
 }

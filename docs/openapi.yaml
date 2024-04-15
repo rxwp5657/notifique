@@ -6,7 +6,7 @@ info:
     name: MIT
     identifier: MIT License
 paths:
-  /users/notifications:
+  /notifications:
     get:
       summary: |
         Gets the user's in-app notifications
@@ -44,7 +44,6 @@ paths:
         "500":
           description: |
             Failed to retrieve the user's notifications.
-  /notifications:
     post:
       summary: Creates a new notification.
       requestBody:
@@ -64,7 +63,7 @@ paths:
             Failed to persist the notification. If a channel fails to deliver
             a message it won't trigger an error.
 
-  /users/notifications/config:
+  /notifications/config:
     get:
       summary: Get the user's notification configuration
       responses:
@@ -77,9 +76,28 @@ paths:
         "500":
           description: |
             Failed to retrieve the user's notification configuration.
+    patch:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserConfig'
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: |
+            If the supplied channel is not a valid channel.
+            If the snoozed at parameter is on the past.
+        "500":
+          description: |
+            Failed to store the new configuration.
+      description: |
+        Updates the user's configuration.
 
-  /users/notifications/{id}/read:
-    put:
+  /notifications/{id}:
+    patch:
       summary: Updates the notification's read status.
       parameters:
         - in: path
@@ -88,59 +106,6 @@ paths:
             type: string
             format: uuid
             required: true
-
-  /users/notifications/opt-in:
-    put:
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: array
-              minItems: 1
-              uniqueItems: true
-              items:
-                $ref: '#/components/schemas/Channel'
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserConfig'
-        "500":
-          description: |
-            Failed to retrieve the user's notification configuration.
-      description: |
-        Enables notifications of the supplied type through the
-        supplied channels for the user who made the request.
-
-  /users/notifications/opt-out:
-    put:
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: array
-              minItems: 1
-              uniqueItems: true
-              items:
-                $ref: '#/components/schemas/Channel'
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/UserConfig'
-        "500":
-          description: |
-            Failed to retrieve the user's notification configuration.
-
-      description: |
-        Disables notifications of the supplied type through the
-        supplied channels for the user who made the request.
 
 components:
 
@@ -189,7 +154,7 @@ components:
         - contents
         - topic
 
-    UserNotificationResponse:
+    UserNotification:
       type: object
       properties:
         id:
@@ -207,12 +172,6 @@ components:
           format: date-time
         topic:
           $ref: '#/components/schemas/Topic'
-        channels:
-           type: array
-           uniqueItems: true
-           description: array of delivery channels
-           items:
-            $ref: '#/components/schemas/Channel'
       required:
         - id
         - title
@@ -220,16 +179,24 @@ components:
         - topic
         - created_at
 
+    ChannelConfig:
+      type: object
+      properties:
+        channel:
+          $ref: '#/components/schemas/Channel'
+        optIn:
+          type: boolean
+        snoozeUntil:
+          type: string
+          format: date-time
+      required:
+        - channel
+
     UserConfig:
       type: array
       uniqueItems: true
       description: |
-        array of channels with a flag indicating if the user has the channel
-        enabled or not
+        Describes the user's configuration on the notification
+        system.
       items:
-        type: object
-        properties:
-          channel:
-            $ref: '#/components/schemas/Channel'
-          opted-in:
-            type: boolean
+        $ref: '#/components/schemas/ChannelConfig'

@@ -13,11 +13,10 @@ func SetupRoutes(ns c.NotificationStorage) *gin.Engine {
 
 	v0 := r.Group("/v0")
 	{
-		v0.GET("/users/notifications", controller.GetUserNotifications)
-		v0.GET("/users/notifications/config", controller.GetUserConfig)
-		v0.PUT("/users/notifications/:id/read", controller.SetReadStatus)
-		v0.PUT("/users/notifications/opt-in", controller.OptIn)
-		v0.PUT("/users/notifications/opt-out", controller.OptOut)
+		v0.GET("/notifications", controller.GetUserNotifications)
+		v0.GET("/notifications/config", controller.GetUserConfig)
+		v0.PATCH("/notifications/:id", controller.SetReadStatus)
+		v0.PATCH("/notifications/config", controller.UpdateUserConfig)
 
 		v0.POST("/notifications", controller.CreateNotification)
 	}
