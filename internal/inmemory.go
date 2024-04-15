@@ -13,6 +13,7 @@ type notification struct {
 	dto.NotificationReq
 	Id        string
 	CreatedAt time.Time
+	CreatedBy string
 }
 
 type InMemoryStorage struct {
@@ -21,12 +22,12 @@ type InMemoryStorage struct {
 	usersConfig       map[string][]dto.ChannelConfig
 }
 
-func (s *InMemoryStorage) SaveNotification(ctx context.Context, notificationReq dto.NotificationReq) (string, error) {
+func (s *InMemoryStorage) SaveNotification(ctx context.Context, createdBy string, notificationReq dto.NotificationReq) (string, error) {
 
 	id := uuid.NewString()
 	createdAt := time.Now()
 
-	n := notification{notificationReq, id, createdAt}
+	n := notification{notificationReq, id, createdAt, createdBy}
 
 	s.notifications[id] = n
 

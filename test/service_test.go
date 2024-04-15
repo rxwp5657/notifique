@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -22,6 +23,28 @@ func getStorage() internal.InMemoryStorage {
 	return internal.MakeInMemoryStorage()
 }
 
+func makeStrWithSize(size int) string {
+	field, i := "", 0
+
+	for i < size {
+		field += "+"
+		i += 1
+	}
+
+	return field
+}
+
+func copyNotification(notification dto.NotificationReq) dto.NotificationReq {
+	cp := notification
+	cp.Recipients = make([]string, len(notification.Recipients))
+	cp.Channels = make([]string, len(notification.Channels))
+
+	copy(cp.Recipients, notification.Recipients)
+	copy(cp.Channels, notification.Channels)
+
+	return cp
+}
+
 func TestGetUserNotifications(t *testing.T) {
 	storage := getStorage()
 	router := routes.SetupRoutes(&storage)
@@ -35,7 +58,7 @@ func TestGetUserNotifications(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	storage.SaveNotification(ctx, testNofitication)
+	storage.SaveNotification(ctx, userId, testNofitication)
 
 	w := httptest.NewRecorder()
 
@@ -104,7 +127,7 @@ func TestSetReadStatus(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	notificationId, _ := storage.SaveNotification(ctx, testNofitication)
+	notificationId, _ := storage.SaveNotification(ctx, userId, testNofitication)
 
 	w := httptest.NewRecorder()
 
@@ -142,4 +165,88 @@ func TestSetReadStatusOnMissingNotification(t *testing.T) {
 
 	assert.Equal(t, 404, w.Code)
 	assert.Equal(t, expectedError, resp["error"])
+}
+
+func TestUpdateUserConfig(t *testing.T) {
+}
+
+func TestCreateNotification(t *testing.T) {
+
+	storage := getStorage()
+	router := routes.SetupRoutes(&storage)
+
+	testNofitication := dto.NotificationReq{
+		Title:      "Notification 1",
+		Contents:   "Notification Contents 1",
+		Topic:      "Testing",
+		Recipients: []string{userId},
+		Channels:   []string{"in-app", "e-mail"},
+	}
+
+	callWithNotification := func(notification dto.NotificationReq) (*http.Request, *httptest.ResponseRecorder) {
+		body, _ := json.Marshal(notification)
+		reader := bytes.NewReader(body)
+
+		w := httptest.NewRecorder()
+
+		req, _ := http.NewRequest("POST", "/v0/notifications", reader)
+		req.Header.Add("userId", userId)
+
+		router.ServeHTTP(w, req)
+
+		return req, w
+	}
+
+	t.Run("Can create new notifications", func(t *testing.T) {
+		notification := copyNotification(testNofitication)
+		_, w := callWithNotification(notification)
+
+		assert.Equal(t, 204, w.Code)
+	})
+
+	t.Run("Should failed on bad channel", func(t *testing.T) {
+		notification := copyNotification(testNofitication)
+		notification.Channels = append(notification.Channels, "Bad Channel")
+
+		_, w := callWithNotification(notification)
+
+		assert.Equal(t, 400, w.Code)
+	})
+
+	t.Run("Should failed on long title", func(t *testing.T) {
+		notification := copyNotification(testNofitication)
+		notification.Title = makeStrWithSize(200)
+
+		_, w := callWithNotification(notification)
+
+		assert.Equal(t, 400, w.Code)
+	})
+
+	t.Run("Should failed on long contents", func(t *testing.T) {
+		notification := copyNotification(testNofitication)
+		notification.Contents = makeStrWithSize(1025)
+
+		_, w := callWithNotification(notification)
+
+		assert.Equal(t, 400, w.Code)
+	})
+
+	t.Run("Should failed on long topic", func(t *testing.T) {
+		notification := copyNotification(testNofitication)
+		notification.Topic = makeStrWithSize(200)
+
+		_, w := callWithNotification(notification)
+
+		assert.Equal(t, 400, w.Code)
+	})
+
+	t.Run("Should failed on duplicated recipients", func(t *testing.T) {
+		notification := copyNotification(testNofitication)
+		notification.Recipients = append(notification.Recipients, userId)
+
+		fmt.Println(notification)
+		_, w := callWithNotification(notification)
+
+		assert.Equal(t, 400, w.Code)
+	})
 }

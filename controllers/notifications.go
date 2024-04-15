@@ -12,7 +12,7 @@ import (
 )
 
 type NotificationStorage interface {
-	SaveNotification(ctx context.Context, notification dto.NotificationReq) (string, error)
+	SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error)
 	GetUserNotifications(ctx context.Context, filters dto.UserNotificationFilters) ([]dto.UserNotification, error)
 	GetUserConfig(ctx context.Context, userId string) ([]dto.ChannelConfig, error)
 	SetReadStatus(ctx context.Context, userId, notificationId string) error
@@ -64,7 +64,8 @@ func (nc NotificationController) CreateNotification(c *gin.Context) {
 		return
 	}
 
-	if _, err := nc.Storage.SaveNotification(c, notification); err != nil {
+	userId := c.GetHeader(userIdHeaderKey)
+	if _, err := nc.Storage.SaveNotification(c, userId, notification); err != nil {
 		c.Status(http.StatusInternalServerError)
 		return
 	}
