@@ -204,7 +204,7 @@ func TestCreateNotification(t *testing.T) {
 		assert.Equal(t, 204, w.Code)
 	})
 
-	t.Run("Should failed on bad channel", func(t *testing.T) {
+	t.Run("Should fail on bad channel", func(t *testing.T) {
 		notification := copyNotification(testNofitication)
 		notification.Channels = append(notification.Channels, "Bad Channel")
 
@@ -213,7 +213,7 @@ func TestCreateNotification(t *testing.T) {
 		assert.Equal(t, 400, w.Code)
 	})
 
-	t.Run("Should failed on long title", func(t *testing.T) {
+	t.Run("Should fail on long title", func(t *testing.T) {
 		notification := copyNotification(testNofitication)
 		notification.Title = makeStrWithSize(200)
 
@@ -222,7 +222,7 @@ func TestCreateNotification(t *testing.T) {
 		assert.Equal(t, 400, w.Code)
 	})
 
-	t.Run("Should failed on long contents", func(t *testing.T) {
+	t.Run("Should fail on long contents", func(t *testing.T) {
 		notification := copyNotification(testNofitication)
 		notification.Contents = makeStrWithSize(1025)
 
@@ -231,7 +231,7 @@ func TestCreateNotification(t *testing.T) {
 		assert.Equal(t, 400, w.Code)
 	})
 
-	t.Run("Should failed on long topic", func(t *testing.T) {
+	t.Run("Should fail on long topic", func(t *testing.T) {
 		notification := copyNotification(testNofitication)
 		notification.Topic = makeStrWithSize(200)
 
@@ -240,7 +240,7 @@ func TestCreateNotification(t *testing.T) {
 		assert.Equal(t, 400, w.Code)
 	})
 
-	t.Run("Should failed on duplicated recipients", func(t *testing.T) {
+	t.Run("Should fail on duplicated recipients", func(t *testing.T) {
 		notification := copyNotification(testNofitication)
 		notification.Recipients = append(notification.Recipients, userId)
 
