@@ -193,10 +193,13 @@ components:
         - channel
 
     UserConfig:
-      type: array
-      uniqueItems: true
-      description: |
-        Describes the user's configuration on the notification
-        system.
-      items:
-        $ref: '#/components/schemas/ChannelConfig'
+      type: object
+      properties:
+        config:
+          type: array
+          uniqueItems: true
+          description: |
+            Describes the user's configuration on the notification
+            system.
+          items:
+            $ref: '#/components/schemas/ChannelConfig'

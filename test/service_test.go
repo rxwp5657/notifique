@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -168,6 +169,63 @@ func TestSetReadStatusOnMissingNotification(t *testing.T) {
 }
 
 func TestUpdateUserConfig(t *testing.T) {
+	storage := getStorage()
+	router := routes.SetupRoutes(&storage)
+
+	callWithUserConfig := func(config []dto.ChannelConfig) (*http.Request, *httptest.ResponseRecorder) {
+
+		w := httptest.NewRecorder()
+
+		body := make(map[string][]dto.ChannelConfig)
+		body["config"] = config
+
+		marshalled, _ := json.Marshal(body)
+		reader := bytes.NewReader(marshalled)
+
+		req, _ := http.NewRequest("PATCH", "/v0/notifications/config", reader)
+		req.Header.Add("userId", userId)
+
+		router.ServeHTTP(w, req)
+
+		return req, w
+	}
+
+	t.Run("Can update the user config", func(t *testing.T) {
+
+		snoozeUntil := time.Now().AddDate(0, 0, 10).Format(time.RFC3339)
+
+		userConfig := []dto.ChannelConfig{
+			{Channel: "e-mail", OptIn: false, SnoozeUntil: nil},
+			{Channel: "sms", OptIn: true, SnoozeUntil: &snoozeUntil},
+		}
+
+		_, w := callWithUserConfig(userConfig)
+
+		assert.Equal(t, 200, w.Code)
+	})
+
+	t.Run("Should fail on bad channel", func(t *testing.T) {
+
+		userConfig := []dto.ChannelConfig{
+			{Channel: "BadChannel", OptIn: true, SnoozeUntil: nil},
+		}
+
+		_, w := callWithUserConfig(userConfig)
+
+		assert.Equal(t, 400, w.Code)
+	})
+
+	t.Run("Should fail when passing a snooze date in the past", func(t *testing.T) {
+		snoozeUntil := time.Now().AddDate(0, 0, -10).Format(time.RFC3339)
+
+		userConfig := []dto.ChannelConfig{
+			{Channel: "sms", OptIn: true, SnoozeUntil: &snoozeUntil},
+		}
+
+		_, w := callWithUserConfig(userConfig)
+
+		assert.Equal(t, 400, w.Code)
+	})
 }
 
 func TestCreateNotification(t *testing.T) {
@@ -244,7 +302,6 @@ func TestCreateNotification(t *testing.T) {
 		notification := copyNotification(testNofitication)
 		notification.Recipients = append(notification.Recipients, userId)
 
-		fmt.Println(notification)
 		_, w := callWithNotification(notification)
 
 		assert.Equal(t, 400, w.Code)

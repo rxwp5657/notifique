@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -135,8 +134,6 @@ func (s *InMemoryStorage) SetReadStatus(ctx context.Context, userId, notificatio
 			break
 		}
 	}
-
-	fmt.Println(s.userNotifications[userId])
 
 	if userNotification == nil {
 		return NotificationNotFound{notificationId}
