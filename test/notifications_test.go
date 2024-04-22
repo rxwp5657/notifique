@@ -10,8 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	c "github.com/notifique/controllers"
 	"github.com/notifique/dto"
 	"github.com/notifique/internal"
 	"github.com/notifique/routes"
@@ -22,6 +24,12 @@ const userId = "12345"
 
 func getStorage() internal.InMemoryStorage {
 	return internal.MakeInMemoryStorage()
+}
+
+func makeNotificationRouter(ns c.NotificationStorage) *gin.Engine {
+	r := gin.Default()
+	routes.SetupNotificationRoutes(r, ns)
+	return r
 }
 
 func makeStrWithSize(size int) string {
@@ -48,7 +56,7 @@ func copyNotification(notification dto.NotificationReq) dto.NotificationReq {
 
 func TestGetUserNotifications(t *testing.T) {
 	storage := getStorage()
-	router := routes.SetupRoutes(&storage)
+	router := makeNotificationRouter(&storage)
 
 	testNofitication := dto.NotificationReq{
 		Title:      "Notification 1",
@@ -91,7 +99,7 @@ func TestGetUserNotifications(t *testing.T) {
 
 func TestGetUserConfiguration(t *testing.T) {
 	storage := getStorage()
-	router := routes.SetupRoutes(&storage)
+	router := makeNotificationRouter(&storage)
 
 	expectedConfig := []dto.ChannelConfig{
 		{Channel: "e-mail", OptIn: true},
@@ -118,7 +126,7 @@ func TestGetUserConfiguration(t *testing.T) {
 
 func TestSetReadStatus(t *testing.T) {
 	storage := getStorage()
-	router := routes.SetupRoutes(&storage)
+	router := makeNotificationRouter(&storage)
 
 	testNofitication := dto.NotificationReq{
 		Title:      "Notification 1",
@@ -145,7 +153,7 @@ func TestSetReadStatus(t *testing.T) {
 
 func TestSetReadStatusOnMissingNotification(t *testing.T) {
 	storage := getStorage()
-	router := routes.SetupRoutes(&storage)
+	router := makeNotificationRouter(&storage)
 
 	notificationId := uuid.NewString()
 
@@ -172,7 +180,7 @@ func TestSetReadStatusOnMissingNotification(t *testing.T) {
 
 func TestUpdateUserConfig(t *testing.T) {
 	storage := getStorage()
-	router := routes.SetupRoutes(&storage)
+	router := makeNotificationRouter(&storage)
 
 	callWithUserConfig := func(config []dto.ChannelConfig) (*http.Request, *httptest.ResponseRecorder) {
 
@@ -233,7 +241,7 @@ func TestUpdateUserConfig(t *testing.T) {
 func TestCreateNotification(t *testing.T) {
 
 	storage := getStorage()
-	router := routes.SetupRoutes(&storage)
+	router := makeNotificationRouter(&storage)
 
 	testNofitication := dto.NotificationReq{
 		Title:      "Notification 1",

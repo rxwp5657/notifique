@@ -145,6 +145,30 @@ func (s *InMemoryStorage) SetReadStatus(ctx context.Context, userId, notificatio
 	return nil
 }
 
+func (s *InMemoryStorage) CreateDistributionList(ctx context.Context, distributionList dto.DistributionList) error {
+	return nil
+}
+
+func (s *InMemoryStorage) GetDistributionLists(ctx context.Context, filter dto.PageFilter) ([]dto.DistributionListSummary, error) {
+	summaries := make([]dto.DistributionListSummary, 0)
+
+	return summaries, nil
+}
+
+func (s *InMemoryStorage) GetRecipients(ctx context.Context, distlistName string, filter dto.PageFilter) ([]string, error) {
+	recipients := make([]string, 0)
+
+	return recipients, nil
+}
+
+func (s *InMemoryStorage) AddRecipients(ctx context.Context, distlistName string, recipients []string) error {
+	return nil
+}
+
+func (s *InMemoryStorage) DeleteRecipients(ctx context.Context, distlistName string, recipients []string) error {
+	return nil
+}
+
 func MakeInMemoryStorage() InMemoryStorage {
 	storage := InMemoryStorage{}
 

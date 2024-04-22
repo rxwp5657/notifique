@@ -9,9 +9,7 @@ import (
 	"github.com/notifique/internal"
 )
 
-func SetupRoutes(ns c.NotificationStorage) *gin.Engine {
-
-	r := gin.Default()
+func SetupNotificationRoutes(r *gin.Engine, ns c.NotificationStorage) {
 
 	controller := c.NotificationController{Storage: ns}
 
@@ -28,6 +26,4 @@ func SetupRoutes(ns c.NotificationStorage) *gin.Engine {
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
 		v.RegisterValidation("future", internal.FutureValidator)
 	}
-
-	return r
 }

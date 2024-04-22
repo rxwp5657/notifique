@@ -43,9 +43,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserNotification'
-        "500":
-          description: |
-            Failed to retrieve the user's notifications.
     post:
       summary: Creates a new notification.
       tags:
@@ -62,10 +59,6 @@ paths:
         "400":
           description: |
             Topic is not a string or doesn't comply with the specified constraints.
-        "500":
-          description: |
-            Failed to persist the notification. If a channel fails to deliver
-            a message it won't trigger an error.
 
   /notifications/config:
     get:
@@ -79,9 +72,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserConfig'
-        "500":
-          description: |
-            Failed to retrieve the user's notification configuration.
     patch:
       summary: Update the user's notification configuration.
       tags:
@@ -101,9 +91,6 @@ paths:
           description: |
             If the supplied channel is not a valid channel.
             If the snoozed at parameter is on the past.
-        "500":
-          description: |
-            Failed to store the new configuration.
 
   /notifications/{id}:
     patch:
@@ -121,9 +108,6 @@ paths:
         "404":
           description: |
             If the notification doesn't exists.
-        "500":
-          description: |
-            If the update fails for unknown reasons.
         "200":
           description: Ok
 
@@ -143,9 +127,6 @@ paths:
         "400":
           description: |
             The distribution list already exists.
-        "500":
-          description: |
-            Unknown error.
         "201":
           description: |
             The distribution list was created successfully.
@@ -174,11 +155,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DistributionListSummary'
-        "500":
-          description: |
-            Unknown error.
 
-  /distribution-lists/{id}/recipients:
+  /distribution-lists/{name}/recipients:
     get:
       summary: |
         Gets the users of the distribution list.
@@ -200,8 +178,6 @@ paths:
       responses:
         "200":
           description: OK
-        "500":
-          description: Unknown error.
     patch:
       summary: |
         Adds new users to the distribution list.
@@ -213,6 +189,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/UserIdList'
+      responses:
+        "204":
+          description: |
+            Users added successfully.
     delete:
       summary: |
         Deletes users from the distribution list.
@@ -224,6 +204,10 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/UserIdList'
+      responses:
+        "204":
+          description: |
+            Users added successfully.
 
 components:
 
@@ -351,11 +335,7 @@ components:
         name:
           $ref: '#/components/schemas/DistributionListName'
         recipients:
-          type: array
-          uniqueItems: true
-          description: array of user ids
-          items:
-            $ref: '#/components/schemas/UserId'
+          $ref: '#/components/schemas/UserIdList'
 
     DistributionListSummary:
       type: object
