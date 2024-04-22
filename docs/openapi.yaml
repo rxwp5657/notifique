@@ -10,6 +10,8 @@ paths:
     get:
       summary: |
         Gets the user's in-app notifications
+      tags:
+        - notifications
       parameters:
         - in: query
           name: take
@@ -46,6 +48,8 @@ paths:
             Failed to retrieve the user's notifications.
     post:
       summary: Creates a new notification.
+      tags:
+        - notifications
       requestBody:
         required: true
         content:
@@ -66,6 +70,8 @@ paths:
   /notifications/config:
     get:
       summary: Get the user's notification configuration
+      tags:
+        - notifications
       responses:
         "200":
           description: OK
@@ -77,6 +83,11 @@ paths:
           description: |
             Failed to retrieve the user's notification configuration.
     patch:
+      summary: Update the user's notification configuration.
+      tags:
+        - notifications
+      description: |
+        Updates the user's notification configuration.
       requestBody:
         required: true
         content:
@@ -93,12 +104,12 @@ paths:
         "500":
           description: |
             Failed to store the new configuration.
-      description: |
-        Updates the user's configuration.
 
   /notifications/{id}:
     patch:
       summary: Updates the notification's read status.
+      tags:
+        - notifications
       parameters:
         - in: path
           name: id
@@ -106,6 +117,113 @@ paths:
             type: string
             format: uuid
             required: true
+      responses:
+        "404":
+          description: |
+            If the notification doesn't exists.
+        "500":
+          description: |
+            If the update fails for unknown reasons.
+        "200":
+          description: Ok
+
+  /distribution-lists:
+    post:
+      summary: |
+        Creates a new distribution list.
+      tags:
+        - distribution list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DistributionList'
+      responses:
+        "400":
+          description: |
+            The distribution list already exists.
+        "500":
+          description: |
+            Unknown error.
+        "201":
+          description: |
+            The distribution list was created successfully.
+    get:
+      summary: |
+        Gets the available distribution lists with their number of recipients.
+      tags:
+        - distribution list
+      parameters:
+        - in: query
+          name: take
+          description: |
+            The number of distributed lists to display (used for pagination).
+          schema:
+            type: integer
+        - in: query
+          name: skip
+          description: |
+            Skips the top N distributed lists (used for pagination).
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DistributionListSummary'
+        "500":
+          description: |
+            Unknown error.
+
+  /distribution-lists/{id}/recipients:
+    get:
+      summary: |
+        Gets the users of the distribution list.
+      tags:
+        - distribution list
+      parameters:
+        - in: query
+          name: take
+          description: |
+            The number of users to display (used for pagination).
+          schema:
+            type: integer
+        - in: query
+          name: skip
+          description: |
+            Skips the top N users (used for pagination).
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: OK
+        "500":
+          description: Unknown error.
+    patch:
+      summary: |
+        Adds new users to the distribution list.
+      tags:
+        - distribution list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserIdList'
+    delete:
+      summary: |
+        Deletes users from the distribution list.
+      tags:
+        - distribution list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserIdList'
 
 components:
 
@@ -123,6 +241,25 @@ components:
          - sms
          - in-app
 
+    Priority:
+      type: string
+      enum:
+        - HIGH
+        - MEDIUM
+        - LOW
+
+    UserId:
+      type: string
+      minLenght: 1
+
+    UserIdList:
+      type: array
+      uniqueItems: true
+      description: array of user ids
+      maxItems: 256
+      items:
+        $ref: '#/components/schemas/UserId'      
+
     Notification:
       type: object
       properties:
@@ -138,21 +275,20 @@ components:
         topic:
           $ref: '#/components/schemas/Topic'
         recipients:
-          type: array
-          uniqueItems: true
-          description: array of user ids
-          items:
-            type: string
+          $ref: '#/components/schemas/UserIdList'
         channels:
            type: array
            uniqueItems: true
            description: array of delivery channels
            items:
             $ref: '#/components/schemas/Channel'
+        priority:
+          $ref: '#/components/schemas/Priority'
       required:
         - title
         - contents
         - topic
+        - priority
 
     UserNotification:
       type: object
@@ -203,3 +339,28 @@ components:
             system.
           items:
             $ref: '#/components/schemas/ChannelConfig'
+
+    DistributionListName:
+      type: string
+      minLength: 3
+      maxLength: 120
+
+    DistributionList:
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/DistributionListName'
+        recipients:
+          type: array
+          uniqueItems: true
+          description: array of user ids
+          items:
+            $ref: '#/components/schemas/UserId'
+
+    DistributionListSummary:
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/DistributionListName'
+        numberOfRecipients:
+          type: number

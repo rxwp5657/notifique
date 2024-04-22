@@ -54,6 +54,7 @@ func TestGetUserNotifications(t *testing.T) {
 		Title:      "Notification 1",
 		Contents:   "Notification Contents 1",
 		Topic:      "Testing",
+		Priority:   "HIGH",
 		Recipients: []string{userId},
 		Channels:   []string{"in-app", "e-mail"},
 	}
@@ -123,6 +124,7 @@ func TestSetReadStatus(t *testing.T) {
 		Title:      "Notification 1",
 		Contents:   "Notification Contents 1",
 		Topic:      "Testing",
+		Priority:   "LOW",
 		Recipients: []string{userId},
 		Channels:   []string{"in-app", "e-mail"},
 	}
@@ -237,6 +239,7 @@ func TestCreateNotification(t *testing.T) {
 		Title:      "Notification 1",
 		Contents:   "Notification Contents 1",
 		Topic:      "Testing",
+		Priority:   "MEDIUM",
 		Recipients: []string{userId},
 		Channels:   []string{"in-app", "e-mail"},
 	}
@@ -301,6 +304,15 @@ func TestCreateNotification(t *testing.T) {
 	t.Run("Should fail on duplicated recipients", func(t *testing.T) {
 		notification := copyNotification(testNofitication)
 		notification.Recipients = append(notification.Recipients, userId)
+
+		_, w := callWithNotification(notification)
+
+		assert.Equal(t, 400, w.Code)
+	})
+
+	t.Run("Should fail on invalid priority", func(t *testing.T) {
+		notification := copyNotification(testNofitication)
+		notification.Priority = "Bad Priority"
 
 		_, w := callWithNotification(notification)
 

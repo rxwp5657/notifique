@@ -5,6 +5,7 @@ type NotificationReq struct {
 	Contents   string   `json:"contents" binding:"required,max=1024"`
 	Image      *string  `json:"image" binding:"omitempty,uri"`
 	Topic      string   `json:"topic" binding:"required,min=1,max=120"`
+	Priority   string   `json:"priority" binding:"oneof=HIGH MEDIUM LOW"`
 	Recipients []string `json:"recipients" binding:"unique"`
 	Channels   []string `json:"channels" binding:"unique,dive,oneof=e-mail sms in-app"`
 }
