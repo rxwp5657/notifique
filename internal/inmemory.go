@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,10 +16,16 @@ type notification struct {
 	CreatedBy string
 }
 
+type distributionList struct {
+	Name       string
+	Recipients map[string]struct{}
+}
+
 type InMemoryStorage struct {
 	notifications     map[string]notification
 	userNotifications map[string][]dto.UserNotification
 	usersConfig       map[string][]dto.ChannelConfig
+	distributionLists []distributionList
 }
 
 func (s *InMemoryStorage) SaveNotification(ctx context.Context, createdBy string, notificationReq dto.NotificationReq) (string, error) {
@@ -145,27 +152,146 @@ func (s *InMemoryStorage) SetReadStatus(ctx context.Context, userId, notificatio
 	return nil
 }
 
-func (s *InMemoryStorage) CreateDistributionList(ctx context.Context, distributionList dto.DistributionList) error {
+func (s *InMemoryStorage) CreateDistributionList(ctx context.Context, newDL dto.DistributionList) error {
+
+	dlName := newDL.Name
+
+	for _, dl := range s.distributionLists {
+		if dl.Name == dlName {
+			return DistributionListAlreadyExists{dlName}
+		}
+	}
+
+	dl := distributionList{}
+	dl.Name = newDL.Name
+	dl.Recipients = make(map[string]struct{}, 0)
+
+	s.distributionLists = append(s.distributionLists, dl)
+
+	for _, recipient := range newDL.Recipients {
+		dl.Recipients[recipient] = struct{}{}
+	}
+
+	sort.Slice(s.distributionLists, func(i, j int) bool {
+		return s.distributionLists[i].Name < s.distributionLists[j].Name
+	})
+
 	return nil
 }
 
 func (s *InMemoryStorage) GetDistributionLists(ctx context.Context, filter dto.PageFilter) ([]dto.DistributionListSummary, error) {
-	summaries := make([]dto.DistributionListSummary, 0)
+
+	skip := 0
+
+	if filter.Skip != nil {
+		skip = *filter.Skip
+	}
+
+	lists := s.distributionLists[skip:]
+	take := min(len(lists), 50)
+
+	if filter.Take != nil {
+		take = min(len(lists), *filter.Take)
+	}
+
+	summaries := make([]dto.DistributionListSummary, 0, take)
+
+	for _, dl := range lists[:take] {
+
+		summary := dto.DistributionListSummary{
+			Name:               dl.Name,
+			NumberOfRecipients: len(dl.Recipients),
+		}
+
+		summaries = append(summaries, summary)
+	}
 
 	return summaries, nil
 }
 
 func (s *InMemoryStorage) GetRecipients(ctx context.Context, distlistName string, filter dto.PageFilter) ([]string, error) {
-	recipients := make([]string, 0)
+
+	var dl *distributionList = nil
+
+	for _, list := range s.distributionLists {
+		if list.Name == distlistName {
+			dl = &list
+			break
+		}
+	}
+
+	if dl == nil {
+		return make([]string, 0), DistributionListNotFound{distlistName}
+	}
+
+	recipients := make([]string, 0, len(dl.Recipients))
+
+	for recipient := range dl.Recipients {
+		recipients = append(recipients, recipient)
+	}
+
+	sort.Slice(recipients, func(i int, j int) bool {
+		return recipients[i] < recipients[j]
+	})
+
+	skip := 0
+
+	if filter.Skip != nil {
+		skip = min(len(recipients), *filter.Skip)
+	}
+
+	recipients = recipients[skip:]
+
+	take := min(len(recipients), 50)
+
+	if filter.Take != nil {
+		take = min(len(recipients), *filter.Take)
+	}
+
+	recipients = recipients[:take]
 
 	return recipients, nil
 }
 
 func (s *InMemoryStorage) AddRecipients(ctx context.Context, distlistName string, recipients []string) error {
+	var dl *distributionList
+
+	for _, dlist := range s.distributionLists {
+		if dlist.Name == distlistName {
+			dl = &dlist
+			break
+		}
+	}
+
+	if dl == nil {
+		return DistributionListNotFound{distlistName}
+	}
+
+	for _, recipient := range recipients {
+		dl.Recipients[recipient] = struct{}{}
+	}
+
 	return nil
 }
 
 func (s *InMemoryStorage) DeleteRecipients(ctx context.Context, distlistName string, recipients []string) error {
+	var dl *distributionList
+
+	for _, dlist := range s.distributionLists {
+		if dlist.Name == distlistName {
+			dl = &dlist
+			break
+		}
+	}
+
+	if dl == nil {
+		return DistributionListNotFound{distlistName}
+	}
+
+	for _, recipient := range recipients {
+		delete(dl.Recipients, recipient)
+	}
+
 	return nil
 }
 
@@ -175,6 +301,7 @@ func MakeInMemoryStorage() InMemoryStorage {
 	storage.notifications = make(map[string]notification)
 	storage.userNotifications = make(map[string][]dto.UserNotification)
 	storage.usersConfig = make(map[string][]dto.ChannelConfig)
+	storage.distributionLists = make([]distributionList, 0)
 
 	return storage
 }

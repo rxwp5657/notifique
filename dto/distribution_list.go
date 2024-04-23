@@ -1,13 +1,13 @@
 package dto
 
 type DistributionList struct {
-	Name       string `json:"name" binding:"max=120,min=3"`
-	Recipients string `json:"recipients" binding:"max=256,unique,dive,min=1"`
+	Name       string   `json:"name" binding:"max=120,min=3"`
+	Recipients []string `json:"recipients" binding:"max=256,unique,dive,min=1"`
 }
 
 type DistributionListSummary struct {
 	Name               string `json:"name"`
-	NumberOfRecipients string `json:"numberOfRecipients"`
+	NumberOfRecipients int    `json:"numberOfRecipients"`
 }
 
 type DistributionListRecipients struct {

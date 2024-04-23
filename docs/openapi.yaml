@@ -178,6 +178,8 @@ paths:
       responses:
         "200":
           description: OK
+        "404":
+          description: The distribution list doesn't exists
     patch:
       summary: |
         Adds new users to the distribution list.
@@ -193,6 +195,9 @@ paths:
         "204":
           description: |
             Users added successfully.
+        "400":
+          description: |
+            The distribution list doesn't exists
     delete:
       summary: |
         Deletes users from the distribution list.
@@ -208,6 +213,9 @@ paths:
         "204":
           description: |
             Users added successfully.
+        "400":
+          description: |
+            The distribution list doesn't exists
 
 components:
 

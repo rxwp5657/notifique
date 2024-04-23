@@ -15,9 +15,8 @@ func SetupDistributionListRoutes(r *gin.Engine, dls c.DistributionListStorage) {
 		v0.GET("/distribution-lists", controller.GetDistributionLists)
 		v0.POST("/distribution-lists", controller.CreateDistributionList)
 
+		v0.GET("/distribution-lists/:id/recipients", controller.GetRecipients)
 		v0.PATCH("/distribution-lists/:id/recipients", controller.AddRecipients)
 		v0.DELETE("/distribution-lists/:id/recipients", controller.DeleteRecipients)
-		v0.GET("/distribution-lists/:id/recipients", controller.GetRecipients)
 	}
-
 }

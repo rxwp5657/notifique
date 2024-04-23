@@ -15,16 +15,11 @@ import (
 
 	c "github.com/notifique/controllers"
 	"github.com/notifique/dto"
-	"github.com/notifique/internal"
 	"github.com/notifique/routes"
 	"github.com/stretchr/testify/assert"
 )
 
 const userId = "12345"
-
-func getStorage() internal.InMemoryStorage {
-	return internal.MakeInMemoryStorage()
-}
 
 func makeNotificationRouter(ns c.NotificationStorage) *gin.Engine {
 	r := gin.Default()
