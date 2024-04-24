@@ -23,6 +23,16 @@ func makeDistributionListRouter(dls c.DistributionListStorage) *gin.Engine {
 	return r
 }
 
+func makeRecipientsList(numRecipients int) []string {
+	recipients := make([]string, 0, numRecipients)
+
+	for i := range numRecipients {
+		recipients = append(recipients, fmt.Sprint(i))
+	}
+
+	return recipients
+}
+
 func TestCreateDistributionList(t *testing.T) {
 	storage := getStorage()
 	router := makeDistributionListRouter(&storage)
@@ -143,7 +153,7 @@ func TestGetDistributionListRecipients(t *testing.T) {
 	ctx := context.Background()
 	storage.CreateDistributionList(ctx, dl)
 
-	getRecipients := func(dlName string, filters *dto.PageFilter) (*http.Request, *httptest.ResponseRecorder) {
+	getRecipients := func(dlName string, filters *dto.PageFilter) *httptest.ResponseRecorder {
 
 		w := httptest.NewRecorder()
 
@@ -166,12 +176,12 @@ func TestGetDistributionListRecipients(t *testing.T) {
 
 		router.ServeHTTP(w, req)
 
-		return req, w
+		return w
 	}
 
 	t.Run("Should be able to retrieve the recipients", func(t *testing.T) {
 
-		_, w := getRecipients(dl.Name, nil)
+		w := getRecipients(dl.Name, nil)
 
 		resp := make([]string, 0)
 
@@ -186,7 +196,7 @@ func TestGetDistributionListRecipients(t *testing.T) {
 	t.Run("Should fail if the distribution list doesn't exists", func(t *testing.T) {
 
 		missingDL := "Missing"
-		_, w := getRecipients(missingDL, nil)
+		w := getRecipients(missingDL, nil)
 
 		resp := make(map[string]string, 0)
 
@@ -209,7 +219,7 @@ func TestGetDistributionListRecipients(t *testing.T) {
 			Take: &take,
 		}
 
-		_, w := getRecipients(dl.Name, &filters)
+		w := getRecipients(dl.Name, &filters)
 
 		resp := make([]string, 0)
 
@@ -219,5 +229,136 @@ func TestGetDistributionListRecipients(t *testing.T) {
 
 		assert.Equal(t, 200, w.Code)
 		assert.Equal(t, []string{"2"}, resp)
+	})
+}
+
+func TestAddRecipeints(t *testing.T) {
+
+	storage := getStorage()
+	router := makeDistributionListRouter(&storage)
+
+	dl := dto.DistributionList{
+		Name:       "TestDL",
+		Recipients: []string{"1", "2", "123"},
+	}
+
+	ctx := context.Background()
+	storage.CreateDistributionList(ctx, dl)
+
+	addRecipients := func(dlName string, recipients []string) *httptest.ResponseRecorder {
+
+		w := httptest.NewRecorder()
+
+		body := make(map[string][]string)
+		body["recipients"] = recipients
+
+		marshalled, _ := json.Marshal(body)
+		reader := bytes.NewReader(marshalled)
+
+		url := fmt.Sprintf("/v0/distribution-lists/%v/recipients", dlName)
+
+		req, _ := http.NewRequest("PATCH", url, reader)
+		req.Header.Add("userId", userId)
+
+		router.ServeHTTP(w, req)
+
+		return w
+	}
+
+	t.Run("Should be able to add recipients", func(t *testing.T) {
+
+		newRecipients := []string{"3", "4", "123"}
+
+		w := addRecipients(dl.Name, newRecipients)
+
+		assert.Equal(t, 204, w.Code)
+
+	})
+
+	t.Run("Should fail if the distribution list doesn't exists", func(t *testing.T) {
+
+		w := addRecipients("Missing", []string{})
+
+		assert.Equal(t, 400, w.Code)
+	})
+
+	t.Run("Should fail when adding empty recipients", func(t *testing.T) {
+		newRecipients := []string{""}
+
+		w := addRecipients(dl.Name, newRecipients)
+
+		assert.Equal(t, 400, w.Code)
+	})
+
+	t.Run("Should fail when exceeding the number of recipients", func(t *testing.T) {
+		newRecipients := makeRecipientsList(260)
+
+		w := addRecipients(dl.Name, newRecipients)
+
+		assert.Equal(t, 400, w.Code)
+	})
+}
+
+func TestRemoveRecipeints(t *testing.T) {
+
+	storage := getStorage()
+	router := makeDistributionListRouter(&storage)
+
+	dl := dto.DistributionList{
+		Name:       "TestDL",
+		Recipients: []string{"1", "2", "123"},
+	}
+
+	ctx := context.Background()
+	storage.CreateDistributionList(ctx, dl)
+
+	deleteRecipients := func(dlName string, recipients []string) *httptest.ResponseRecorder {
+
+		w := httptest.NewRecorder()
+
+		body := make(map[string][]string)
+		body["recipients"] = recipients
+
+		marshalled, _ := json.Marshal(body)
+		reader := bytes.NewReader(marshalled)
+
+		url := fmt.Sprintf("/v0/distribution-lists/%v/recipients", dlName)
+
+		req, _ := http.NewRequest("DELETE", url, reader)
+		req.Header.Add("userId", userId)
+
+		router.ServeHTTP(w, req)
+
+		return w
+	}
+
+	t.Run("Should be able to delete recipients", func(t *testing.T) {
+		toDelete := []string{"1", "2"}
+
+		w := deleteRecipients(dl.Name, toDelete)
+
+		assert.Equal(t, 204, w.Code)
+	})
+
+	t.Run("Should fail if the distribution list doesn't exists", func(t *testing.T) {
+		w := deleteRecipients("Missing", []string{})
+
+		assert.Equal(t, 400, w.Code)
+	})
+
+	t.Run("Should fail when adding empty recipients", func(t *testing.T) {
+		toDelete := []string{""}
+
+		w := deleteRecipients(dl.Name, toDelete)
+
+		assert.Equal(t, 400, w.Code)
+	})
+
+	t.Run("Should fail when exceeding the number of recipients", func(t *testing.T) {
+		toDelete := makeRecipientsList(260)
+
+		w := deleteRecipients(dl.Name, toDelete)
+
+		assert.Equal(t, 400, w.Code)
 	})
 }
