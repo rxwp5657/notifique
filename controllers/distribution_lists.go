@@ -15,15 +15,15 @@ type DistributionListStorage interface {
 	CreateDistributionList(ctx context.Context, distributionList dto.DistributionList) error
 	GetDistributionLists(ctx context.Context, filter dto.PageFilter) ([]dto.DistributionListSummary, error)
 	GetRecipients(ctx context.Context, distlistName string, filter dto.PageFilter) ([]string, error)
-	AddRecipients(ctx context.Context, distlistName string, recipients []string) error
-	DeleteRecipients(ctx context.Context, distlistName string, recipients []string) error
+	AddRecipients(ctx context.Context, distlistName string, recipients []string) (dto.DistributionListSummary, error)
+	DeleteRecipients(ctx context.Context, distlistName string, recipients []string) (dto.DistributionListSummary, error)
 }
 
 type DistributionListController struct {
 	Storage DistributionListStorage
 }
 
-type recipientsHandler func(context.Context, string, []string) error
+type recipientsHandler func(context.Context, string, []string) (dto.DistributionListSummary, error)
 
 func (dc DistributionListController) CreateDistributionList(c *gin.Context) {
 	var dl dto.DistributionList
@@ -116,7 +116,7 @@ func (dc DistributionListController) handleRecipients(c *gin.Context, handler re
 		return
 	}
 
-	err := handler(c, uriParams.Name, recipients.Recipients)
+	summary, err := handler(c, uriParams.Name, recipients.Recipients)
 
 	if err != nil {
 		if errors.As(err, &internal.DistributionListNotFound{}) {
@@ -128,5 +128,5 @@ func (dc DistributionListController) handleRecipients(c *gin.Context, handler re
 		}
 	}
 
-	c.Status(http.StatusNoContent)
+	c.JSON(http.StatusOK, summary)
 }

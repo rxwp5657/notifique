@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"sort"
 	"time"
 
@@ -253,7 +254,7 @@ func (s *InMemoryStorage) GetRecipients(ctx context.Context, distlistName string
 	return recipients, nil
 }
 
-func (s *InMemoryStorage) AddRecipients(ctx context.Context, distlistName string, recipients []string) error {
+func (s *InMemoryStorage) AddRecipients(ctx context.Context, distlistName string, recipients []string) (dto.DistributionListSummary, error) {
 	var dl *distributionList
 
 	for _, dlist := range s.distributionLists {
@@ -264,17 +265,23 @@ func (s *InMemoryStorage) AddRecipients(ctx context.Context, distlistName string
 	}
 
 	if dl == nil {
-		return DistributionListNotFound{distlistName}
+		err := DistributionListNotFound{distlistName}
+		return dto.DistributionListSummary{}, err
 	}
 
 	for _, recipient := range recipients {
 		dl.Recipients[recipient] = struct{}{}
 	}
 
-	return nil
+	summary := dto.DistributionListSummary{
+		Name:               dl.Name,
+		NumberOfRecipients: len(dl.Recipients),
+	}
+
+	return summary, nil
 }
 
-func (s *InMemoryStorage) DeleteRecipients(ctx context.Context, distlistName string, recipients []string) error {
+func (s *InMemoryStorage) DeleteRecipients(ctx context.Context, distlistName string, recipients []string) (dto.DistributionListSummary, error) {
 	var dl *distributionList
 
 	for _, dlist := range s.distributionLists {
@@ -285,14 +292,22 @@ func (s *InMemoryStorage) DeleteRecipients(ctx context.Context, distlistName str
 	}
 
 	if dl == nil {
-		return DistributionListNotFound{distlistName}
+		err := DistributionListNotFound{distlistName}
+		return dto.DistributionListSummary{}, err
 	}
 
 	for _, recipient := range recipients {
 		delete(dl.Recipients, recipient)
 	}
 
-	return nil
+	fmt.Println(dl)
+
+	summary := dto.DistributionListSummary{
+		Name:               dl.Name,
+		NumberOfRecipients: len(dl.Recipients),
+	}
+
+	return summary, nil
 }
 
 func MakeInMemoryStorage() InMemoryStorage {

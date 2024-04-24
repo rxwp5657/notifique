@@ -269,10 +269,21 @@ func TestAddRecipeints(t *testing.T) {
 
 		newRecipients := []string{"3", "4", "123"}
 
+		expectedSummary := dto.DistributionListSummary{
+			Name:               dl.Name,
+			NumberOfRecipients: 5,
+		}
+
 		w := addRecipients(dl.Name, newRecipients)
 
-		assert.Equal(t, 204, w.Code)
+		resp := dto.DistributionListSummary{}
 
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.FailNow()
+		}
+
+		assert.Equal(t, 200, w.Code)
+		assert.Equal(t, expectedSummary, resp)
 	})
 
 	t.Run("Should fail if the distribution list doesn't exists", func(t *testing.T) {
@@ -335,9 +346,21 @@ func TestRemoveRecipeints(t *testing.T) {
 	t.Run("Should be able to delete recipients", func(t *testing.T) {
 		toDelete := []string{"1", "2"}
 
+		expectedSummary := dto.DistributionListSummary{
+			Name:               dl.Name,
+			NumberOfRecipients: 1,
+		}
+
 		w := deleteRecipients(dl.Name, toDelete)
 
-		assert.Equal(t, 204, w.Code)
+		resp := dto.DistributionListSummary{}
+
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.FailNow()
+		}
+
+		assert.Equal(t, 200, w.Code)
+		assert.Equal(t, expectedSummary, resp)
 	})
 
 	t.Run("Should fail if the distribution list doesn't exists", func(t *testing.T) {
