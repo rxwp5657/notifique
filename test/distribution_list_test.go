@@ -105,7 +105,7 @@ func TestGetDistributionLists(t *testing.T) {
 		{Name: "TestDL3", Recipients: []string{}},
 	}
 
-	expectedResp := []dto.DistributionListSummary{
+	summaries := []dto.DistributionListSummary{
 		{Name: lists[0].Name, NumberOfRecipients: len(lists[0].Recipients)},
 		{Name: lists[1].Name, NumberOfRecipients: len(lists[1].Recipients)},
 		{Name: lists[2].Name, NumberOfRecipients: len(lists[2].Recipients)},
@@ -117,21 +117,82 @@ func TestGetDistributionLists(t *testing.T) {
 		storage.CreateDistributionList(ctx, list)
 	}
 
-	w := httptest.NewRecorder()
+	getDistributionLists := func(filters *dto.PageFilter) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
 
-	req, _ := http.NewRequest("GET", "/v0/distribution-lists", nil)
-	req.Header.Add("userId", userId)
+		req, _ := http.NewRequest("GET", "/v0/distribution-lists", nil)
+		req.Header.Add("userId", userId)
 
-	router.ServeHTTP(w, req)
+		if filters != nil {
+			q := req.URL.Query()
+			if filters.Page != nil {
+				q.Add("page", fmt.Sprint(*filters.Page))
+			}
+			if filters.PageSize != nil {
+				q.Add("pageSize", fmt.Sprint(*filters.PageSize))
+			}
 
-	resp := make([]dto.DistributionListSummary, 0)
+			req.URL.RawQuery = q.Encode()
+		}
 
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.FailNow()
+		router.ServeHTTP(w, req)
+
+		return w
 	}
 
-	assert.Equal(t, 200, w.Code)
-	assert.Equal(t, expectedResp, resp)
+	t.Run("Should be able to retrieve distribution lists", func(t *testing.T) {
+
+		w := getDistributionLists(nil)
+
+		expectedResp := dto.Page[dto.DistributionListSummary]{
+			CurrentPage:  1,
+			NextPage:     nil,
+			PrevPage:     nil,
+			TotalPages:   1,
+			TotalRecords: len(lists),
+			Data:         summaries,
+		}
+
+		resp := dto.Page[dto.DistributionListSummary]{}
+
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.FailNow()
+		}
+
+		assert.Equal(t, 200, w.Code)
+		assert.Equal(t, expectedResp, resp)
+	})
+
+	t.Run("Should be able to apply filters", func(t *testing.T) {
+
+		page, pageSize := 1, 1
+
+		filters := dto.PageFilter{
+			Page:     &page,
+			PageSize: &pageSize,
+		}
+
+		w := getDistributionLists(&filters)
+
+		nextPage := 2
+		expectedResp := dto.Page[dto.DistributionListSummary]{
+			CurrentPage:  1,
+			NextPage:     &nextPage,
+			PrevPage:     nil,
+			TotalPages:   3,
+			TotalRecords: len(lists),
+			Data:         summaries[0:1],
+		}
+
+		resp := dto.Page[dto.DistributionListSummary]{}
+
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.FailNow()
+		}
+
+		assert.Equal(t, 200, w.Code)
+		assert.Equal(t, expectedResp, resp)
+	})
 }
 
 func TestGetDistributionListRecipients(t *testing.T) {
@@ -164,11 +225,11 @@ func TestGetDistributionListRecipients(t *testing.T) {
 
 		if filters != nil {
 			q := req.URL.Query()
-			if filters.Skip != nil {
-				q.Add("skip", fmt.Sprint(*filters.Skip))
+			if filters.Page != nil {
+				q.Add("page", fmt.Sprint(*filters.Page))
 			}
-			if filters.Take != nil {
-				q.Add("take", fmt.Sprint(*filters.Take))
+			if filters.PageSize != nil {
+				q.Add("pageSize", fmt.Sprint(*filters.PageSize))
 			}
 
 			req.URL.RawQuery = q.Encode()
@@ -183,14 +244,23 @@ func TestGetDistributionListRecipients(t *testing.T) {
 
 		w := getRecipients(dl.Name, nil)
 
-		resp := make([]string, 0)
+		expectedResponse := dto.Page[string]{
+			CurrentPage:  1,
+			NextPage:     nil,
+			PrevPage:     nil,
+			TotalPages:   1,
+			TotalRecords: 3,
+			Data:         sortedRecipients,
+		}
+
+		resp := dto.Page[string]{}
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 			t.FailNow()
 		}
 
 		assert.Equal(t, 200, w.Code)
-		assert.Equal(t, sortedRecipients, resp)
+		assert.Equal(t, expectedResponse, resp)
 	})
 
 	t.Run("Should fail if the distribution list doesn't exists", func(t *testing.T) {
@@ -212,23 +282,33 @@ func TestGetDistributionListRecipients(t *testing.T) {
 	})
 
 	t.Run("Should be able to apply filters", func(t *testing.T) {
-		take, skip := 1, 2
+		page, pageSize := 1, 1
 
 		filters := dto.PageFilter{
-			Skip: &skip,
-			Take: &take,
+			Page:     &page,
+			PageSize: &pageSize,
+		}
+
+		nextPage := 2
+		expectedResponse := dto.Page[string]{
+			CurrentPage:  1,
+			NextPage:     &nextPage,
+			PrevPage:     nil,
+			TotalPages:   3,
+			TotalRecords: 3,
+			Data:         []string{"1"},
 		}
 
 		w := getRecipients(dl.Name, &filters)
 
-		resp := make([]string, 0)
+		resp := dto.Page[string]{}
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 			t.FailNow()
 		}
 
 		assert.Equal(t, 200, w.Code)
-		assert.Equal(t, []string{"2"}, resp)
+		assert.Equal(t, expectedResponse, resp)
 	})
 }
 

@@ -14,15 +14,15 @@ paths:
         - notifications
       parameters:
         - in: query
-          name: take
+          name: pageSize
           description: |
-            The number of notifications to take (used for pagination).
+            The number of notifications to retrieve.
           schema:
             type: integer
         - in: query
-          name: skip
+          name: page
           description: |
-            Skips the top N newest notifications (used for pagination).
+            Page number
           schema:
             type: integer
         - in: query
@@ -42,7 +42,12 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UserNotification'
+                allOf:
+                  - $ref: '#/components/schemas/PageResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserNotification'
     post:
       summary: Creates a new notification.
       tags:
@@ -137,15 +142,15 @@ paths:
         - distribution list
       parameters:
         - in: query
-          name: take
+          name: pageSize
           description: |
-            The number of distributed lists to display (used for pagination).
+            The number of distributed lists to retrieve.
           schema:
             type: integer
         - in: query
-          name: skip
+          name: page
           description: |
-            Skips the top N distributed lists (used for pagination).
+            Page number
           schema:
             type: integer
       responses:
@@ -154,9 +159,14 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DistributionListSummary'
+                allOf:
+                  - $ref: '#/components/schemas/PageResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DistributionListSummary'
 
-  /distribution-lists/{name}/recipients:
+  /distribution-lists/{id}/recipients:
     get:
       summary: |
         Gets the users of the distribution list.
@@ -164,20 +174,29 @@ paths:
         - distribution list
       parameters:
         - in: query
-          name: take
+          name: pageSize
           description: |
-            The number of users to display (used for pagination).
+            The number of users to retrieve.
           schema:
             type: integer
         - in: query
-          name: skip
+          name: page
           description: |
-            Skips the top N users (used for pagination).
+            Page number.
           schema:
             type: integer
       responses:
         "200":
           description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserIdList'
         "404":
           description: The distribution list doesn't exists
 
@@ -354,7 +373,26 @@ components:
     DistributionListSummary:
       type: object
       properties:
+        id:
+          type: string
+          format: uuid
         name:
           $ref: '#/components/schemas/DistributionListName'
         numberOfRecipients:
           type: number
+    
+    PageResponse:
+      type: object
+      properties:
+        currentPage:
+          type: integer
+        nextPage:
+          type: integer
+          nullable: true
+        prevPage:
+          type: integer
+          nullable: true
+        totalPages:
+          type: integer
+        totalRecords:
+          type: integer

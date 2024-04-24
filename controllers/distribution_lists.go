@@ -13,8 +13,8 @@ import (
 
 type DistributionListStorage interface {
 	CreateDistributionList(ctx context.Context, distributionList dto.DistributionList) error
-	GetDistributionLists(ctx context.Context, filter dto.PageFilter) ([]dto.DistributionListSummary, error)
-	GetRecipients(ctx context.Context, distlistName string, filter dto.PageFilter) ([]string, error)
+	GetDistributionLists(ctx context.Context, filter dto.PageFilter) (dto.Page[dto.DistributionListSummary], error)
+	GetRecipients(ctx context.Context, distlistName string, filter dto.PageFilter) (dto.Page[string], error)
 	AddRecipients(ctx context.Context, distlistName string, recipients []string) (dto.DistributionListSummary, error)
 	DeleteRecipients(ctx context.Context, distlistName string, recipients []string) (dto.DistributionListSummary, error)
 }

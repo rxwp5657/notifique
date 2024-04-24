@@ -2,7 +2,7 @@ package internal
 
 import (
 	"context"
-	"fmt"
+	"math"
 	"sort"
 	"time"
 
@@ -180,24 +180,51 @@ func (s *InMemoryStorage) CreateDistributionList(ctx context.Context, newDL dto.
 	return nil
 }
 
-func (s *InMemoryStorage) GetDistributionLists(ctx context.Context, filter dto.PageFilter) ([]dto.DistributionListSummary, error) {
+func makePage[T any](page, pageSize, totalRecords int, data []T) dto.Page[T] {
 
-	skip := 0
+	totalPages := int(math.Ceil(float64(totalRecords) / float64(pageSize)))
 
-	if filter.Skip != nil {
-		skip = *filter.Skip
+	var nextPage *int = nil
+	var prevPage *int = nil
+
+	if page+1 <= totalPages {
+		np := page + 1
+		nextPage = &np
 	}
 
-	lists := s.distributionLists[skip:]
-	take := min(len(lists), 50)
-
-	if filter.Take != nil {
-		take = min(len(lists), *filter.Take)
+	if page != 1 {
+		pp := page - 1
+		prevPage = &pp
 	}
 
-	summaries := make([]dto.DistributionListSummary, 0, take)
+	return dto.Page[T]{
+		CurrentPage:  page,
+		NextPage:     nextPage,
+		PrevPage:     prevPage,
+		TotalPages:   totalPages,
+		TotalRecords: totalRecords,
+		Data:         data,
+	}
 
-	for _, dl := range lists[:take] {
+}
+
+func (s *InMemoryStorage) GetDistributionLists(ctx context.Context, filter dto.PageFilter) (dto.Page[dto.DistributionListSummary], error) {
+
+	page, pageSize := 1, min(len(s.distributionLists), 500)
+
+	if filter.Page != nil {
+		page = *filter.Page
+	}
+
+	if filter.PageSize != nil {
+		pageSize = *filter.PageSize
+		pageSize = min(pageSize, len(s.distributionLists)-(page-1)*pageSize)
+	}
+
+	lists := s.distributionLists[(page-1)*pageSize:]
+	summaries := make([]dto.DistributionListSummary, 0, pageSize)
+
+	for _, dl := range lists[:pageSize] {
 
 		summary := dto.DistributionListSummary{
 			Name:               dl.Name,
@@ -207,10 +234,10 @@ func (s *InMemoryStorage) GetDistributionLists(ctx context.Context, filter dto.P
 		summaries = append(summaries, summary)
 	}
 
-	return summaries, nil
+	return makePage(page, pageSize, len(s.distributionLists), summaries), nil
 }
 
-func (s *InMemoryStorage) GetRecipients(ctx context.Context, distlistName string, filter dto.PageFilter) ([]string, error) {
+func (s *InMemoryStorage) GetRecipients(ctx context.Context, distlistName string, filter dto.PageFilter) (dto.Page[string], error) {
 
 	var dl *distributionList = nil
 
@@ -222,7 +249,7 @@ func (s *InMemoryStorage) GetRecipients(ctx context.Context, distlistName string
 	}
 
 	if dl == nil {
-		return make([]string, 0), DistributionListNotFound{distlistName}
+		return dto.Page[string]{}, DistributionListNotFound{distlistName}
 	}
 
 	recipients := make([]string, 0, len(dl.Recipients))
@@ -235,23 +262,23 @@ func (s *InMemoryStorage) GetRecipients(ctx context.Context, distlistName string
 		return recipients[i] < recipients[j]
 	})
 
-	skip := 0
+	page := 1
 
-	if filter.Skip != nil {
-		skip = min(len(recipients), *filter.Skip)
+	if filter.Page != nil {
+		page = *filter.Page
 	}
 
-	recipients = recipients[skip:]
+	pageSize := min(len(recipients), 500)
 
-	take := min(len(recipients), 50)
-
-	if filter.Take != nil {
-		take = min(len(recipients), *filter.Take)
+	if filter.PageSize != nil {
+		pageSize = *filter.PageSize
+		pageSize = min(pageSize, len(recipients)-(page-1)*pageSize)
 	}
 
-	recipients = recipients[:take]
+	filteredRecipients := recipients[(page-1)*pageSize:]
+	filteredRecipients = filteredRecipients[:pageSize]
 
-	return recipients, nil
+	return makePage(page, pageSize, len(recipients), filteredRecipients), nil
 }
 
 func (s *InMemoryStorage) AddRecipients(ctx context.Context, distlistName string, recipients []string) (dto.DistributionListSummary, error) {
@@ -299,8 +326,6 @@ func (s *InMemoryStorage) DeleteRecipients(ctx context.Context, distlistName str
 	for _, recipient := range recipients {
 		delete(dl.Recipients, recipient)
 	}
-
-	fmt.Println(dl)
 
 	summary := dto.DistributionListSummary{
 		Name:               dl.Name,

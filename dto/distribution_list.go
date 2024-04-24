@@ -6,6 +6,7 @@ type DistributionList struct {
 }
 
 type DistributionListSummary struct {
+	Id                 string `json:"id"`
 	Name               string `json:"name"`
 	NumberOfRecipients int    `json:"numberOfRecipients"`
 }
