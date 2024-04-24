@@ -1,10 +1,10 @@
 package dto
 
 type UserNotificationFilters struct {
-	UserId string
-	Take   *int     `form:"take" binding:"omitempty,min=0"`
-	Skip   *int     `form:"skip" binding:"omitempty,min=0"`
-	Topics []string `form:"topics" binding:"unique"`
+	UserId   string
+	Page     *int     `form:"page" binding:"omitempty,min=0"`
+	PageSize *int     `form:"pageSize" binding:"omitempty,min=0"`
+	Topics   []string `form:"topics" binding:"unique"`
 }
 
 type UserNotification struct {

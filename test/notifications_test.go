@@ -72,17 +72,17 @@ func TestGetUserNotifications(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 
-	notifications := make([]dto.UserNotification, 0)
+	page := dto.Page[dto.UserNotification]{}
 
-	if err := json.Unmarshal(w.Body.Bytes(), &notifications); err != nil {
+	if err := json.Unmarshal(w.Body.Bytes(), &page); err != nil {
 		t.Fatalf("Failed to unmarshal response")
 	}
 
-	if len(notifications) == 0 {
+	if len(page.Data) == 0 {
 		t.Fatalf("Num notifications is zero, expected at least one")
 	}
 
-	notification := notifications[0]
+	notification := page.Data[0]
 
 	assert.Equal(t, 200, w.Code)
 	assert.Equal(t, notification.Title, testNofitication.Title)
@@ -90,6 +90,12 @@ func TestGetUserNotifications(t *testing.T) {
 	assert.Equal(t, notification.Topic, testNofitication.Topic)
 	assert.Nil(t, notification.ReadAt)
 	assert.NotEmpty(t, notification.CreatedAt)
+
+	assert.Equal(t, 1, page.CurrentPage)
+	assert.Nil(t, page.NextPage)
+	assert.Nil(t, page.PrevPage)
+	assert.Equal(t, 1, page.TotalPages)
+	assert.Equal(t, 1, page.TotalRecords)
 }
 
 func TestGetUserConfiguration(t *testing.T) {

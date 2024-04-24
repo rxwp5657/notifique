@@ -13,7 +13,7 @@ import (
 
 type NotificationStorage interface {
 	SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error)
-	GetUserNotifications(ctx context.Context, filters dto.UserNotificationFilters) ([]dto.UserNotification, error)
+	GetUserNotifications(ctx context.Context, filters dto.UserNotificationFilters) (dto.Page[dto.UserNotification], error)
 	GetUserConfig(ctx context.Context, userId string) ([]dto.ChannelConfig, error)
 	SetReadStatus(ctx context.Context, userId, notificationId string) error
 	UpdateUserConfig(ctx context.Context, userId string, config dto.UserConfig) error

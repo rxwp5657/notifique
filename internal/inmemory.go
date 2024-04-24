@@ -67,7 +67,7 @@ func (s *InMemoryStorage) SaveNotification(ctx context.Context, createdBy string
 	return id, nil
 }
 
-func (s *InMemoryStorage) GetUserNotifications(ctx context.Context, filters dto.UserNotificationFilters) ([]dto.UserNotification, error) {
+func (s *InMemoryStorage) GetUserNotifications(ctx context.Context, filters dto.UserNotificationFilters) (dto.Page[dto.UserNotification], error) {
 	userNotifications := make([]dto.UserNotification, 0)
 
 	topicsSet := make(map[string]struct{})
@@ -82,16 +82,24 @@ func (s *InMemoryStorage) GetUserNotifications(ctx context.Context, filters dto.
 		}
 	}
 
-	if filters.Skip != nil {
-		userNotifications = userNotifications[*filters.Skip:]
+	page := 1
+
+	if filters.Page != nil {
+		page = *filters.Page
 	}
 
-	if filters.Take != nil {
-		take := min(*filters.Take, len(userNotifications))
-		userNotifications = userNotifications[:take]
+	pageSize := min(len(userNotifications), 15)
+
+	if filters.PageSize != nil {
+		pageSize = *filters.PageSize
+		pageSize = min(pageSize, len(userNotifications)-(page-1)*pageSize)
 	}
 
-	return userNotifications, nil
+	totalRecords := len(userNotifications)
+	userNotifications = userNotifications[(page-1)*pageSize:]
+	userNotifications = userNotifications[:page]
+
+	return makePage(page, pageSize, totalRecords, userNotifications), nil
 }
 
 func makeNewUserConfig() []dto.ChannelConfig {
