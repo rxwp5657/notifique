@@ -55,6 +55,28 @@ func TestCreateDistributionList(t *testing.T) {
 	assert.Equal(t, 201, w.Code)
 }
 
+func TestCreateDistributionListWithBadName(t *testing.T) {
+	storage := getStorage()
+	router := makeDistributionListRouter(&storage)
+
+	dl := dto.DistributionList{
+		Name:       "TestDL/BadToken",
+		Recipients: []string{"1", "2", "123"},
+	}
+
+	w := httptest.NewRecorder()
+
+	marshalled, _ := json.Marshal(dl)
+	reader := bytes.NewReader(marshalled)
+
+	req, _ := http.NewRequest("POST", "/v0/distribution-lists", reader)
+	req.Header.Add("userId", userId)
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, 400, w.Code)
+}
+
 func TestCreateDuplicatedDistributionList(t *testing.T) {
 	storage := getStorage()
 	router := makeDistributionListRouter(&storage)

@@ -166,13 +166,17 @@ paths:
                       data:
                         $ref: '#/components/schemas/DistributionListSummary'
 
-  /distribution-lists/{id}/recipients:
+  /distribution-lists/{name}/recipients:
     get:
       summary: |
         Gets the users of the distribution list.
       tags:
         - distribution list
       parameters:
+        - in: path
+          name: name
+          schema:
+            $ref: '#/components/schemas/DistributionListName'
         - in: query
           name: pageSize
           description: |
@@ -205,6 +209,11 @@ paths:
         Adds new users to the distribution list.
       tags:
         - distribution list
+      parameters:
+        - in: path
+          name: name
+          schema:
+            $ref: '#/components/schemas/DistributionListName'
       requestBody:
         required: true
         content:
@@ -226,6 +235,11 @@ paths:
         Deletes users from the distribution list.
       tags:
         - distribution list
+      parameters:
+        - in: path
+          name: name
+          schema:
+            $ref: '#/components/schemas/DistributionListName'
       requestBody:
         required: true
         content:
@@ -275,7 +289,7 @@ components:
       description: array of user ids
       maxItems: 256
       items:
-        $ref: '#/components/schemas/UserId'      
+        $ref: '#/components/schemas/UserId'
 
     Notification:
       type: object
@@ -293,6 +307,8 @@ components:
           $ref: '#/components/schemas/Topic'
         recipients:
           $ref: '#/components/schemas/UserIdList'
+        distributionList:
+          $ref: '#/components/schemas/DistributionListName'
         channels:
            type: array
            uniqueItems: true
@@ -359,8 +375,9 @@ components:
 
     DistributionListName:
       type: string
-      minLength: 3
+      minLength: 1
       maxLength: 120
+      pattern: '[A-Za-z0-9$#@-_]+'
 
     DistributionList:
       type: object
