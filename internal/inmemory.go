@@ -29,7 +29,31 @@ type InMemoryStorage struct {
 	distributionLists []distributionList
 }
 
+func (s *InMemoryStorage) getDistributionList(name string) *distributionList {
+
+	var dl *distributionList = nil
+
+	for _, list := range s.distributionLists {
+		if list.Name == name {
+			dl = &list
+			break
+		}
+	}
+
+	return dl
+}
+
 func (s *InMemoryStorage) SaveNotification(ctx context.Context, createdBy string, notificationReq dto.NotificationReq) (string, error) {
+
+	var dl *distributionList = nil
+
+	if notificationReq.DistributionList != nil {
+		dlName := *notificationReq.DistributionList
+		dl = s.getDistributionList(dlName)
+		if dl == nil {
+			return "", DistributionListNotFound{dlName}
+		}
+	}
 
 	id := uuid.NewString()
 	createdAt := time.Now()
@@ -62,6 +86,12 @@ func (s *InMemoryStorage) SaveNotification(ctx context.Context, createdBy string
 
 	for _, recipient := range notificationReq.Recipients {
 		s.userNotifications[recipient] = append(s.userNotifications[recipient], userNotification)
+	}
+
+	if dl != nil {
+		for recipient := range dl.Recipients {
+			s.userNotifications[recipient] = append(s.userNotifications[recipient], userNotification)
+		}
 	}
 
 	return id, nil
@@ -165,10 +195,8 @@ func (s *InMemoryStorage) CreateDistributionList(ctx context.Context, newDL dto.
 
 	dlName := newDL.Name
 
-	for _, dl := range s.distributionLists {
-		if dl.Name == dlName {
-			return DistributionListAlreadyExists{dlName}
-		}
+	if dl := s.getDistributionList(dlName); dl != nil {
+		return DistributionListAlreadyExists{dlName}
 	}
 
 	dl := distributionList{}
@@ -247,14 +275,7 @@ func (s *InMemoryStorage) GetDistributionLists(ctx context.Context, filter dto.P
 
 func (s *InMemoryStorage) GetRecipients(ctx context.Context, distlistName string, filter dto.PageFilter) (dto.Page[string], error) {
 
-	var dl *distributionList = nil
-
-	for _, list := range s.distributionLists {
-		if list.Name == distlistName {
-			dl = &list
-			break
-		}
-	}
+	dl := s.getDistributionList(distlistName)
 
 	if dl == nil {
 		return dto.Page[string]{}, DistributionListNotFound{distlistName}
@@ -290,14 +311,8 @@ func (s *InMemoryStorage) GetRecipients(ctx context.Context, distlistName string
 }
 
 func (s *InMemoryStorage) AddRecipients(ctx context.Context, distlistName string, recipients []string) (dto.DistributionListSummary, error) {
-	var dl *distributionList
 
-	for _, dlist := range s.distributionLists {
-		if dlist.Name == distlistName {
-			dl = &dlist
-			break
-		}
-	}
+	dl := s.getDistributionList(distlistName)
 
 	if dl == nil {
 		err := DistributionListNotFound{distlistName}
@@ -317,14 +332,8 @@ func (s *InMemoryStorage) AddRecipients(ctx context.Context, distlistName string
 }
 
 func (s *InMemoryStorage) DeleteRecipients(ctx context.Context, distlistName string, recipients []string) (dto.DistributionListSummary, error) {
-	var dl *distributionList
 
-	for _, dlist := range s.distributionLists {
-		if dlist.Name == distlistName {
-			dl = &dlist
-			break
-		}
-	}
+	dl := s.getDistributionList(distlistName)
 
 	if dl == nil {
 		err := DistributionListNotFound{distlistName}

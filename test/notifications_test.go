@@ -245,12 +245,13 @@ func TestCreateNotification(t *testing.T) {
 	router := makeNotificationRouter(&storage)
 
 	testNofitication := dto.NotificationReq{
-		Title:      "Notification 1",
-		Contents:   "Notification Contents 1",
-		Topic:      "Testing",
-		Priority:   "MEDIUM",
-		Recipients: []string{userId},
-		Channels:   []string{"in-app", "e-mail"},
+		Title:            "Notification 1",
+		Contents:         "Notification Contents 1",
+		Topic:            "Testing",
+		Priority:         "MEDIUM",
+		DistributionList: nil,
+		Recipients:       []string{userId},
+		Channels:         []string{"in-app", "e-mail"},
 	}
 
 	callWithNotification := func(notification dto.NotificationReq) (*http.Request, *httptest.ResponseRecorder) {

@@ -64,6 +64,7 @@ paths:
         "400":
           description: |
             Topic is not a string or doesn't comply with the specified constraints.
+            Distribution list doesn' exists.
 
   /notifications/config:
     get:
