@@ -13,6 +13,7 @@ import (
 
 type NotificationStorage interface {
 	SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error)
+	CreateUserNotification(ctx context.Context, userId string, notification dto.UserNotificationReq) (string, error)
 	GetUserNotifications(ctx context.Context, filters dto.UserNotificationFilters) (dto.Page[dto.UserNotification], error)
 	GetUserConfig(ctx context.Context, userId string) ([]dto.ChannelConfig, error)
 	SetReadStatus(ctx context.Context, userId, notificationId string) error
@@ -42,6 +43,31 @@ func (nc NotificationController) GetUserNotifications(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, notifications)
+}
+
+func (nc NotificationController) CreateUserNotification(c *gin.Context) {
+	var uriParam dto.UserNotificationUriParam
+
+	if err := c.ShouldBindUri(&uriParam); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var userNotification dto.UserNotificationReq
+
+	if err := c.ShouldBindJSON(&userNotification); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err := nc.Storage.CreateUserNotification(c, uriParam.Id, userNotification)
+
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.Status(http.StatusCreated)
 }
 
 func (nc NotificationController) GetUserConfig(c *gin.Context) {

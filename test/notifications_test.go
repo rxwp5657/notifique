@@ -53,21 +53,18 @@ func TestGetUserNotifications(t *testing.T) {
 	storage := getStorage()
 	router := makeNotificationRouter(&storage)
 
-	testNofitication := dto.NotificationReq{
-		Title:      "Notification 1",
-		Contents:   "Notification Contents 1",
-		Topic:      "Testing",
-		Priority:   "HIGH",
-		Recipients: []string{userId},
-		Channels:   []string{"in-app", "e-mail"},
+	testNofitication := dto.UserNotificationReq{
+		Title:    "Notification 1",
+		Contents: "Notification Contents 1",
+		Topic:    "Testing",
 	}
 
 	ctx := context.Background()
-	storage.SaveNotification(ctx, userId, testNofitication)
+	storage.CreateUserNotification(ctx, userId, testNofitication)
 
 	w := httptest.NewRecorder()
 
-	req, _ := http.NewRequest("GET", "/v0/notifications", nil)
+	req, _ := http.NewRequest("GET", "/v0/users/me/notifications", nil)
 	req.Header.Add("userId", userId)
 
 	router.ServeHTTP(w, req)
@@ -110,7 +107,7 @@ func TestGetUserConfiguration(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	req, _ := http.NewRequest("GET", "/v0/notifications/config", nil)
+	req, _ := http.NewRequest("GET", "/v0/users/me/notifications/config", nil)
 	req.Header.Add("userId", userId)
 
 	router.ServeHTTP(w, req)
@@ -129,21 +126,18 @@ func TestSetReadStatus(t *testing.T) {
 	storage := getStorage()
 	router := makeNotificationRouter(&storage)
 
-	testNofitication := dto.NotificationReq{
-		Title:      "Notification 1",
-		Contents:   "Notification Contents 1",
-		Topic:      "Testing",
-		Priority:   "LOW",
-		Recipients: []string{userId},
-		Channels:   []string{"in-app", "e-mail"},
+	testNofitication := dto.UserNotificationReq{
+		Title:    "Notification 1",
+		Contents: "Notification Contents 1",
+		Topic:    "Testing",
 	}
 
 	ctx := context.Background()
-	notificationId, _ := storage.SaveNotification(ctx, userId, testNofitication)
+	notificationId, _ := storage.CreateUserNotification(ctx, userId, testNofitication)
 
 	w := httptest.NewRecorder()
 
-	url := fmt.Sprintf("/v0/notifications/%s", notificationId)
+	url := fmt.Sprintf("/v0/users/me/notifications/%s", notificationId)
 	req, _ := http.NewRequest("PATCH", url, nil)
 	req.Header.Add("userId", userId)
 
@@ -163,7 +157,7 @@ func TestSetReadStatusOnMissingNotification(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	url := fmt.Sprintf("/v0/notifications/%s", notificationId)
+	url := fmt.Sprintf("/v0/users/me/notifications/%s", notificationId)
 	req, _ := http.NewRequest("PATCH", url, nil)
 	req.Header.Add("userId", userId)
 
@@ -193,7 +187,7 @@ func TestUpdateUserConfig(t *testing.T) {
 		marshalled, _ := json.Marshal(body)
 		reader := bytes.NewReader(marshalled)
 
-		req, _ := http.NewRequest("PATCH", "/v0/notifications/config", reader)
+		req, _ := http.NewRequest("PATCH", "/v0/users/me/notifications/config", reader)
 		req.Header.Add("userId", userId)
 
 		router.ServeHTTP(w, req)
