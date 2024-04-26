@@ -487,3 +487,26 @@ func TestRemoveRecipeints(t *testing.T) {
 		assert.Equal(t, 400, w.Code)
 	})
 }
+
+func TestDeleteDistributionList(t *testing.T) {
+	storage := getStorage()
+	router := makeDistributionListRouter(&storage)
+
+	dl := dto.DistributionList{
+		Name:       "TestDL",
+		Recipients: []string{"1", "2", "123"},
+	}
+
+	storage.CreateDistributionList(context.Background(), dl)
+
+	w := httptest.NewRecorder()
+
+	url := fmt.Sprintf("/v0/distribution-lists/%v", dl.Name)
+
+	req, _ := http.NewRequest("DELETE", url, nil)
+	req.Header.Add("userId", userId)
+
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, 204, w.Code)
+}

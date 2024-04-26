@@ -14,6 +14,7 @@ import (
 type DistributionListStorage interface {
 	CreateDistributionList(ctx context.Context, distributionList dto.DistributionList) error
 	GetDistributionLists(ctx context.Context, filter dto.PageFilter) (dto.Page[dto.DistributionListSummary], error)
+	DeleteDistributionList(ctx context.Context, distlistName string) error
 	GetRecipients(ctx context.Context, distlistName string, filter dto.PageFilter) (dto.Page[string], error)
 	AddRecipients(ctx context.Context, distlistName string, recipients []string) (dto.DistributionListSummary, error)
 	DeleteRecipients(ctx context.Context, distlistName string, recipients []string) (dto.DistributionListSummary, error)
@@ -91,6 +92,25 @@ func (dc DistributionListController) GetRecipients(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, recipients)
+}
+
+func (dc DistributionListController) DeleteDistributionList(c *gin.Context) {
+
+	var uriParams dto.DistributionListUriParams
+
+	if err := c.ShouldBindUri(&uriParams); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := dc.Storage.DeleteDistributionList(c, uriParams.Name)
+
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
 func (dc DistributionListController) AddRecipients(c *gin.Context) {

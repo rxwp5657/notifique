@@ -15,5 +15,5 @@ type DistributionListRecipients struct {
 }
 
 type DistributionListUriParams struct {
-	Name string `uri:"id" binding:"max=120,min=3"`
+	Name string `uri:"name" binding:"max=120,min=3"`
 }

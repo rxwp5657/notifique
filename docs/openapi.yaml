@@ -6,12 +6,12 @@ info:
     name: MIT
     identifier: MIT License
 paths:
-  /notifications:
+  /users/me/notifications:
     get:
       summary: |
         Gets the user's in-app notifications
       tags:
-        - notifications
+        - users
       parameters:
         - in: query
           name: pageSize
@@ -48,6 +48,51 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/UserNotification'
+
+  /users/{id}/notifications:
+    post:
+      summary: Creates a new in-app user notification.
+    tags:
+      - users
+    parameters:
+    - in: path
+      name: id
+      description: user id.
+      schema:
+        $ref: '#/components/schemas/DistributionListName'
+    requestBody:
+      required: true
+      content:
+        application/json:
+            schema:
+              $ref: '#/components/schemas/UserNotificationReq'
+    responses:
+      "201":
+        description: Notification created.
+      "400":
+        description: Some validation failed.
+
+  /users/me/notifications/{id}:
+    patch:
+      summary: Updates the notification's read status.
+      tags:
+        - users
+      parameters:
+        - in: path
+          name: id
+          description: notification id.
+          schema:
+            type: string
+            format: uuid
+            required: true
+      responses:
+        "404":
+          description: |
+            If the notification doesn't exists.
+        "200":
+          description: Ok
+
+  /notifications:
     post:
       summary: Creates a new notification.
       tags:
@@ -66,7 +111,7 @@ paths:
             Topic is not a string or doesn't comply with the specified constraints.
             Distribution list doesn' exists.
 
-  /notifications/config:
+  /users/me/notifications/config:
     get:
       summary: Get the user's notification configuration
       tags:
@@ -97,25 +142,6 @@ paths:
           description: |
             If the supplied channel is not a valid channel.
             If the snoozed at parameter is on the past.
-
-  /notifications/{id}:
-    patch:
-      summary: Updates the notification's read status.
-      tags:
-        - notifications
-      parameters:
-        - in: path
-          name: id
-          schema:
-            type: string
-            format: uuid
-            required: true
-      responses:
-        "404":
-          description: |
-            If the notification doesn't exists.
-        "200":
-          description: Ok
 
   /distribution-lists:
     post:
@@ -166,6 +192,20 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/DistributionListSummary'
+
+  /distribution-lists/{name}:
+    delete:
+      summary: Delete distribution list
+    tags:
+      - distribution lists
+    parameters:
+      - in: path
+        name: name
+        schema:
+          $ref: '#/components/schemas/DistributionListName'
+    responses:
+      "204":
+        description: No content.
 
   /distribution-lists/{name}/recipients:
     get:
@@ -334,6 +374,9 @@ components:
           type: string
         contents:
           type: string
+        image:
+          type: string
+          format: uri
         read_at:
           type: string
           format: date-time
@@ -348,6 +391,19 @@ components:
         - contents
         - topic
         - created_at
+
+    UserNotificationReq:
+      type: object
+      properties:
+        title:
+          type: string
+        contents:
+          type: string
+        topic:
+          $ref: '#/components/schemas/Topic'
+        image:
+          type: string
+          format: uri
 
     ChannelConfig:
       type: object

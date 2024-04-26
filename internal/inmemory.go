@@ -45,11 +45,9 @@ func (s *InMemoryStorage) getDistributionList(name string) *distributionList {
 
 func (s *InMemoryStorage) SaveNotification(ctx context.Context, createdBy string, notificationReq dto.NotificationReq) (string, error) {
 
-	var dl *distributionList = nil
-
 	if notificationReq.DistributionList != nil {
 		dlName := *notificationReq.DistributionList
-		dl = s.getDistributionList(dlName)
+		dl := s.getDistributionList(dlName)
 		if dl == nil {
 			return "", DistributionListNotFound{dlName}
 		}
@@ -62,37 +60,24 @@ func (s *InMemoryStorage) SaveNotification(ctx context.Context, createdBy string
 
 	s.notifications[id] = n
 
-	hasInAppChannel := false
+	return id, nil
+}
 
-	for _, channel := range notificationReq.Channels {
-		if channel == "in-app" {
-			hasInAppChannel = true
-			break
-		}
-	}
+func (s *InMemoryStorage) CreateUserNotification(ctx context.Context, userId string, notification dto.UserNotificationReq) (string, error) {
 
-	if !hasInAppChannel {
-		return id, nil
-	}
+	id := uuid.NewString()
 
-	userNotification := dto.UserNotification{
+	un := dto.UserNotification{
 		Id:        id,
-		Title:     notificationReq.Title,
-		Contents:  notificationReq.Contents,
-		CreatedAt: createdAt.String(),
+		Title:     notification.Title,
+		Contents:  notification.Contents,
+		CreatedAt: time.Now().String(),
+		Image:     nil,
 		ReadAt:    nil,
-		Topic:     notificationReq.Topic,
+		Topic:     notification.Topic,
 	}
 
-	for _, recipient := range notificationReq.Recipients {
-		s.userNotifications[recipient] = append(s.userNotifications[recipient], userNotification)
-	}
-
-	if dl != nil {
-		for recipient := range dl.Recipients {
-			s.userNotifications[recipient] = append(s.userNotifications[recipient], userNotification)
-		}
-	}
+	s.userNotifications[userId] = append(s.userNotifications[userId], un)
 
 	return id, nil
 }
@@ -350,6 +335,20 @@ func (s *InMemoryStorage) DeleteRecipients(ctx context.Context, distlistName str
 	}
 
 	return summary, nil
+}
+
+func (s *InMemoryStorage) DeleteDistributionList(ctx context.Context, distlistName string) error {
+	lists := make([]distributionList, 0)
+
+	for _, dl := range s.distributionLists {
+		if dl.Name != distlistName {
+			lists = append(lists, dl)
+		}
+	}
+
+	s.distributionLists = lists
+
+	return nil
 }
 
 func MakeInMemoryStorage() InMemoryStorage {
