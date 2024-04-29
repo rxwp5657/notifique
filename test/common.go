@@ -1,7 +1,7 @@
 package main
 
-import "github.com/notifique/internal"
+import "github.com/notifique/internal/storage"
 
-func getStorage() internal.InMemoryStorage {
-	return internal.MakeInMemoryStorage()
+func getStorage() storage.InMemoryStorage {
+	return storage.MakeInMemoryStorage()
 }

@@ -1,4 +1,4 @@
-package internal
+package storage
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/notifique/dto"
+	e "github.com/notifique/internal"
 )
 
 type notification struct {
@@ -49,7 +50,7 @@ func (s *InMemoryStorage) SaveNotification(ctx context.Context, createdBy string
 		dlName := *notificationReq.DistributionList
 		dl := s.getDistributionList(dlName)
 		if dl == nil {
-			return "", DistributionListNotFound{dlName}
+			return "", e.DistributionListNotFound{Name: dlName}
 		}
 	}
 
@@ -167,7 +168,7 @@ func (s *InMemoryStorage) SetReadStatus(ctx context.Context, userId, notificatio
 	}
 
 	if userNotification == nil {
-		return NotificationNotFound{notificationId}
+		return e.NotificationNotFound{NotificationId: notificationId}
 	} else {
 		readAt := time.Now().String()
 		userNotification.ReadAt = &readAt
@@ -181,7 +182,7 @@ func (s *InMemoryStorage) CreateDistributionList(ctx context.Context, newDL dto.
 	dlName := newDL.Name
 
 	if dl := s.getDistributionList(dlName); dl != nil {
-		return DistributionListAlreadyExists{dlName}
+		return e.DistributionListAlreadyExists{Name: dlName}
 	}
 
 	dl := distributionList{}
@@ -263,7 +264,7 @@ func (s *InMemoryStorage) GetRecipients(ctx context.Context, distlistName string
 	dl := s.getDistributionList(distlistName)
 
 	if dl == nil {
-		return dto.Page[string]{}, DistributionListNotFound{distlistName}
+		return dto.Page[string]{}, e.DistributionListNotFound{Name: distlistName}
 	}
 
 	recipients := make([]string, 0, len(dl.Recipients))
@@ -300,7 +301,7 @@ func (s *InMemoryStorage) AddRecipients(ctx context.Context, distlistName string
 	dl := s.getDistributionList(distlistName)
 
 	if dl == nil {
-		err := DistributionListNotFound{distlistName}
+		err := e.DistributionListNotFound{Name: distlistName}
 		return dto.DistributionListSummary{}, err
 	}
 
@@ -321,7 +322,7 @@ func (s *InMemoryStorage) DeleteRecipients(ctx context.Context, distlistName str
 	dl := s.getDistributionList(distlistName)
 
 	if dl == nil {
-		err := DistributionListNotFound{distlistName}
+		err := e.DistributionListNotFound{Name: distlistName}
 		return dto.DistributionListSummary{}, err
 	}
 

@@ -23,3 +23,7 @@ run: vet
 deploy-dynamodb: vet
 	go run ./cmd/deployments/dynamodb/main.go
 .PHONY:deploy-dynamodb
+
+test: vet
+	go test ./test
+.PHONY:test
