@@ -2,13 +2,13 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/notifique/internal"
+	"github.com/notifique/internal/storage"
 	"github.com/notifique/routes"
 )
 
 func main() {
 
-	storage := internal.MakeInMemoryStorage()
+	storage := storage.MakeInMemoryStorage()
 	r := gin.Default()
 
 	routes.SetupNotificationRoutes(r, &storage)

@@ -19,3 +19,7 @@ build: vet
 run: vet
 	go run ./server.go
 .PHONY:run
+
+test: vet
+	go test ./test
+.PHONY:test
