@@ -18,7 +18,7 @@ type UserNotification struct {
 }
 
 type UserNotificationUriParam struct {
-	Id string `form:"id"`
+	Id string `uri:"id"`
 }
 
 type UserNotificationReq struct {

@@ -24,81 +24,11 @@ const (
 	DISTRIBUTION_LISTS_TABLE         = "distributionLists"
 )
 
-type notificationLog struct {
-	Channel    string `dynamodbav:"channel"`
-	Status     string `dynamodbav:"status"`
-	StatusDate string `dynamodbav:"statusDate"`
-}
-
-type notification struct {
-	Id               string            `dynamodbav:"id"`
-	CreatedBy        string            `dynamodbav:"createdBy"`
-	CreatedAt        string            `dynamodbav:"createdAt"`
-	Title            string            `dynamodbav:"title"`
-	Contents         string            `dynamodbav:"contents"`
-	Image            *string           `dynamodbav:"image"`
-	Topic            string            `dynamodbav:"topic"`
-	Priority         string            `dynamodbav:"priority"`
-	DistributionList *string           `dynamodbav:"distributionList"`
-	Recipients       []string          `dynamodbav:"recipients"`
-	Channels         []string          `dynamodbav:"channels"`
-	Logs             []notificationLog `dynamodbav:"logs"`
-}
-
-type userNotification struct {
-	Id        string  `dynamodbav:"id"`
-	Title     string  `dynamodbav:"title"`
-	Contents  string  `dynamodbav:"contents"`
-	CreatedAt string  `dynamodbav:"createdAt"`
-	Image     *string `dynamodbav:"image"`
-	ReadAt    *string `dynamodbav:"readAt"`
-	Topic     string  `dynamodbav:"topic"`
-}
-
-type channelConfig struct {
-	OptIn       bool    `dynamodbav:"optIn"`
-	SnoozeUntil *string `dynamodbav:"snoozeUntil"`
-}
-
-type userConfig struct {
-	UserId      string        `dynamodbav:"userId"`
-	EmailConfig channelConfig `dynamodbav:"emailConfig"`
-	SMSConfig   channelConfig `dynamodbav:"smsConfig"`
-}
-
 type DynamoDBStorage struct {
 	client *dynamodb.Client
 }
 
 type DynamoDBKey map[string]types.AttributeValue
-
-func (cfg *userConfig) GetKey() (DynamoDBKey, error) {
-	key := make(map[string]types.AttributeValue)
-
-	userId, err := attributevalue.Marshal(cfg.UserId)
-
-	if err != nil {
-		return key, fmt.Errorf("failed to make user config key - %w", err)
-	}
-
-	key["userId"] = userId
-
-	return key, nil
-}
-
-func (n *userNotification) GetKey() (DynamoDBKey, error) {
-	key := make(map[string]types.AttributeValue)
-
-	id, err := attributevalue.Marshal(n.Id)
-
-	if err != nil {
-		return key, fmt.Errorf("failed to make user config key - %w", err)
-	}
-
-	key["id"] = id
-
-	return key, nil
-}
 
 func (s *DynamoDBStorage) getUserConfig(ctx context.Context, userId string) (*userConfig, error) {
 
@@ -200,6 +130,7 @@ func (s *DynamoDBStorage) CreateUserNotification(ctx context.Context, userId str
 
 	notification := userNotification{
 		Id:        id,
+		UserId:    userId,
 		Title:     notificationReq.Title,
 		Contents:  notificationReq.Contents,
 		CreatedAt: time.Now().Format(time.RFC3339),
@@ -215,7 +146,7 @@ func (s *DynamoDBStorage) CreateUserNotification(ctx context.Context, userId str
 	}
 
 	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(NOTIFICATION_TABLE),
+		TableName: aws.String(USER_NOTIFICATIONS_TABLE),
 		Item:      item,
 	})
 
@@ -228,7 +159,8 @@ func (s *DynamoDBStorage) CreateUserNotification(ctx context.Context, userId str
 
 func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.UserNotificationFilters) (dto.Page[dto.UserNotification], error) {
 
-	keyExp := expression.Key("userId").Equal(expression.Value(filters.UserId))
+	userId := &types.AttributeValueMemberS{Value: filters.UserId}
+	keyExp := expression.Key("userId").Equal(expression.Value(userId))
 	builder := expression.NewBuilder().WithKeyCondition(keyExp)
 
 	topicFilters := make([]expression.OperandBuilder, 0)
@@ -284,7 +216,7 @@ func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.
 		notifications = append(notifications, notificationsPage...)
 	}
 
-	result := make([]dto.UserNotification, len(notifications))
+	result := make([]dto.UserNotification, 0, len(notifications))
 
 	for _, notification := range notifications {
 		un := dto.UserNotification{

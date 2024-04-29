@@ -13,6 +13,16 @@ docker run -p 80:8080 \
     swaggerapi/swagger-ui
 ```
 
+## DynamoDB
+
+### Useful Commands
+
+```bash
+aws dynamodb scan \
+    --endpoint-url http://localhost:8000 \
+    --table-name notifications
+```
+
 ## Useful Links
 
 * https://swagger.io/resources/articles/best-practices-in-api-design/
@@ -20,3 +30,11 @@ docker run -p 80:8080 \
 * https://swagger.io/docs/specification/data-models/data-types/#string
 * https://gin-gonic.com/docs/examples/binding-and-validation/
 * https://pkg.go.dev/github.com/go-playground/validator/v10#section-readme
+* https://github.com/awsdocs/aws-doc-sdk-examples/blob/main/gov2/dynamodb/actions/table_basics.go
+* https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GettingStarted.Query.html
+* https://aws.github.io/aws-sdk-go-v2/docs/getting-started/
+* https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.DownloadingAndRunning.html
+* https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html
+* https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue#Marshal
+* https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/dynamodb#GetItemOutput
+* 

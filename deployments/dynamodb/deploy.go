@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	sdb "github.com/notifique/internal/storage"
+	sdb "github.com/notifique/internal/storage/dynamodb"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
