@@ -1,0 +1,190 @@
+package deployments
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	sdb "github.com/notifique/internal/storage"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+)
+
+func tableExists(client *dynamodb.Client, tableName string) (bool, error) {
+
+	_, err := client.DescribeTable(context.TODO(), &dynamodb.DescribeTableInput{
+		TableName: aws.String(tableName),
+	})
+
+	if err == nil {
+		return true, nil
+	}
+
+	var notFoundEx *types.ResourceNotFoundException
+
+	if errors.As(err, &notFoundEx) {
+		return false, nil
+	} else {
+		return false, err
+	}
+}
+
+func createTable(client *dynamodb.Client, tableName string, input *dynamodb.CreateTableInput) error {
+
+	if exists, err := tableExists(client, tableName); exists || err != nil {
+		return err
+	}
+
+	_, err := client.CreateTable(context.TODO(), input)
+
+	if err != nil {
+		return err
+	}
+
+	waiter := dynamodb.NewTableExistsWaiter(client)
+
+	descTableInput := dynamodb.DescribeTableInput{
+		TableName: aws.String(tableName),
+	}
+
+	err = waiter.Wait(context.TODO(), &descTableInput, 5*time.Minute)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createNotificationTable(client *dynamodb.Client, tableName string) error {
+
+	tableInput := dynamodb.CreateTableInput{
+		AttributeDefinitions: []types.AttributeDefinition{{
+			AttributeName: aws.String("id"),
+			AttributeType: types.ScalarAttributeTypeS,
+		}},
+		KeySchema: []types.KeySchemaElement{{
+			AttributeName: aws.String("id"),
+			KeyType:       types.KeyTypeHash,
+		}},
+		TableName: aws.String(tableName),
+		ProvisionedThroughput: &types.ProvisionedThroughput{
+			ReadCapacityUnits:  aws.Int64(10),
+			WriteCapacityUnits: aws.Int64(10),
+		},
+	}
+
+	return createTable(client, tableName, &tableInput)
+}
+
+func createUserConfigTable(client *dynamodb.Client, tableName string) error {
+	tableInput := dynamodb.CreateTableInput{
+		AttributeDefinitions: []types.AttributeDefinition{{
+			AttributeName: aws.String("userId"),
+			AttributeType: types.ScalarAttributeTypeS,
+		}},
+		KeySchema: []types.KeySchemaElement{{
+			AttributeName: aws.String("userId"),
+			KeyType:       types.KeyTypeHash,
+		}},
+		TableName: aws.String(tableName),
+		ProvisionedThroughput: &types.ProvisionedThroughput{
+			ReadCapacityUnits:  aws.Int64(10),
+			WriteCapacityUnits: aws.Int64(10),
+		},
+	}
+
+	return createTable(client, tableName, &tableInput)
+}
+
+func createUserNotificationTable(client *dynamodb.Client, tableName string) error {
+	tableInput := dynamodb.CreateTableInput{
+		AttributeDefinitions: []types.AttributeDefinition{{
+			AttributeName: aws.String("id"),
+			AttributeType: types.ScalarAttributeTypeS,
+		}, {
+			AttributeName: aws.String("userId"),
+			AttributeType: types.ScalarAttributeTypeS,
+		}, {
+			AttributeName: aws.String("createdAt"),
+			AttributeType: types.ScalarAttributeTypeS,
+		}},
+		KeySchema: []types.KeySchemaElement{{
+			AttributeName: aws.String("id"),
+			KeyType:       types.KeyTypeHash,
+		}},
+		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{
+			{
+				IndexName: aws.String(sdb.USER_NOTIFICATIONS_SECONDARY_IDX),
+				Projection: &types.Projection{
+					ProjectionType: types.ProjectionTypeAll,
+				},
+				KeySchema: []types.KeySchemaElement{
+					{
+						AttributeName: aws.String("userId"),
+						KeyType:       types.KeyTypeHash,
+					},
+					{
+						AttributeName: aws.String("createdAt"),
+						KeyType:       types.KeyTypeRange,
+					},
+				},
+				ProvisionedThroughput: &types.ProvisionedThroughput{
+					ReadCapacityUnits:  aws.Int64(10),
+					WriteCapacityUnits: aws.Int64(10),
+				},
+			},
+		},
+		TableName: aws.String(tableName),
+		ProvisionedThroughput: &types.ProvisionedThroughput{
+			ReadCapacityUnits:  aws.Int64(10),
+			WriteCapacityUnits: aws.Int64(10),
+		},
+	}
+
+	return createTable(client, tableName, &tableInput)
+}
+
+func createDistributionListTable(client *dynamodb.Client, tableName string) error {
+	tableInput := dynamodb.CreateTableInput{
+		AttributeDefinitions: []types.AttributeDefinition{{
+			AttributeName: aws.String("name"),
+			AttributeType: types.ScalarAttributeTypeS,
+		}},
+		KeySchema: []types.KeySchemaElement{{
+			AttributeName: aws.String("name"),
+			KeyType:       types.KeyTypeHash,
+		}},
+		TableName: aws.String(tableName),
+		ProvisionedThroughput: &types.ProvisionedThroughput{
+			ReadCapacityUnits:  aws.Int64(10),
+			WriteCapacityUnits: aws.Int64(10),
+		},
+	}
+
+	return createTable(client, tableName, &tableInput)
+}
+
+func CreateTables(client *dynamodb.Client) error {
+
+	if err := createNotificationTable(client, sdb.NOTIFICATION_TABLE); err != nil {
+		return fmt.Errorf("notifications table - %w", err)
+	}
+
+	if err := createUserConfigTable(client, sdb.USER_CONFIG_TABLE); err != nil {
+		return fmt.Errorf("user config table - %w", err)
+	}
+
+	if err := createUserNotificationTable(client, sdb.USER_NOTIFICATIONS_TABLE); err != nil {
+		return fmt.Errorf("user notifications table - %w", err)
+	}
+
+	if err := createDistributionListTable(client, sdb.DISTRIBUTION_LISTS_TABLE); err != nil {
+		return fmt.Errorf("distribution lists table - %w", err)
+	}
+
+	return nil
+}

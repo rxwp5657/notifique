@@ -17,5 +17,9 @@ build: vet
 .PHONY:build
 
 run: vet
-	go run ./server.go
+	go run ./cmd/app/main.go
 .PHONY:run
+
+deploy-dynamodb: vet
+	go run ./cmd/deployments/dynamodb/main.go
+.PHONY:deploy-dynamodb

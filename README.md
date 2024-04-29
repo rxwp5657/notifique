@@ -9,7 +9,7 @@ Can be found on the `docs/openapi.yaml` file. Also, it can be visualized using s
 ```bash
 docker run -p 80:8080 \
     -e SWAGGER_JSON=/app/openapi.yaml \
-    -v ./docs:/app \
+    -v ./api:/app \
     swaggerapi/swagger-ui
 ```
 
