@@ -159,8 +159,7 @@ func (s *DynamoDBStorage) CreateUserNotification(ctx context.Context, userId str
 
 func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.UserNotificationFilters) (dto.Page[dto.UserNotification], error) {
 
-	userId := &types.AttributeValueMemberS{Value: filters.UserId}
-	keyExp := expression.Key("userId").Equal(expression.Value(userId))
+	keyExp := expression.Key("userId").Equal(expression.Value(filters.UserId))
 	builder := expression.NewBuilder().WithKeyCondition(keyExp)
 
 	topicFilters := make([]expression.OperandBuilder, 0)
