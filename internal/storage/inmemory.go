@@ -2,7 +2,6 @@ package storage
 
 import (
 	"context"
-	"math"
 	"sort"
 	"time"
 
@@ -29,6 +28,8 @@ type InMemoryStorage struct {
 	usersConfig       map[string][]dto.ChannelConfig
 	distributionLists []distributionList
 }
+
+type getId[T any] func(d T) string
 
 func (s *InMemoryStorage) getDistributionList(name string) *distributionList {
 
@@ -83,7 +84,53 @@ func (s *InMemoryStorage) CreateUserNotification(ctx context.Context, userId str
 	return id, nil
 }
 
+func makePage[T any](filters dto.PageFilter, getIdFn getId[T], data []T) (dto.Page[T], error) {
+
+	nextTokenIdx := 0
+
+	if filters.NextToken != nil {
+		for idx, n := range data {
+			if getIdFn(n) == *filters.NextToken {
+				nextTokenIdx = idx + 1
+			}
+		}
+	}
+
+	if nextTokenIdx == len(data) {
+		page := dto.Page[T]{
+			NextToken:   nil,
+			PrevToken:   filters.NextToken,
+			ResultCount: 0,
+		}
+
+		return page, nil
+	}
+
+	data = data[nextTokenIdx:]
+
+	pageSize := 50
+
+	if filters.MaxResults != nil {
+		pageSize = *filters.MaxResults
+	}
+
+	pageSize = min(pageSize, len(data))
+	data = data[:pageSize]
+
+	nextToken := getIdFn(data[len(data)-1])
+
+	page := dto.Page[T]{
+		NextToken:   &nextToken,
+		PrevToken:   filters.NextToken,
+		ResultCount: len(data),
+		Data:        data,
+	}
+
+	return page, nil
+}
+
 func (s *InMemoryStorage) GetUserNotifications(ctx context.Context, filters dto.UserNotificationFilters) (dto.Page[dto.UserNotification], error) {
+
 	userNotifications := make([]dto.UserNotification, 0)
 
 	topicsSet := make(map[string]struct{})
@@ -98,24 +145,15 @@ func (s *InMemoryStorage) GetUserNotifications(ctx context.Context, filters dto.
 		}
 	}
 
-	page := 1
+	sort.Slice(userNotifications, func(i, j int) bool {
+		return userNotifications[i].CreatedAt > userNotifications[j].CreatedAt
+	})
 
-	if filters.Page != nil {
-		page = *filters.Page
+	getNotificationId := func(n dto.UserNotification) string {
+		return n.Id
 	}
 
-	pageSize := min(len(userNotifications), 15)
-
-	if filters.PageSize != nil {
-		pageSize = *filters.PageSize
-		pageSize = min(pageSize, len(userNotifications)-(page-1)*pageSize)
-	}
-
-	totalRecords := len(userNotifications)
-	userNotifications = userNotifications[(page-1)*pageSize:]
-	userNotifications = userNotifications[:page]
-
-	return makePage(page, pageSize, totalRecords, userNotifications), nil
+	return makePage(filters.PageFilter, getNotificationId, userNotifications)
 }
 
 func makeNewUserConfig() []dto.ChannelConfig {
@@ -202,52 +240,11 @@ func (s *InMemoryStorage) CreateDistributionList(ctx context.Context, newDL dto.
 	return nil
 }
 
-func makePage[T any](page, pageSize, totalRecords int, data []T) dto.Page[T] {
+func (s *InMemoryStorage) GetDistributionLists(ctx context.Context, filters dto.PageFilter) (dto.Page[dto.DistributionListSummary], error) {
 
-	totalPages := int(math.Ceil(float64(totalRecords) / float64(pageSize)))
+	summaries := make([]dto.DistributionListSummary, 0, len(s.distributionLists))
 
-	var nextPage *int = nil
-	var prevPage *int = nil
-
-	if page+1 <= totalPages {
-		np := page + 1
-		nextPage = &np
-	}
-
-	if page != 1 {
-		pp := page - 1
-		prevPage = &pp
-	}
-
-	return dto.Page[T]{
-		CurrentPage:  page,
-		NextPage:     nextPage,
-		PrevPage:     prevPage,
-		TotalPages:   totalPages,
-		TotalRecords: totalRecords,
-		Data:         data,
-	}
-
-}
-
-func (s *InMemoryStorage) GetDistributionLists(ctx context.Context, filter dto.PageFilter) (dto.Page[dto.DistributionListSummary], error) {
-
-	page, pageSize := 1, min(len(s.distributionLists), 500)
-
-	if filter.Page != nil {
-		page = *filter.Page
-	}
-
-	if filter.PageSize != nil {
-		pageSize = *filter.PageSize
-		pageSize = min(pageSize, len(s.distributionLists)-(page-1)*pageSize)
-	}
-
-	lists := s.distributionLists[(page-1)*pageSize:]
-	summaries := make([]dto.DistributionListSummary, 0, pageSize)
-
-	for _, dl := range lists[:pageSize] {
-
+	for _, dl := range s.distributionLists {
 		summary := dto.DistributionListSummary{
 			Name:               dl.Name,
 			NumberOfRecipients: len(dl.Recipients),
@@ -256,7 +253,11 @@ func (s *InMemoryStorage) GetDistributionLists(ctx context.Context, filter dto.P
 		summaries = append(summaries, summary)
 	}
 
-	return makePage(page, pageSize, len(s.distributionLists), summaries), nil
+	getDistributionListId := func(summary dto.DistributionListSummary) string {
+		return summary.Name
+	}
+
+	return makePage(filters, getDistributionListId, summaries)
 }
 
 func (s *InMemoryStorage) GetRecipients(ctx context.Context, distlistName string, filter dto.PageFilter) (dto.Page[string], error) {
@@ -264,7 +265,8 @@ func (s *InMemoryStorage) GetRecipients(ctx context.Context, distlistName string
 	dl := s.getDistributionList(distlistName)
 
 	if dl == nil {
-		return dto.Page[string]{}, e.DistributionListNotFound{Name: distlistName}
+		err := e.DistributionListNotFound{Name: distlistName}
+		return dto.Page[string]{}, err
 	}
 
 	recipients := make([]string, 0, len(dl.Recipients))
@@ -273,27 +275,15 @@ func (s *InMemoryStorage) GetRecipients(ctx context.Context, distlistName string
 		recipients = append(recipients, recipient)
 	}
 
-	sort.Slice(recipients, func(i int, j int) bool {
+	sort.Slice(recipients, func(i, j int) bool {
 		return recipients[i] < recipients[j]
 	})
 
-	page := 1
-
-	if filter.Page != nil {
-		page = *filter.Page
+	getUserRecipientId := func(recipient string) string {
+		return recipient
 	}
 
-	pageSize := min(len(recipients), 500)
-
-	if filter.PageSize != nil {
-		pageSize = *filter.PageSize
-		pageSize = min(pageSize, len(recipients)-(page-1)*pageSize)
-	}
-
-	filteredRecipients := recipients[(page-1)*pageSize:]
-	filteredRecipients = filteredRecipients[:pageSize]
-
-	return makePage(page, pageSize, len(recipients), filteredRecipients), nil
+	return makePage(filter, getUserRecipientId, recipients)
 }
 
 func (s *InMemoryStorage) AddRecipients(ctx context.Context, distlistName string, recipients []string) (dto.DistributionListSummary, error) {

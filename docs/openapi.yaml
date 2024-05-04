@@ -458,15 +458,16 @@ components:
     PageResponse:
       type: object
       properties:
-        currentPage:
-          type: integer
-        nextPage:
-          type: integer
+        nextToken:
+          type: string
           nullable: true
-        prevPage:
-          type: integer
+          desciption: |
+            This is the id of the last evaluated row and is used to know
+            where the operation stopped. This item won't be included on
+            the next page.
+        prevToken:
+          type: string
           nullable: true
-        totalPages:
-          type: integer
-        totalRecords:
-          type: integer
+        resultCount:
+          type: int
+          nullable: false

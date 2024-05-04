@@ -147,11 +147,11 @@ func TestGetDistributionLists(t *testing.T) {
 
 		if filters != nil {
 			q := req.URL.Query()
-			if filters.Page != nil {
-				q.Add("page", fmt.Sprint(*filters.Page))
+			if filters.NextToken != nil {
+				q.Add("nextToken", fmt.Sprint(*filters.NextToken))
 			}
-			if filters.PageSize != nil {
-				q.Add("pageSize", fmt.Sprint(*filters.PageSize))
+			if filters.MaxResults != nil {
+				q.Add("maxResults", fmt.Sprint(*filters.MaxResults))
 			}
 
 			req.URL.RawQuery = q.Encode()
@@ -167,12 +167,10 @@ func TestGetDistributionLists(t *testing.T) {
 		w := getDistributionLists(nil)
 
 		expectedResp := dto.Page[dto.DistributionListSummary]{
-			CurrentPage:  1,
-			NextPage:     nil,
-			PrevPage:     nil,
-			TotalPages:   1,
-			TotalRecords: len(lists),
-			Data:         summaries,
+			NextToken:   &summaries[len(summaries)-1].Name,
+			PrevToken:   nil,
+			ResultCount: len(summaries),
+			Data:        summaries,
 		}
 
 		resp := dto.Page[dto.DistributionListSummary]{}
@@ -187,23 +185,19 @@ func TestGetDistributionLists(t *testing.T) {
 
 	t.Run("Should be able to apply filters", func(t *testing.T) {
 
-		page, pageSize := 1, 1
+		pageSize := 1
 
 		filters := dto.PageFilter{
-			Page:     &page,
-			PageSize: &pageSize,
+			MaxResults: &pageSize,
 		}
 
 		w := getDistributionLists(&filters)
 
-		nextPage := 2
 		expectedResp := dto.Page[dto.DistributionListSummary]{
-			CurrentPage:  1,
-			NextPage:     &nextPage,
-			PrevPage:     nil,
-			TotalPages:   3,
-			TotalRecords: len(lists),
-			Data:         summaries[0:1],
+			NextToken:   &summaries[0].Name,
+			PrevToken:   nil,
+			ResultCount: 1,
+			Data:        summaries[0:1],
 		}
 
 		resp := dto.Page[dto.DistributionListSummary]{}
@@ -247,11 +241,11 @@ func TestGetDistributionListRecipients(t *testing.T) {
 
 		if filters != nil {
 			q := req.URL.Query()
-			if filters.Page != nil {
-				q.Add("page", fmt.Sprint(*filters.Page))
+			if filters.NextToken != nil {
+				q.Add("nextToken", fmt.Sprint(*filters.NextToken))
 			}
-			if filters.PageSize != nil {
-				q.Add("pageSize", fmt.Sprint(*filters.PageSize))
+			if filters.MaxResults != nil {
+				q.Add("maxResults", fmt.Sprint(*filters.MaxResults))
 			}
 
 			req.URL.RawQuery = q.Encode()
@@ -267,12 +261,10 @@ func TestGetDistributionListRecipients(t *testing.T) {
 		w := getRecipients(dl.Name, nil)
 
 		expectedResponse := dto.Page[string]{
-			CurrentPage:  1,
-			NextPage:     nil,
-			PrevPage:     nil,
-			TotalPages:   1,
-			TotalRecords: 3,
-			Data:         sortedRecipients,
+			NextToken:   &sortedRecipients[len(sortedRecipients)-1],
+			PrevToken:   nil,
+			ResultCount: len(sortedRecipients),
+			Data:        sortedRecipients,
 		}
 
 		resp := dto.Page[string]{}
@@ -304,21 +296,20 @@ func TestGetDistributionListRecipients(t *testing.T) {
 	})
 
 	t.Run("Should be able to apply filters", func(t *testing.T) {
-		page, pageSize := 1, 1
+
+		pageSize := 1
 
 		filters := dto.PageFilter{
-			Page:     &page,
-			PageSize: &pageSize,
+			MaxResults: &pageSize,
 		}
 
-		nextPage := 2
+		nextToken := "1"
+
 		expectedResponse := dto.Page[string]{
-			CurrentPage:  1,
-			NextPage:     &nextPage,
-			PrevPage:     nil,
-			TotalPages:   3,
-			TotalRecords: 3,
-			Data:         []string{"1"},
+			NextToken:   &nextToken,
+			PrevToken:   nil,
+			ResultCount: 1,
+			Data:        []string{"1"},
 		}
 
 		w := getRecipients(dl.Name, &filters)

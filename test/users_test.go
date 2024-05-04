@@ -36,7 +36,7 @@ func TestGetUserNotifications(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	storage.CreateUserNotification(ctx, userId, testNofitication)
+	notificationId, _ := storage.CreateUserNotification(ctx, userId, testNofitication)
 
 	w := httptest.NewRecorder()
 
@@ -64,11 +64,9 @@ func TestGetUserNotifications(t *testing.T) {
 	assert.Nil(t, notification.ReadAt)
 	assert.NotEmpty(t, notification.CreatedAt)
 
-	assert.Equal(t, 1, page.CurrentPage)
-	assert.Nil(t, page.NextPage)
-	assert.Nil(t, page.PrevPage)
-	assert.Equal(t, 1, page.TotalPages)
-	assert.Equal(t, 1, page.TotalRecords)
+	assert.Equal(t, 1, page.ResultCount)
+	assert.Nil(t, page.PrevToken)
+	assert.Equal(t, notificationId, *page.NextToken)
 }
 
 func TestGetUserConfiguration(t *testing.T) {
