@@ -1,15 +1,13 @@
 package dto
 
 type PageFilter struct {
-	Page     *int `form:"page" binding:"omitempty,min=0"`
-	PageSize *int `form:"pageSize" binding:"omitempty,min=0"`
+	NextToken  *string `form:"nextToken" binding:"omitempty"`
+	MaxResults *int    `form:"maxResults" binding:"omitempty,min=1"`
 }
 
 type Page[T any] struct {
-	CurrentPage  int  `json:"currentPage"`
-	NextPage     *int `json:"nextPage"`
-	PrevPage     *int `json:"prevPage"`
-	TotalPages   int  `json:"totalPages"`
-	TotalRecords int  `json:"totalRecords"`
-	Data         []T  `json:"data"`
+	NextToken   *string `json:"nextToken"`
+	PrevToken   *string `json:"prevToken"`
+	ResultCount int     `json:"resultCount"`
+	Data        []T     `json:"data"`
 }

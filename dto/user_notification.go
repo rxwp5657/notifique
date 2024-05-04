@@ -1,10 +1,9 @@
 package dto
 
 type UserNotificationFilters struct {
-	UserId   string
-	Page     *int     `form:"page" binding:"omitempty,min=0"`
-	PageSize *int     `form:"pageSize" binding:"omitempty,min=0"`
-	Topics   []string `form:"topics" binding:"unique"`
+	PageFilter
+	UserId string
+	Topics []string `form:"topics" binding:"unique"`
 }
 
 type UserNotification struct {
