@@ -35,6 +35,8 @@ func (nc UserController) GetUserNotifications(c *gin.Context) {
 	filters.UserId = c.GetHeader(USER_ID_HEADER_KEY)
 	notifications, err := nc.Storage.GetUserNotifications(c, filters)
 
+	fmt.Println(err)
+
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
 		return
@@ -58,12 +60,9 @@ func (nc UserController) CreateUserNotification(c *gin.Context) {
 		return
 	}
 
-	fmt.Println(uriParam)
-
 	_, err := nc.Storage.CreateUserNotification(c, uriParam.Id, userNotification)
 
 	if err != nil {
-		fmt.Println(err.Error())
 		c.Status(http.StatusInternalServerError)
 		return
 	}

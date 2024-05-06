@@ -18,16 +18,34 @@ type userNotification struct {
 	Topic     string  `dynamodbav:"topic"`
 }
 
+type userNotificationKey struct {
+	UserId    string `dynamodbav:"userId"`
+	CreatedAt string `dynamodbav:"createdAt"`
+}
+
 func (n *userNotification) GetKey() (DynamoDBKey, error) {
 	key := make(map[string]types.AttributeValue)
 
-	id, err := attributevalue.Marshal(n.Id)
+	id, err := attributevalue.Marshal(n.UserId)
 
 	if err != nil {
-		return key, fmt.Errorf("failed to make user config key - %w", err)
+		return key, fmt.Errorf("failed to marshall userId - %w", err)
 	}
 
-	key["id"] = id
+	createdAt, err := attributevalue.Marshal(n.CreatedAt)
+
+	if err != nil {
+		return key, fmt.Errorf("failed to marshall createdAt - %w", err)
+	}
+
+	key["userId"] = id
+	key["createdAt"] = createdAt
 
 	return key, nil
+}
+
+func (n *userNotificationKey) GetKey() (DynamoDBKey, error) {
+	un := userNotification{UserId: n.UserId, CreatedAt: n.CreatedAt}
+
+	return un.GetKey()
 }

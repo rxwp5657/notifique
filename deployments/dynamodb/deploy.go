@@ -103,9 +103,6 @@ func createUserConfigTable(client *dynamodb.Client, tableName string) error {
 func createUserNotificationTable(client *dynamodb.Client, tableName string) error {
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String("id"),
-			AttributeType: types.ScalarAttributeTypeS,
-		}, {
 			AttributeName: aws.String("userId"),
 			AttributeType: types.ScalarAttributeTypeS,
 		}, {
@@ -113,31 +110,12 @@ func createUserNotificationTable(client *dynamodb.Client, tableName string) erro
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String("id"),
+			AttributeName: aws.String("userId"),
 			KeyType:       types.KeyTypeHash,
+		}, {
+			AttributeName: aws.String("createdAt"),
+			KeyType:       types.KeyTypeRange,
 		}},
-		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{
-			{
-				IndexName: aws.String(sdb.USER_NOTIFICATIONS_SECONDARY_IDX),
-				Projection: &types.Projection{
-					ProjectionType: types.ProjectionTypeAll,
-				},
-				KeySchema: []types.KeySchemaElement{
-					{
-						AttributeName: aws.String("userId"),
-						KeyType:       types.KeyTypeHash,
-					},
-					{
-						AttributeName: aws.String("createdAt"),
-						KeyType:       types.KeyTypeRange,
-					},
-				},
-				ProvisionedThroughput: &types.ProvisionedThroughput{
-					ReadCapacityUnits:  aws.Int64(10),
-					WriteCapacityUnits: aws.Int64(10),
-				},
-			},
-		},
 		TableName: aws.String(tableName),
 		ProvisionedThroughput: &types.ProvisionedThroughput{
 			ReadCapacityUnits:  aws.Int64(10),
@@ -153,10 +131,16 @@ func createDistributionListTable(client *dynamodb.Client, tableName string) erro
 		AttributeDefinitions: []types.AttributeDefinition{{
 			AttributeName: aws.String("name"),
 			AttributeType: types.ScalarAttributeTypeS,
+		}, {
+			AttributeName: aws.String("userId"),
+			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
 			AttributeName: aws.String("name"),
 			KeyType:       types.KeyTypeHash,
+		}, {
+			AttributeName: aws.String("userId"),
+			KeyType:       types.KeyTypeRange,
 		}},
 		TableName: aws.String(tableName),
 		ProvisionedThroughput: &types.ProvisionedThroughput{

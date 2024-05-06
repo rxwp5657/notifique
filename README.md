@@ -30,6 +30,7 @@ aws dynamodb scan \
 * https://swagger.io/docs/specification/data-models/data-types/#string
 * https://gin-gonic.com/docs/examples/binding-and-validation/
 * https://pkg.go.dev/github.com/go-playground/validator/v10#section-readme
+
 * https://github.com/awsdocs/aws-doc-sdk-examples/blob/main/gov2/dynamodb/actions/table_basics.go
 * https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GettingStarted.Query.html
 * https://aws.github.io/aws-sdk-go-v2/docs/getting-started/
@@ -37,4 +38,3 @@ aws dynamodb scan \
 * https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html
 * https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue#Marshal
 * https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/dynamodb#GetItemOutput
-* 
