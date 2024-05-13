@@ -7,6 +7,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
+const (
+	DIST_LIST_RECIPIENT_HASH_KEY = "listName"
+	DIST_LIST_RECIPIENT_SORT_KEY = "userId"
+	DIST_LIST_SUMMARY_HASH_KEY   = "name"
+)
+
 type distListRecipient struct {
 	DistListName string `dynamodbav:"listName"`
 	UserId       string `dynamodbav:"userId"`
@@ -36,7 +42,7 @@ func (dl *distListRecipient) GetKey() (DynamoDBKey, error) {
 		return key, fmt.Errorf("failed to marshall dl userId - %w", err)
 	}
 
-	key["name"] = name
+	key[DIST_LIST_RECIPIENT_HASH_KEY] = name
 	key["userId"] = userId
 
 	return key, nil

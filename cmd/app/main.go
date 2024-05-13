@@ -8,7 +8,9 @@ import (
 
 func main() {
 
-	storage := storage.MakeDynamoDBStorage()
+	baseEndpoint := "http://localhost:8000"
+
+	storage := storage.MakeDynamoDBStorage(&baseEndpoint)
 	r := gin.Default()
 
 	routes.SetupNotificationRoutes(r, &storage)

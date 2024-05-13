@@ -81,7 +81,7 @@ func (dc DistributionListController) GetRecipients(c *gin.Context) {
 	}
 
 	recipients, err := dc.Storage.GetRecipients(c, uriParams.Name, filter)
-
+	fmt.Println(err)
 	if err != nil {
 		if errors.As(err, &internal.DistributionListNotFound{}) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})

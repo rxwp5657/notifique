@@ -258,7 +258,7 @@ func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.
 
 	page := dto.Page[dto.UserNotification]{}
 
-	keyExp := expression.Key("userId").Equal(expression.Value(filters.UserId))
+	keyExp := expression.Key(USER_NOTIFICATION_HASH_KEY).Equal(expression.Value(filters.UserId))
 	builder := expression.NewBuilder().WithKeyCondition(keyExp)
 
 	topicsFilter := makeInFilter("topic", filters.Topics)
@@ -689,7 +689,7 @@ func (s *DynamoDBStorage) deleteRecipients(ctx context.Context, recipients []dis
 
 func (s *DynamoDBStorage) DeleteDistributionList(ctx context.Context, listName string) error {
 
-	keyEx := expression.Key("name").Equal(expression.Value(listName))
+	keyEx := expression.Key(DIST_LIST_RECIPIENT_HASH_KEY).Equal(expression.Value(listName))
 	expr, err := expression.NewBuilder().WithKeyCondition(keyEx).Build()
 
 	if err != nil {
@@ -737,7 +737,7 @@ func (s *DynamoDBStorage) GetRecipients(ctx context.Context, distlistName string
 
 	page := dto.Page[string]{}
 
-	keyExp := expression.Key("listName").Equal(expression.Value(distlistName))
+	keyExp := expression.Key(DIST_LIST_RECIPIENT_HASH_KEY).Equal(expression.Value(distlistName))
 	projExp := expression.NamesList(expression.Name("userId"))
 
 	builder := expression.NewBuilder()
@@ -959,7 +959,7 @@ func (s *DynamoDBStorage) DeleteRecipients(ctx context.Context, listName string,
 		return summary, fmt.Errorf("failed to retrieve recipients - %w", err)
 	}
 
-	_, err = s.addRecipients(ctx, toRemove)
+	_, err = s.deleteRecipients(ctx, toRemove)
 
 	if err != nil {
 		return summary, err
@@ -976,7 +976,7 @@ func (s *DynamoDBStorage) DeleteRecipients(ctx context.Context, listName string,
 	return summary, nil
 }
 
-func MakeDynamoDBStorage() DynamoDBStorage {
+func MakeDynamoDBStorage(baseEndpoint *string) DynamoDBStorage {
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 
 	if err != nil {
@@ -984,7 +984,7 @@ func MakeDynamoDBStorage() DynamoDBStorage {
 	}
 
 	client := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
-		o.BaseEndpoint = aws.String("http://localhost:8000")
+		o.BaseEndpoint = baseEndpoint
 	})
 
 	return DynamoDBStorage{client: client}

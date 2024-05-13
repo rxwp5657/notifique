@@ -7,6 +7,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
+const USER_NOTIFICATION_HASH_KEY = "userId"
+
 type userNotification struct {
 	Id        string  `dynamodbav:"id"`
 	UserId    string  `dynamodbav:"userId"`

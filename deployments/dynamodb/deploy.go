@@ -140,17 +140,17 @@ func createDLRecipientsTable(client *dynamodb.Client) error {
 
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String("listName"),
+			AttributeName: aws.String(sdb.DIST_LIST_RECIPIENT_HASH_KEY),
 			AttributeType: types.ScalarAttributeTypeS,
 		}, {
-			AttributeName: aws.String("userId"),
+			AttributeName: aws.String(sdb.DIST_LIST_RECIPIENT_SORT_KEY),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String("listName"),
+			AttributeName: aws.String(sdb.DIST_LIST_RECIPIENT_HASH_KEY),
 			KeyType:       types.KeyTypeHash,
 		}, {
-			AttributeName: aws.String("userId"),
+			AttributeName: aws.String(sdb.DIST_LIST_RECIPIENT_SORT_KEY),
 			KeyType:       types.KeyTypeRange,
 		}},
 		TableName: aws.String(tableName),
@@ -169,11 +169,11 @@ func createDLSummaryTable(client *dynamodb.Client) error {
 
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String("name"),
+			AttributeName: aws.String(sdb.DIST_LIST_SUMMARY_HASH_KEY),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String("name"),
+			AttributeName: aws.String(sdb.DIST_LIST_SUMMARY_HASH_KEY),
 			KeyType:       types.KeyTypeHash,
 		}},
 		TableName: aws.String(tableName),
