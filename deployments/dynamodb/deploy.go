@@ -65,11 +65,11 @@ func createNotificationTable(client *dynamodb.Client) error {
 
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String("id"),
+			AttributeName: aws.String(sdb.NOTIFICATION_HASH_KEY),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String("id"),
+			AttributeName: aws.String(sdb.NOTIFICATION_HASH_KEY),
 			KeyType:       types.KeyTypeHash,
 		}},
 		TableName: aws.String(tableName),
@@ -88,11 +88,11 @@ func createUserConfigTable(client *dynamodb.Client) error {
 
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String("userId"),
+			AttributeName: aws.String(sdb.USER_CONFIG_HASH_KEY),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String("userId"),
+			AttributeName: aws.String(sdb.USER_CONFIG_HASH_KEY),
 			KeyType:       types.KeyTypeHash,
 		}},
 		TableName: aws.String(tableName),
@@ -111,17 +111,17 @@ func createUserNotificationTable(client *dynamodb.Client) error {
 
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String("userId"),
+			AttributeName: aws.String(sdb.USER_NOTIFICATION_HASH_KEY),
 			AttributeType: types.ScalarAttributeTypeS,
 		}, {
-			AttributeName: aws.String("createdAt"),
+			AttributeName: aws.String(sdb.USER_NOTIFICATION_SORT_KEY),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String("userId"),
+			AttributeName: aws.String(sdb.USER_NOTIFICATION_HASH_KEY),
 			KeyType:       types.KeyTypeHash,
 		}, {
-			AttributeName: aws.String("createdAt"),
+			AttributeName: aws.String(sdb.USER_NOTIFICATION_SORT_KEY),
 			KeyType:       types.KeyTypeRange,
 		}},
 		TableName: aws.String(tableName),
