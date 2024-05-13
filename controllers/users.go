@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 
 	"golang.org/x/net/context"
@@ -34,8 +33,6 @@ func (nc UserController) GetUserNotifications(c *gin.Context) {
 
 	filters.UserId = c.GetHeader(USER_ID_HEADER_KEY)
 	notifications, err := nc.Storage.GetUserNotifications(c, filters)
-
-	fmt.Println(err)
 
 	if err != nil {
 		c.Status(http.StatusInternalServerError)

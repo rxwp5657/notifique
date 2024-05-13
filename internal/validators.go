@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"fmt"
 	"time"
 
 	r "regexp"
@@ -29,8 +28,6 @@ var DLNameValidator validator.Func = func(fl validator.FieldLevel) bool {
 	}
 
 	match, err := r.MatchString("^[A-Za-z0-9$#@-_]+$", name)
-
-	fmt.Println(match)
 
 	if err != nil {
 		return false

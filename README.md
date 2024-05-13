@@ -38,3 +38,5 @@ aws dynamodb scan \
 * https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html
 * https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue#Marshal
 * https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/dynamodb#GetItemOutput
+
+* https://www.alexdebrie.com/posts/dynamodb-single-table/

@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   notifique:
     image: notifique:v0.1.0

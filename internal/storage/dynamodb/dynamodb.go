@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -16,6 +17,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/google/uuid"
 	"github.com/notifique/dto"
+	"github.com/notifique/internal"
 )
 
 const (
@@ -23,21 +25,27 @@ const (
 	USER_CONFIG_TABLE            = "userConfig"
 	USER_NOTIFICATIONS_TABLE     = "userNotifications"
 	USER_NOTIFICATIONS_TOPIC_IDX = "topicIndex"
-	DISTRIBUTION_LISTS_TABLE     = "distributionLists"
+	DIST_LIST_RECIPIENTS_TABLE   = "DistributionListRecipients"
+	DIST_LIST_SUMMARY_TABLE      = "DistributionListSummary"
 )
 
 type DynamoDBStorage struct {
 	client *dynamodb.Client
 }
 
-type dynamodbPrimaryKey interface {
+type DynamodbPrimaryKey interface {
 	GetKey() (DynamoDBKey, error)
+}
+
+type DynamoDBPageParams struct {
+	Limit             *int32
+	ExclusiveStartKey map[string]types.AttributeValue
 }
 
 type DynamoDBKey map[string]types.AttributeValue
 
-func marshallNextToken[T any](key *T, response *dynamodb.QueryOutput) (string, error) {
-	err := attributevalue.UnmarshalMap(response.LastEvaluatedKey, &key)
+func marshallNextToken[T any](key *T, lastEvaluatedKey DynamoDBKey) (string, error) {
+	err := attributevalue.UnmarshalMap(lastEvaluatedKey, &key)
 
 	if err != nil {
 		return "", fmt.Errorf("failed to unmarshall last evaluated key - %w", err)
@@ -195,53 +203,55 @@ func (s *DynamoDBStorage) CreateUserNotification(ctx context.Context, userId str
 	return id, nil
 }
 
-func makeTopicsFilter(topics []string) *expression.ConditionBuilder {
+func makeInFilter(expName string, values []string) *expression.ConditionBuilder {
 
-	if len(topics) == 0 {
+	if len(values) == 0 {
 		return nil
 	}
 
-	topicFilters := make([]expression.OperandBuilder, 0, len(topics))
+	filters := make([]expression.OperandBuilder, 0, len(values))
 
-	for _, topic := range topics {
-		topicFilters = append(topicFilters, expression.Value(topic))
+	for _, v := range values {
+		filters = append(filters, expression.Value(v))
 	}
 
-	first := topicFilters[0]
+	first := filters[0]
 	rest := make([]expression.OperandBuilder, 0)
 
-	if len(topicFilters) > 1 {
-		rest = topicFilters[1:]
+	if len(filters) > 1 {
+		rest = filters[1:]
 	}
 
-	cond := expression.In(expression.Name("topic"), first, rest...)
+	cond := expression.In(expression.Name(expName), first, rest...)
 	return &cond
 }
 
-func addPageFilters[T dynamodbPrimaryKey](key T, qi *dynamodb.QueryInput, filters dto.PageFilter) error {
+func makePageFilters[T DynamodbPrimaryKey](key T, filters dto.PageFilter) (DynamoDBPageParams, error) {
+
+	params := DynamoDBPageParams{}
 
 	if filters.MaxResults != nil {
 		limit := int32(*filters.MaxResults)
-		qi.Limit = &limit
+		params.Limit = &limit
 	}
 
 	if filters.NextToken != nil {
 		err := unmarshallNextToken(*filters.NextToken, &key)
 
 		if err != nil {
-			return fmt.Errorf("failed to unmarshall token - %w", err)
+			return params, fmt.Errorf("failed to unmarshall token - %w", err)
 		}
 
 		dynamoDBKey, err := key.GetKey()
 
 		if err != nil {
-			return fmt.Errorf("failed to get model key - %w", err)
+			return params, fmt.Errorf("failed to get model key - %w", err)
 		}
 
-		qi.ExclusiveStartKey = dynamoDBKey
+		params.ExclusiveStartKey = dynamoDBKey
 	}
 
-	return nil
+	return params, nil
 }
 
 func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.UserNotificationFilters) (dto.Page[dto.UserNotification], error) {
@@ -251,7 +261,7 @@ func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.
 	keyExp := expression.Key("userId").Equal(expression.Value(filters.UserId))
 	builder := expression.NewBuilder().WithKeyCondition(keyExp)
 
-	topicsFilter := makeTopicsFilter(filters.Topics)
+	topicsFilter := makeInFilter("topic", filters.Topics)
 
 	if topicsFilter != nil {
 		builder.WithFilter(*topicsFilter)
@@ -263,6 +273,12 @@ func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.
 		return page, fmt.Errorf("failed to build query - %w", err)
 	}
 
+	pageParams, err := makePageFilters(&userNotificationKey{}, filters.PageFilter)
+
+	if err != nil {
+		return page, fmt.Errorf("failed to make page params - %w", err)
+	}
+
 	queryInput := dynamodb.QueryInput{
 		TableName:                 aws.String(USER_NOTIFICATIONS_TABLE),
 		ExpressionAttributeNames:  expr.Names(),
@@ -270,12 +286,8 @@ func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.
 		KeyConditionExpression:    expr.KeyCondition(),
 		FilterExpression:          expr.Filter(),
 		ScanIndexForward:          aws.Bool(false),
-	}
-
-	err = addPageFilters(&userNotificationKey{}, &queryInput, filters.PageFilter)
-
-	if err != nil {
-		return page, err
+		Limit:                     pageParams.Limit,
+		ExclusiveStartKey:         pageParams.ExclusiveStartKey,
 	}
 
 	response, err := s.client.Query(ctx, &queryInput)
@@ -295,7 +307,7 @@ func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.
 
 	if len(response.LastEvaluatedKey) != 0 {
 		key := userNotificationKey{}
-		encoded, err := marshallNextToken(&key, response)
+		encoded, err := marshallNextToken(&key, response.LastEvaluatedKey)
 
 		if err != nil {
 			return page, err
@@ -323,7 +335,6 @@ func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.
 	page.NextToken = nextToken
 	page.PrevToken = filters.NextToken
 	page.ResultCount = len(result)
-
 	page.Data = result
 
 	return page, nil
@@ -461,15 +472,15 @@ func (s *DynamoDBStorage) UpdateUserConfig(ctx context.Context, userId string, c
 	return nil
 }
 
-func (s *DynamoDBStorage) addRecipients(ctx context.Context, recipients []distributionList) (int, error) {
+func (s *DynamoDBStorage) addRecipients(ctx context.Context, recipients []distListRecipient) (int, error) {
 
 	writeReq := make([]types.WriteRequest, 0, len(recipients))
 
-	for _, recipient := range recipients {
-		item, err := attributevalue.MarshalMap(recipient)
+	for _, r := range recipients {
+		item, err := attributevalue.MarshalMap(r)
 
 		if err != nil {
-			return 0, fmt.Errorf("failed to marshal dl recipient - %w", err)
+			return 0, fmt.Errorf("failed to marshal dl distListRecipient - %w", err)
 		}
 
 		writeReq = append(writeReq, types.WriteRequest{
@@ -480,7 +491,7 @@ func (s *DynamoDBStorage) addRecipients(ctx context.Context, recipients []distri
 	}
 
 	requestItems := map[string][]types.WriteRequest{
-		DISTRIBUTION_LISTS_TABLE: writeReq,
+		DIST_LIST_RECIPIENTS_TABLE: writeReq,
 	}
 
 	_, err := s.client.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
@@ -494,106 +505,166 @@ func (s *DynamoDBStorage) addRecipients(ctx context.Context, recipients []distri
 	return len(recipients), nil
 }
 
-func (s *DynamoDBStorage) CreateDistributionList(ctx context.Context, dlReq dto.DistributionList) error {
+func (s *DynamoDBStorage) distListExists(ctx context.Context, listName string) (bool, error) {
+	summary := distListSummary{Name: listName}
+	key, err := summary.GetKey()
 
-	recipients := make([]distributionList, 0, len(dlReq.Recipients))
-
-	for _, recipient := range dlReq.Recipients {
-		recipients = append(recipients, distributionList{
-			Name:   dlReq.Name,
-			UserId: recipient,
-		})
+	if err != nil {
+		return false, err
 	}
 
-	_, err := s.addRecipients(ctx, recipients)
+	resp, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
+		Key:       key,
+		TableName: aws.String(DIST_LIST_SUMMARY_TABLE),
+	})
+
+	if err != nil {
+		return false, err
+	}
+
+	return len(resp.Item) != 0, nil
+}
+
+func (s *DynamoDBStorage) deleteSummary(ctx context.Context, listName string) error {
+	summary := distListSummary{Name: listName}
+	key, err := summary.GetKey()
+
+	if err != nil {
+		return err
+	}
+
+	_, err = s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: aws.String(DIST_LIST_SUMMARY_TABLE),
+		Key:       key,
+	})
 
 	return err
 }
 
-func (s *DynamoDBStorage) getDLSummary(ctx context.Context, listName string) (*dto.DistributionListSummary, error) {
-	keyEx := expression.Key("name").Equal(expression.Value(listName))
-	expr, err := expression.NewBuilder().WithKeyCondition(keyEx).Build()
+func (s *DynamoDBStorage) CreateDistributionList(ctx context.Context, dlReq dto.DistributionList) error {
+
+	exists, err := s.distListExists(ctx, dlReq.Name)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create expression - %w", err)
+		return fmt.Errorf("failed to check for list existence - %w", err)
 	}
 
-	queryPaginator := dynamodb.NewQueryPaginator(s.client, &dynamodb.QueryInput{
-		TableName:                 aws.String(DISTRIBUTION_LISTS_TABLE),
-		ExpressionAttributeNames:  expr.Names(),
-		ExpressionAttributeValues: expr.Values(),
-		KeyConditionExpression:    expr.KeyCondition(),
+	if exists {
+		return internal.DistributionListAlreadyExists{Name: dlReq.Name}
+	}
+
+	summary := distListSummary{
+		Name:          dlReq.Name,
+		NumRecipients: len(dlReq.Recipients),
+	}
+
+	marshalled, err := attributevalue.MarshalMap(summary)
+
+	if err != nil {
+		return fmt.Errorf("failed to marshall distribution list summary - %w", err)
+	}
+
+	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(DIST_LIST_SUMMARY_TABLE),
+		Item:      marshalled,
 	})
 
-	count := 0
-	for queryPaginator.HasMorePages() {
-		resp, err := queryPaginator.NextPage(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create summary - %w", err)
+	}
 
-		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve user page - %w", err)
+	recipients := make([]distListRecipient, 0, len(dlReq.Recipients))
+
+	for _, r := range dlReq.Recipients {
+		recipients = append(recipients, distListRecipient{
+			DistListName: dlReq.Name,
+			UserId:       r,
+		})
+	}
+
+	_, recipientsErr := s.addRecipients(ctx, recipients)
+
+	if recipientsErr != nil {
+		recipientsErr = fmt.Errorf("failed to add recipients to list - %w", err)
+		summaryError := s.deleteSummary(ctx, dlReq.Name)
+
+		if summaryError != nil {
+			summaryError = fmt.Errorf("failed to delete dist list summary - %w", summaryError)
 		}
 
-		count += int(resp.Count)
+		err = errors.Join(recipientsErr, summaryError)
 	}
 
-	summary := dto.DistributionListSummary{
-		Name:               listName,
-		NumberOfRecipients: count,
-	}
-
-	return &summary, nil
+	return err
 }
 
-func (s *DynamoDBStorage) GetDistributionLists(ctx context.Context, filter dto.PageFilter) (dto.Page[dto.DistributionListSummary], error) {
+func (s *DynamoDBStorage) GetDistributionLists(ctx context.Context, filters dto.PageFilter) (dto.Page[dto.DistributionListSummary], error) {
 
 	page := dto.Page[dto.DistributionListSummary]{}
-	dlMap := make(map[string]int)
 
-	scanPaginator := dynamodb.NewScanPaginator(s.client, &dynamodb.ScanInput{
-		TableName: aws.String(DISTRIBUTION_LISTS_TABLE),
-	})
+	pageParams, err := makePageFilters(&distListSummaryKey{}, filters)
 
-	for scanPaginator.HasMorePages() {
-		resp, err := scanPaginator.NextPage(ctx)
-
-		if err != nil {
-			return page, fmt.Errorf("failed to fetch distribution list page - %w", err)
-		}
-
-		var recipients []distributionList
-		err = attributevalue.UnmarshalListOfMaps(resp.Items, &recipients)
-
-		if err != nil {
-			return page, fmt.Errorf("failed to unmarshall list of recipients - %w", err)
-		}
-
-		for _, r := range recipients {
-			dlMap[r.Name] = dlMap[r.Name] + 1
-		}
+	if err != nil {
+		return page, fmt.Errorf("failed to make page params - %w", err)
 	}
 
-	summaries := make([]dto.DistributionListSummary, 0, len(dlMap))
-
-	for k, v := range dlMap {
-		summary := dto.DistributionListSummary{
-			Name:               k,
-			NumberOfRecipients: v,
-		}
-		summaries = append(summaries, summary)
+	scanInput := dynamodb.ScanInput{
+		TableName:         aws.String(DIST_LIST_SUMMARY_TABLE),
+		Limit:             pageParams.Limit,
+		ExclusiveStartKey: pageParams.ExclusiveStartKey,
 	}
 
-	page.Data = summaries
+	response, err := s.client.Scan(ctx, &scanInput)
+
+	if err != nil {
+		return page, fmt.Errorf("failed to get the summaries - %w", err)
+	}
+
+	var summaries []distListSummary
+	err = attributevalue.UnmarshalListOfMaps(response.Items, &summaries)
+
+	if err != nil {
+		return page, fmt.Errorf("failed to unmarshall the summaries - %w", err)
+	}
+
+	var nextToken *string = nil
+
+	if len(response.LastEvaluatedKey) != 0 {
+		key := distListSummaryKey{}
+		encoded, err := marshallNextToken(&key, response.LastEvaluatedKey)
+
+		if err != nil {
+			return page, err
+		}
+
+		nextToken = &encoded
+	}
+
+	result := make([]dto.DistributionListSummary, 0, len(summaries))
+
+	for _, summary := range summaries {
+		s := dto.DistributionListSummary{
+			Name:               summary.Name,
+			NumberOfRecipients: summary.NumRecipients,
+		}
+
+		result = append(result, s)
+	}
+
+	page.PrevToken = filters.NextToken
+	page.NextToken = nextToken
 	page.ResultCount = len(summaries)
+	page.Data = result
 
 	return page, nil
 }
 
-func (s *DynamoDBStorage) deleteRecipients(ctx context.Context, recipients []distributionList) (int, error) {
+func (s *DynamoDBStorage) deleteRecipients(ctx context.Context, recipients []distListRecipient) (int, error) {
 
 	deleteReq := make([]types.WriteRequest, 0, len(recipients))
 
-	for _, recipient := range recipients {
-		key, _ := recipient.GetKey()
+	for _, distListRecipient := range recipients {
+		key, _ := distListRecipient.GetKey()
 		deleteReq = append(deleteReq, types.WriteRequest{
 			DeleteRequest: &types.DeleteRequest{
 				Key: key,
@@ -602,7 +673,7 @@ func (s *DynamoDBStorage) deleteRecipients(ctx context.Context, recipients []dis
 	}
 
 	requestItems := map[string][]types.WriteRequest{
-		DISTRIBUTION_LISTS_TABLE: deleteReq,
+		DIST_LIST_RECIPIENTS_TABLE: deleteReq,
 	}
 
 	_, err := s.client.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
@@ -626,7 +697,7 @@ func (s *DynamoDBStorage) DeleteDistributionList(ctx context.Context, listName s
 	}
 
 	queryPaginator := dynamodb.NewQueryPaginator(s.client, &dynamodb.QueryInput{
-		TableName:                 aws.String(DISTRIBUTION_LISTS_TABLE),
+		TableName:                 aws.String(DIST_LIST_RECIPIENTS_TABLE),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
 		KeyConditionExpression:    expr.KeyCondition(),
@@ -639,7 +710,7 @@ func (s *DynamoDBStorage) DeleteDistributionList(ctx context.Context, listName s
 			return fmt.Errorf("failed to retrieve user page - %w", err)
 		}
 
-		var recipients []distributionList
+		var recipients []distListRecipient
 		err = attributevalue.UnmarshalListOfMaps(resp.Items, &recipients)
 
 		if err != nil {
@@ -653,6 +724,12 @@ func (s *DynamoDBStorage) DeleteDistributionList(ctx context.Context, listName s
 		}
 	}
 
+	err = s.deleteSummary(ctx, listName)
+
+	if err != nil {
+		return fmt.Errorf("failed to delete summary - %w", err)
+	}
+
 	return nil
 }
 
@@ -660,7 +737,7 @@ func (s *DynamoDBStorage) GetRecipients(ctx context.Context, distlistName string
 
 	page := dto.Page[string]{}
 
-	keyExp := expression.Key("name").Equal(expression.Value(distlistName))
+	keyExp := expression.Key("listName").Equal(expression.Value(distlistName))
 	projExp := expression.NamesList(expression.Name("userId"))
 
 	builder := expression.NewBuilder()
@@ -670,18 +747,20 @@ func (s *DynamoDBStorage) GetRecipients(ctx context.Context, distlistName string
 		return page, fmt.Errorf("failed to build query - %w", err)
 	}
 
+	pageParams, err := makePageFilters(&userNotificationKey{}, filters)
+
+	if err != nil {
+		return page, fmt.Errorf("failed to make page params - %w", err)
+	}
+
 	queryInput := dynamodb.QueryInput{
-		TableName:                 aws.String(DISTRIBUTION_LISTS_TABLE),
+		TableName:                 aws.String(DIST_LIST_RECIPIENTS_TABLE),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
 		KeyConditionExpression:    expr.KeyCondition(),
 		ProjectionExpression:      expr.Projection(),
-	}
-
-	err = addPageFilters(&userNotificationKey{}, &queryInput, filters)
-
-	if err != nil {
-		return page, err
+		Limit:                     pageParams.Limit,
+		ExclusiveStartKey:         pageParams.ExclusiveStartKey,
 	}
 
 	response, err := s.client.Query(ctx, &queryInput)
@@ -690,7 +769,7 @@ func (s *DynamoDBStorage) GetRecipients(ctx context.Context, distlistName string
 		return page, fmt.Errorf("failed to get recipients - %w", err)
 	}
 
-	var recipients []distributionList
+	var recipients []distListRecipient
 	err = attributevalue.UnmarshalListOfMaps(response.Items, &recipients)
 
 	if err != nil {
@@ -700,8 +779,8 @@ func (s *DynamoDBStorage) GetRecipients(ctx context.Context, distlistName string
 	var nextToken *string = nil
 
 	if len(response.LastEvaluatedKey) != 0 {
-		key := distributionList{}
-		encoded, err := marshallNextToken(&key, response)
+		key := distListRecipient{}
+		encoded, err := marshallNextToken(&key, response.LastEvaluatedKey)
 
 		if err != nil {
 			return page, err
@@ -725,56 +804,176 @@ func (s *DynamoDBStorage) GetRecipients(ctx context.Context, distlistName string
 	return page, nil
 }
 
+func (s *DynamoDBStorage) getRecipientsInDL(ctx context.Context, listName string, recipients []string) ([]distListRecipient, error) {
+
+	result := make([]distListRecipient, 0)
+
+	if len(recipients) == 0 {
+		return result, nil
+	}
+
+	listFilter := expression.Equal(expression.Name("listName"), expression.Value(listName))
+	userFilter := makeInFilter("userId", recipients)
+	filterEx := listFilter.And(*userFilter)
+
+	expr, err := expression.NewBuilder().WithFilter(filterEx).Build()
+
+	if err != nil {
+		return result, fmt.Errorf("failed to make expression - %w", err)
+	}
+
+	scanPaginator := dynamodb.NewScanPaginator(s.client, &dynamodb.ScanInput{
+		TableName:                 aws.String(DIST_LIST_RECIPIENTS_TABLE),
+		ConsistentRead:            aws.Bool(true),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+		FilterExpression:          expr.Filter(),
+	})
+
+	for scanPaginator.HasMorePages() {
+		resp, err := scanPaginator.NextPage(ctx)
+
+		if err != nil {
+			return []distListRecipient{}, fmt.Errorf("failed to retrieve recipients page - %w", err)
+		}
+
+		var page []distListRecipient
+		err = attributevalue.UnmarshalListOfMaps(resp.Items, &page)
+
+		if err != nil {
+			return []distListRecipient{}, fmt.Errorf("failed to unmarshall recipients page - %w", err)
+		}
+
+		result = append(result, page...)
+	}
+
+	return result, nil
+}
+
+func (s *DynamoDBStorage) updateRecipientCount(ctx context.Context, listName string, numRecipients int) (int, error) {
+
+	summary := distListSummary{Name: listName}
+	key, err := summary.GetKey()
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to build summary key")
+	}
+
+	update := expression.Add(expression.Name("numOfRecipients"), expression.Value(numRecipients))
+	exp, err := expression.NewBuilder().WithUpdate(update).Build()
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to build update expression - %w", err)
+	}
+
+	resp, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:                 aws.String(DIST_LIST_SUMMARY_TABLE),
+		Key:                       key,
+		ExpressionAttributeNames:  exp.Names(),
+		ExpressionAttributeValues: exp.Values(),
+		UpdateExpression:          exp.Update(),
+		ReturnValues:              types.ReturnValueUpdatedNew,
+	})
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to update summary count - %w", err)
+	}
+
+	var attrMap map[string]int
+
+	err = attributevalue.UnmarshalMap(resp.Attributes, &attrMap)
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to unmarshall summary count update - %w", err)
+	}
+
+	return attrMap["numOfRecipients"], nil
+}
+
+func (s *DynamoDBStorage) getNewRecipients(recipientsInDL []distListRecipient, toCheck []string) []string {
+
+	newRecipients := make([]string, 0)
+	recipientSet := make(map[string]struct{})
+
+	for _, r := range recipientsInDL {
+		recipientSet[r.UserId] = struct{}{}
+	}
+
+	for _, r := range toCheck {
+		if _, ok := recipientSet[r]; !ok {
+			newRecipients = append(newRecipients, r)
+		}
+	}
+
+	return newRecipients
+}
+
 func (s *DynamoDBStorage) AddRecipients(ctx context.Context, listName string, recipients []string) (dto.DistributionListSummary, error) {
 
-	dlRecipients := make([]distributionList, 0, len(recipients))
+	summary := dto.DistributionListSummary{
+		Name: listName,
+	}
 
-	for _, recipient := range recipients {
-		dlRecipients = append(dlRecipients, distributionList{
-			Name:   listName,
-			UserId: recipient,
+	recipientsInDL, err := s.getRecipientsInDL(ctx, listName, recipients)
+
+	if err != nil {
+		return summary, fmt.Errorf("failed to retrieve recipients - %w", err)
+	}
+
+	newRecipients := s.getNewRecipients(recipientsInDL, recipients)
+	toAdd := make([]distListRecipient, 0, len(recipients))
+
+	for _, r := range newRecipients {
+		toAdd = append(toAdd, distListRecipient{
+			DistListName: listName,
+			UserId:       r,
 		})
 	}
 
-	_, err := s.addRecipients(ctx, dlRecipients)
+	_, err = s.addRecipients(ctx, toAdd)
 
 	if err != nil {
-		return dto.DistributionListSummary{}, err
+		return summary, err
 	}
 
-	summary, err := s.getDLSummary(ctx, listName)
+	count, err := s.updateRecipientCount(ctx, listName, len(newRecipients))
 
 	if err != nil {
-		return dto.DistributionListSummary{}, err
+		return summary, fmt.Errorf("failed to update summary count - %w", err)
 	}
 
-	return *summary, nil
+	summary.NumberOfRecipients = count
+
+	return summary, nil
 }
 
 func (s *DynamoDBStorage) DeleteRecipients(ctx context.Context, listName string, recipients []string) (dto.DistributionListSummary, error) {
 
-	dlRecipients := make([]distributionList, 0, len(recipients))
-
-	for _, r := range recipients {
-		dlRecipients = append(dlRecipients, distributionList{
-			Name:   listName,
-			UserId: r,
-		})
+	summary := dto.DistributionListSummary{
+		Name: listName,
 	}
 
-	_, err := s.deleteRecipients(ctx, dlRecipients)
+	toRemove, err := s.getRecipientsInDL(ctx, listName, recipients)
 
 	if err != nil {
-		return dto.DistributionListSummary{}, err
+		return summary, fmt.Errorf("failed to retrieve recipients - %w", err)
 	}
 
-	summary, err := s.getDLSummary(ctx, listName)
+	_, err = s.addRecipients(ctx, toRemove)
 
 	if err != nil {
-		return dto.DistributionListSummary{}, err
+		return summary, err
 	}
 
-	return *summary, nil
+	count, err := s.updateRecipientCount(ctx, listName, -len(toRemove))
+
+	if err != nil {
+		return summary, fmt.Errorf("failed to update summary count - %w", err)
+	}
+
+	summary.NumberOfRecipients = count
+
+	return summary, nil
 }
 
 func MakeDynamoDBStorage() DynamoDBStorage {

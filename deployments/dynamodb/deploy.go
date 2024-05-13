@@ -126,21 +126,41 @@ func createUserNotificationTable(client *dynamodb.Client, tableName string) erro
 	return createTable(client, tableName, &tableInput)
 }
 
-func createDistributionListTable(client *dynamodb.Client, tableName string) error {
+func createDLRecipientsTable(client *dynamodb.Client, tableName string) error {
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String("name"),
+			AttributeName: aws.String("listName"),
 			AttributeType: types.ScalarAttributeTypeS,
 		}, {
 			AttributeName: aws.String("userId"),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String("name"),
+			AttributeName: aws.String("listName"),
 			KeyType:       types.KeyTypeHash,
 		}, {
 			AttributeName: aws.String("userId"),
 			KeyType:       types.KeyTypeRange,
+		}},
+		TableName: aws.String(tableName),
+		ProvisionedThroughput: &types.ProvisionedThroughput{
+			ReadCapacityUnits:  aws.Int64(10),
+			WriteCapacityUnits: aws.Int64(10),
+		},
+	}
+
+	return createTable(client, tableName, &tableInput)
+}
+
+func createDLSummaryTable(client *dynamodb.Client, tableName string) error {
+	tableInput := dynamodb.CreateTableInput{
+		AttributeDefinitions: []types.AttributeDefinition{{
+			AttributeName: aws.String("name"),
+			AttributeType: types.ScalarAttributeTypeS,
+		}},
+		KeySchema: []types.KeySchemaElement{{
+			AttributeName: aws.String("name"),
+			KeyType:       types.KeyTypeHash,
 		}},
 		TableName: aws.String(tableName),
 		ProvisionedThroughput: &types.ProvisionedThroughput{
@@ -166,7 +186,11 @@ func CreateTables(client *dynamodb.Client) error {
 		return fmt.Errorf("user notifications table - %w", err)
 	}
 
-	if err := createDistributionListTable(client, sdb.DISTRIBUTION_LISTS_TABLE); err != nil {
+	if err := createDLRecipientsTable(client, sdb.DIST_LIST_RECIPIENTS_TABLE); err != nil {
+		return fmt.Errorf("distribution lists table - %w", err)
+	}
+
+	if err := createDLSummaryTable(client, sdb.DIST_LIST_SUMMARY_TABLE); err != nil {
 		return fmt.Errorf("distribution lists table - %w", err)
 	}
 

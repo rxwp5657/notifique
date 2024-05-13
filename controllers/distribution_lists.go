@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"golang.org/x/net/context"
@@ -139,6 +140,7 @@ func (dc DistributionListController) handleRecipients(c *gin.Context, handler re
 	summary, err := handler(c, uriParams.Name, recipients.Recipients)
 
 	if err != nil {
+		fmt.Println(err)
 		if errors.As(err, &internal.DistributionListNotFound{}) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
