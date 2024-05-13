@@ -59,7 +59,9 @@ func createTable(client *dynamodb.Client, tableName string, input *dynamodb.Crea
 	return nil
 }
 
-func createNotificationTable(client *dynamodb.Client, tableName string) error {
+func createNotificationTable(client *dynamodb.Client) error {
+
+	tableName := sdb.NOTIFICATION_TABLE
 
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
@@ -80,7 +82,10 @@ func createNotificationTable(client *dynamodb.Client, tableName string) error {
 	return createTable(client, tableName, &tableInput)
 }
 
-func createUserConfigTable(client *dynamodb.Client, tableName string) error {
+func createUserConfigTable(client *dynamodb.Client) error {
+
+	tableName := sdb.USER_CONFIG_TABLE
+
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
 			AttributeName: aws.String("userId"),
@@ -100,7 +105,10 @@ func createUserConfigTable(client *dynamodb.Client, tableName string) error {
 	return createTable(client, tableName, &tableInput)
 }
 
-func createUserNotificationTable(client *dynamodb.Client, tableName string) error {
+func createUserNotificationTable(client *dynamodb.Client) error {
+
+	tableName := sdb.USER_NOTIFICATIONS_TABLE
+
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
 			AttributeName: aws.String("userId"),
@@ -126,7 +134,10 @@ func createUserNotificationTable(client *dynamodb.Client, tableName string) erro
 	return createTable(client, tableName, &tableInput)
 }
 
-func createDLRecipientsTable(client *dynamodb.Client, tableName string) error {
+func createDLRecipientsTable(client *dynamodb.Client) error {
+
+	tableName := sdb.DIST_LIST_RECIPIENTS_TABLE
+
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
 			AttributeName: aws.String("listName"),
@@ -152,7 +163,10 @@ func createDLRecipientsTable(client *dynamodb.Client, tableName string) error {
 	return createTable(client, tableName, &tableInput)
 }
 
-func createDLSummaryTable(client *dynamodb.Client, tableName string) error {
+func createDLSummaryTable(client *dynamodb.Client) error {
+
+	tableName := sdb.DIST_LIST_SUMMARY_TABLE
+
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
 			AttributeName: aws.String("name"),
@@ -174,23 +188,23 @@ func createDLSummaryTable(client *dynamodb.Client, tableName string) error {
 
 func CreateTables(client *dynamodb.Client) error {
 
-	if err := createNotificationTable(client, sdb.NOTIFICATION_TABLE); err != nil {
+	if err := createNotificationTable(client); err != nil {
 		return fmt.Errorf("notifications table - %w", err)
 	}
 
-	if err := createUserConfigTable(client, sdb.USER_CONFIG_TABLE); err != nil {
+	if err := createUserConfigTable(client); err != nil {
 		return fmt.Errorf("user config table - %w", err)
 	}
 
-	if err := createUserNotificationTable(client, sdb.USER_NOTIFICATIONS_TABLE); err != nil {
+	if err := createUserNotificationTable(client); err != nil {
 		return fmt.Errorf("user notifications table - %w", err)
 	}
 
-	if err := createDLRecipientsTable(client, sdb.DIST_LIST_RECIPIENTS_TABLE); err != nil {
+	if err := createDLRecipientsTable(client); err != nil {
 		return fmt.Errorf("distribution lists table - %w", err)
 	}
 
-	if err := createDLSummaryTable(client, sdb.DIST_LIST_SUMMARY_TABLE); err != nil {
+	if err := createDLSummaryTable(client); err != nil {
 		return fmt.Errorf("distribution lists table - %w", err)
 	}
 
