@@ -19,8 +19,8 @@ type userNotification struct {
 }
 
 type userNotificationKey struct {
-	UserId    string `dynamodbav:"userId"`
-	CreatedAt string `dynamodbav:"createdAt"`
+	UserId    string `dynamodbav:"userId" json:"userId"`
+	CreatedAt string `dynamodbav:"createdAt" json:"createdAt"`
 }
 
 func (n *userNotification) GetKey() (DynamoDBKey, error) {
