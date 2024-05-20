@@ -68,11 +68,11 @@ func (nc UserController) SetReadStatus(c *gin.Context) {
 	err := nc.Storage.SetReadStatus(c, userId, n.NotificationId)
 
 	if err != nil {
-		slog.Error(err.Error())
 		if errors.As(err, &internal.NotificationNotFound{}) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		} else {
+			slog.Error(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}

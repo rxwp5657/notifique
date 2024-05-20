@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -26,7 +27,9 @@ func (nc NotificationController) CreateNotification(c *gin.Context) {
 	}
 
 	userId := c.GetHeader(USER_ID_HEADER_KEY)
+
 	if _, err := nc.Storage.SaveNotification(c, userId, notification); err != nil {
+		slog.Error(err.Error())
 		c.Status(http.StatusInternalServerError)
 		return
 	}
