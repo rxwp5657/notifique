@@ -162,10 +162,12 @@ func makeNewUserConfig() []dto.ChannelConfig {
 
 	newUserConfig := make([]dto.ChannelConfig, 0, len(channels))
 
-	for _, channel := range channels {
-		config := dto.ChannelConfig{Channel: channel, OptIn: true}
-		newUserConfig = append(newUserConfig, config)
-	}
+	/*
+		for _, channel := range channels {
+			config := dto.ChannelConfig{Channel: channel, OptIn: true}
+			newUserConfig = append(newUserConfig, config)
+		}
+	*/
 
 	return newUserConfig
 }
@@ -189,7 +191,7 @@ func (s *InMemoryStorage) UpdateUserConfig(ctx context.Context, userId string, c
 		s.usersConfig[userId] = newUserConfig
 	}
 
-	s.usersConfig[userId] = config.Config
+	// s.usersConfig[userId] = config.Config
 
 	return nil
 }

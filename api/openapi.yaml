@@ -49,29 +49,6 @@ paths:
                       data:
                         $ref: '#/components/schemas/UserNotification'
 
-  /users/{id}/notifications:
-    post:
-      summary: Creates a new in-app user notification.
-    tags:
-      - users
-    parameters:
-    - in: path
-      name: id
-      description: user id.
-      schema:
-        $ref: '#/components/schemas/DistributionListName'
-    requestBody:
-      required: true
-      content:
-        application/json:
-            schema:
-              $ref: '#/components/schemas/UserNotificationReq'
-    responses:
-      "201":
-        description: Notification created.
-      "400":
-        description: Some validation failed.
-
   /users/me/notifications/{id}:
     patch:
       summary: Updates the notification's read status.

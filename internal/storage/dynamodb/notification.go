@@ -1,5 +1,10 @@
 package storage
 
+const (
+	NOTIFICATIONS_TABLE   = "notifications"
+	NOTIFICATION_HASH_KEY = "id"
+)
+
 type notificationLog struct {
 	Channel    string `dynamodbav:"channel"`
 	Status     string `dynamodbav:"status"`

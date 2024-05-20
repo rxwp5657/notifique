@@ -8,10 +8,11 @@ import (
 )
 
 const (
-	NOTIFICATION_HASH_KEY      = "id"
-	USER_NOTIFICATION_HASH_KEY = "userId"
-	USER_NOTIFICATION_SORT_KEY = "createdAt"
-	USER_CONFIG_HASH_KEY       = "userId"
+	USER_NOTIFICATIONS_TABLE                  = "userNotifications"
+	USER_NOTIFICATIONS_CREATEDAT_IDX          = "createdAtIdx"
+	USER_NOTIFICATIONS_HASH_KEY               = "userId"
+	USER_NOTIFICATIONS_SORT_KEY               = "id"
+	USER_NOTIFICATIONS_CREATEDAT_IDX_SORT_KEY = "createdAt"
 )
 
 type userNotification struct {
@@ -33,6 +34,27 @@ type userNotificationKey struct {
 func (n *userNotification) GetKey() (DynamoDBKey, error) {
 	key := make(map[string]types.AttributeValue)
 
+	userId, err := attributevalue.Marshal(n.UserId)
+
+	if err != nil {
+		return key, fmt.Errorf("failed to marshall userId - %w", err)
+	}
+
+	id, err := attributevalue.Marshal(n.Id)
+
+	if err != nil {
+		return key, fmt.Errorf("failed to marshall createdAt - %w", err)
+	}
+
+	key["userId"] = userId
+	key["id"] = id
+
+	return key, nil
+}
+
+func (n *userNotification) GetSecondaryIdxKey() (DynamoDBKey, error) {
+	key := make(map[string]types.AttributeValue)
+
 	id, err := attributevalue.Marshal(n.UserId)
 
 	if err != nil {
@@ -52,7 +74,7 @@ func (n *userNotification) GetKey() (DynamoDBKey, error) {
 }
 
 func (n *userNotificationKey) GetKey() (DynamoDBKey, error) {
-	un := userNotification{UserId: n.UserId, CreatedAt: n.CreatedAt}
+	un := userNotification{UserId: n.UserId, Id: n.UserId}
 
 	return un.GetKey()
 }

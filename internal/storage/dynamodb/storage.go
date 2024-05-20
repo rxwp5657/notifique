@@ -20,15 +20,6 @@ import (
 	"github.com/notifique/internal"
 )
 
-const (
-	NOTIFICATION_TABLE           = "notifications"
-	USER_CONFIG_TABLE            = "userConfig"
-	USER_NOTIFICATIONS_TABLE     = "userNotifications"
-	USER_NOTIFICATIONS_TOPIC_IDX = "topicIndex"
-	DIST_LIST_RECIPIENTS_TABLE   = "DistributionListRecipients"
-	DIST_LIST_SUMMARY_TABLE      = "DistributionListSummary"
-)
-
 type DynamoDBStorage struct {
 	client *dynamodb.Client
 }
@@ -86,14 +77,15 @@ func (s *DynamoDBStorage) getUserConfig(ctx context.Context, userId string) (*us
 	}
 
 	resp, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
-		Key: key, TableName: aws.String(USER_CONFIG_TABLE),
+		Key:       key,
+		TableName: aws.String(USER_CONFIG_TABLE),
 	})
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to get the user config - %w", err)
 	}
 
-	if resp == nil {
+	if len(resp.Item) == 0 {
 		return nil, nil
 	}
 
@@ -113,6 +105,7 @@ func (s *DynamoDBStorage) createUserConfig(ctx context.Context, userId string) (
 		UserId:      userId,
 		EmailConfig: channelConfig{OptIn: true, SnoozeUntil: nil},
 		SMSConfig:   channelConfig{OptIn: true, SnoozeUntil: nil},
+		InAppConfig: channelConfig{OptIn: true, SnoozeUntil: nil},
 	}
 
 	item, err := attributevalue.MarshalMap(config)
@@ -140,7 +133,7 @@ func (s *DynamoDBStorage) SaveNotification(ctx context.Context, createdBy string
 	notification := notification{
 		Id:               id,
 		CreatedBy:        createdBy,
-		CreatedAt:        time.Now().Format(time.RFC3339),
+		CreatedAt:        time.Now().Format(time.RFC3339Nano),
 		Title:            notificationReq.Title,
 		Contents:         notificationReq.Contents,
 		Image:            notificationReq.Image,
@@ -159,45 +152,12 @@ func (s *DynamoDBStorage) SaveNotification(ctx context.Context, createdBy string
 	}
 
 	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(NOTIFICATION_TABLE),
+		TableName: aws.String(NOTIFICATIONS_TABLE),
 		Item:      item,
 	})
 
 	if err != nil {
 		return "", fmt.Errorf("failed to store notification - %w", err)
-	}
-
-	return id, nil
-}
-
-func (s *DynamoDBStorage) CreateUserNotification(ctx context.Context, userId string, notificationReq dto.UserNotificationReq) (string, error) {
-
-	id := uuid.NewString()
-
-	notification := userNotification{
-		Id:        id,
-		UserId:    userId,
-		Title:     notificationReq.Title,
-		Contents:  notificationReq.Contents,
-		CreatedAt: time.Now().Format(time.RFC3339),
-		Image:     notificationReq.Image,
-		ReadAt:    nil,
-		Topic:     notificationReq.Topic,
-	}
-
-	item, err := attributevalue.MarshalMap(notification)
-
-	if err != nil {
-		return "", fmt.Errorf("failed to marshall user notification - %w", err)
-	}
-
-	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(USER_NOTIFICATIONS_TABLE),
-		Item:      item,
-	})
-
-	if err != nil {
-		return "", fmt.Errorf("failed to store user notification - %w", err)
 	}
 
 	return id, nil
@@ -258,7 +218,7 @@ func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.
 
 	page := dto.Page[dto.UserNotification]{}
 
-	keyExp := expression.Key(USER_NOTIFICATION_HASH_KEY).Equal(expression.Value(filters.UserId))
+	keyExp := expression.Key(USER_NOTIFICATIONS_HASH_KEY).Equal(expression.Value(filters.UserId))
 	builder := expression.NewBuilder().WithKeyCondition(keyExp)
 
 	topicsFilter := makeInFilter("topic", filters.Topics)
@@ -288,6 +248,7 @@ func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.
 		ScanIndexForward:          aws.Bool(false),
 		Limit:                     pageParams.Limit,
 		ExclusiveStartKey:         pageParams.ExclusiveStartKey,
+		IndexName:                 aws.String(USER_NOTIFICATIONS_CREATEDAT_IDX),
 	}
 
 	response, err := s.client.Query(ctx, &queryInput)
@@ -340,63 +301,74 @@ func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.
 	return page, nil
 }
 
-func (s *DynamoDBStorage) GetUserConfig(ctx context.Context, userId string) ([]dto.ChannelConfig, error) {
+func (s *DynamoDBStorage) GetUserConfig(ctx context.Context, userId string) (dto.UserConfig, error) {
 
 	config, err := s.getUserConfig(ctx, userId)
 
 	if err != nil {
-		return []dto.ChannelConfig{}, err
+		return dto.UserConfig{}, err
 	}
 
 	if config == nil {
 		config, err = s.createUserConfig(ctx, userId)
 
 		if err != nil {
-			return []dto.ChannelConfig{}, err
+			return dto.UserConfig{}, err
 		}
 	}
 
-	chCfg := []dto.ChannelConfig{
-		{
-			Channel:     "e-mail",
+	cfg := dto.UserConfig{
+		EmailConfig: dto.ChannelConfig{
 			OptIn:       config.EmailConfig.OptIn,
 			SnoozeUntil: config.EmailConfig.SnoozeUntil,
 		},
-		{
-			Channel:     "sms",
-			OptIn:       config.EmailConfig.OptIn,
-			SnoozeUntil: config.EmailConfig.SnoozeUntil,
+		SMSConfig: dto.ChannelConfig{
+			OptIn:       config.SMSConfig.OptIn,
+			SnoozeUntil: config.SMSConfig.SnoozeUntil,
+		},
+		InAppConfig: dto.ChannelConfig{
+			OptIn:       config.InAppConfig.OptIn,
+			SnoozeUntil: config.InAppConfig.SnoozeUntil,
 		},
 	}
 
-	return chCfg, nil
+	return cfg, nil
 }
 
 func (s *DynamoDBStorage) SetReadStatus(ctx context.Context, userId, notificationId string) error {
 
-	reatAt := time.Now().Format(time.RFC3339)
+	reatAt := time.Now().Format(time.RFC3339Nano)
 	update := expression.Set(expression.Name("readAt"), expression.Value(reatAt))
-	expr, err := expression.NewBuilder().WithUpdate(update).Build()
+	condEx := expression.AttributeExists(expression.Name(USER_NOTIFICATIONS_HASH_KEY))
+	expr, err := expression.NewBuilder().WithUpdate(update).WithCondition(condEx).Build()
 
 	if err != nil {
 		return fmt.Errorf("failed to make update query - %w", err)
 	}
 
-	tmpNotification := userNotification{Id: notificationId}
-	key, err := tmpNotification.GetKey()
+	notification := userNotification{UserId: userId, Id: notificationId}
+	key, err := notification.GetKey()
 
 	if err != nil {
 		return err
 	}
 
 	_, err = s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName:                 aws.String(USER_NOTIFICATIONS_TABLE),
-		Key:                       key,
-		ExpressionAttributeNames:  expr.Names(),
-		ExpressionAttributeValues: expr.Values(),
+		TableName:                           aws.String(USER_NOTIFICATIONS_TABLE),
+		Key:                                 key,
+		ExpressionAttributeNames:            expr.Names(),
+		ExpressionAttributeValues:           expr.Values(),
+		UpdateExpression:                    expr.Update(),
+		ConditionExpression:                 expr.Condition(),
+		ReturnValues:                        types.ReturnValueUpdatedNew,
+		ReturnValuesOnConditionCheckFailure: types.ReturnValuesOnConditionCheckFailureNone,
 	})
 
 	if err != nil {
+		target := &types.ConditionalCheckFailedException{}
+		if errors.As(err, &target) {
+			return internal.NotificationNotFound{NotificationId: notificationId}
+		}
 		return fmt.Errorf("failed to set the read status - %w", err)
 	}
 
@@ -419,33 +391,24 @@ func (s *DynamoDBStorage) UpdateUserConfig(ctx context.Context, userId string, c
 		}
 	}
 
-	builder := expression.NewBuilder()
-
-	makeUpdateExpr := func(key string, cfg dto.ChannelConfig) expression.UpdateBuilder {
-		update := expression.Set(
-			expression.Name(fmt.Sprintf("%v.optIn", key)),
-			expression.Value(cfg.OptIn),
-		)
-		update.Set(
-			expression.Name(fmt.Sprintf("%v.optIn", key)),
-			expression.Value(cfg.SnoozeUntil),
-		)
-
-		return update
-	}
-
-	for _, config := range config.Config {
-		switch config.Channel {
-		case "e-mail":
-			update := makeUpdateExpr("emailConfig", config)
-			builder.WithUpdate(update)
-		case "sms":
-			update := makeUpdateExpr("smsConfig", config)
-			builder.WithUpdate(update)
+	makeKeyFormatter := func(key string) func(string) expression.NameBuilder {
+		return func(subKey string) expression.NameBuilder {
+			return expression.Name(fmt.Sprintf("%v.%v", key, subKey))
 		}
 	}
 
-	expr, err := builder.Build()
+	emailFmt := makeKeyFormatter(USER_CONFIG_EMAIL_KEY)
+	smsFmt := makeKeyFormatter(USER_CONFIG_SMS_KEY)
+	inAppFmt := makeKeyFormatter(USER_CONFIG_INAPP_KEY)
+
+	update := expression.Set(emailFmt(USER_CONFIG_OPT_IN), expression.Value(config.EmailConfig.OptIn))
+	update.Set(emailFmt(USER_CONFIG_SNOOZE_UNTIL), expression.Value(config.EmailConfig.SnoozeUntil))
+	update.Set(smsFmt(USER_CONFIG_OPT_IN), expression.Value(config.SMSConfig.OptIn))
+	update.Set(smsFmt(USER_CONFIG_SNOOZE_UNTIL), expression.Value(config.SMSConfig.SnoozeUntil))
+	update.Set(inAppFmt(USER_CONFIG_OPT_IN), expression.Value(config.InAppConfig.OptIn))
+	update.Set(inAppFmt(USER_CONFIG_SNOOZE_UNTIL), expression.Value(config.InAppConfig.SnoozeUntil))
+
+	expr, err := expression.NewBuilder().WithUpdate(update).Build()
 
 	if err != nil {
 		return fmt.Errorf("failed to make update query - %w", err)
@@ -463,6 +426,9 @@ func (s *DynamoDBStorage) UpdateUserConfig(ctx context.Context, userId string, c
 		Key:                       key,
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
+		UpdateExpression:          expr.Update(),
+		ConditionExpression:       expr.Condition(),
+		ReturnValues:              types.ReturnValueUpdatedNew,
 	})
 
 	if err != nil {
@@ -976,7 +942,60 @@ func (s *DynamoDBStorage) DeleteRecipients(ctx context.Context, listName string,
 	return summary, nil
 }
 
+func (s *DynamoDBStorage) CreateUserNotification(ctx context.Context, userId string, un dto.UserNotification) error {
+
+	notification := userNotification{
+		Id:        un.Id,
+		UserId:    userId,
+		Title:     un.Title,
+		Contents:  un.Contents,
+		CreatedAt: un.CreatedAt,
+		Image:     un.Image,
+		ReadAt:    un.ReadAt,
+		Topic:     un.Topic,
+	}
+
+	item, err := attributevalue.MarshalMap(notification)
+
+	if err != nil {
+		return fmt.Errorf("failed to marshall user notification - %w", err)
+	}
+
+	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(USER_NOTIFICATIONS_TABLE),
+		Item:      item,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to store user notification - %w", err)
+	}
+
+	return nil
+}
+
+func (s *DynamoDBStorage) DeleteUserNotification(ctx context.Context, userId string, un dto.UserNotification) error {
+
+	notification := userNotification{
+		UserId: userId,
+		ReadAt: un.ReadAt,
+	}
+
+	key, err := notification.GetKey()
+
+	if err != nil {
+		return err
+	}
+
+	_, err = s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: aws.String(USER_NOTIFICATIONS_TABLE),
+		Key:       key,
+	})
+
+	return err
+}
+
 func MakeDynamoDBStorage(baseEndpoint *string) DynamoDBStorage {
+
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 
 	if err != nil {

@@ -8,6 +8,8 @@ import (
 )
 
 const (
+	DIST_LIST_RECIPIENTS_TABLE   = "DistributionListRecipients"
+	DIST_LIST_SUMMARY_TABLE      = "DistributionListSummary"
 	DIST_LIST_RECIPIENT_HASH_KEY = "listName"
 	DIST_LIST_RECIPIENT_SORT_KEY = "userId"
 	DIST_LIST_SUMMARY_HASH_KEY   = "name"

@@ -7,6 +7,16 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
+const (
+	USER_CONFIG_TABLE        = "userConfig"
+	USER_CONFIG_HASH_KEY     = "userId"
+	USER_CONFIG_EMAIL_KEY    = "emailConfig"
+	USER_CONFIG_SMS_KEY      = "smsConfig"
+	USER_CONFIG_INAPP_KEY    = "inAppConfig"
+	USER_CONFIG_SNOOZE_UNTIL = "snoozeUntil"
+	USER_CONFIG_OPT_IN       = "optIn"
+)
+
 type channelConfig struct {
 	OptIn       bool    `dynamodbav:"optIn"`
 	SnoozeUntil *string `dynamodbav:"snoozeUntil"`
@@ -16,6 +26,7 @@ type userConfig struct {
 	UserId      string        `dynamodbav:"userId"`
 	EmailConfig channelConfig `dynamodbav:"emailConfig"`
 	SMSConfig   channelConfig `dynamodbav:"smsConfig"`
+	InAppConfig channelConfig `dynamodbav:"inAppConfig"`
 }
 
 func (cfg *userConfig) GetKey() (DynamoDBKey, error) {
