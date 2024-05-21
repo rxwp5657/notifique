@@ -139,8 +139,20 @@ func TestUserController(t *testing.T) {
 		})
 
 		t.Run("Should fail to set the read status on a non-existing notification", func(t *testing.T) {
-			w := setReadStatus(userId, uuid.NewString())
+			notificationId := uuid.NewString()
+			w := setReadStatus(userId, notificationId)
+
+			resp := make(map[string]string, 0)
+
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.FailNow()
+			}
+
+			errTemplate := "Notification %v not found"
+			errMsg := fmt.Sprintf(errTemplate, notificationId)
+
 			assert.Equal(t, http.StatusNotFound, w.Code)
+			assert.Equal(t, resp["error"], errMsg)
 		})
 	})
 
@@ -215,7 +227,16 @@ func TestUserController(t *testing.T) {
 
 			w := updateUserConfig(userId, userConfig)
 
-			assert.Equal(t, 400, w.Code)
+			resp := make(map[string]string, 0)
+
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.FailNow()
+			}
+
+			errMsg := "Error:Field validation for 'SnoozeUntil' failed"
+
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			assert.Contains(t, resp["error"], errMsg)
 		})
 	})
 }

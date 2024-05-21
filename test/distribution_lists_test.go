@@ -49,11 +49,51 @@ func TestDistributionListController(t *testing.T) {
 		return w
 	}
 
+	addRecipients := func(dlName string, recipients []string) *httptest.ResponseRecorder {
+
+		w := httptest.NewRecorder()
+
+		body := make(map[string][]string)
+		body["recipients"] = recipients
+
+		marshalled, _ := json.Marshal(body)
+		reader := bytes.NewReader(marshalled)
+
+		url := fmt.Sprintf("/v0/distribution-lists/%v/recipients", dlName)
+
+		req, _ := http.NewRequest("PATCH", url, reader)
+		req.Header.Add("userId", userId)
+
+		router.ServeHTTP(w, req)
+
+		return w
+	}
+
+	deleteRecipients := func(dlName string, recipients []string) *httptest.ResponseRecorder {
+
+		w := httptest.NewRecorder()
+
+		body := make(map[string][]string)
+		body["recipients"] = recipients
+
+		marshalled, _ := json.Marshal(body)
+		reader := bytes.NewReader(marshalled)
+
+		url := fmt.Sprintf("/v0/distribution-lists/%v/recipients", dlName)
+
+		req, _ := http.NewRequest("DELETE", url, reader)
+		req.Header.Add("userId", userId)
+
+		router.ServeHTTP(w, req)
+
+		return w
+	}
+
 	t.Run("TestCreateDistributionList", func(t *testing.T) {
 
 		t.Run("Should be able to create a distribution list", func(t *testing.T) {
 			w := createDistributionList(dl)
-			assert.Equal(t, 201, w.Code)
+			assert.Equal(t, http.StatusCreated, w.Code)
 		})
 
 		t.Run("Should fail if distribution list has a bad name", func(t *testing.T) {
@@ -63,7 +103,17 @@ func TestDistributionListController(t *testing.T) {
 			}
 
 			w := createDistributionList(dl)
-			assert.Equal(t, 400, w.Code)
+
+			resp := make(map[string]string, 0)
+
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.FailNow()
+			}
+
+			expectedMsg := "Error:Field validation for 'Name' failed"
+
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			assert.Contains(t, resp["error"], expectedMsg)
 		})
 
 		storage.DeleteDistributionList(context.TODO(), dl.Name)
@@ -79,7 +129,18 @@ func TestDistributionListController(t *testing.T) {
 
 		t.Run("Should not be able to create a list with the same name", func(t *testing.T) {
 			w := createDistributionList(dl)
-			assert.Equal(t, 400, w.Code)
+
+			resp := make(map[string]string, 0)
+
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.FailNow()
+			}
+
+			errTemplate := "Distribution list %v already exists"
+			expectedMsg := fmt.Sprintf(errTemplate, dl.Name)
+
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			assert.Equal(t, expectedMsg, resp["error"])
 		})
 
 		err = storage.DeleteDistributionList(context.TODO(), dl.Name)
@@ -127,7 +188,7 @@ func TestDistributionListController(t *testing.T) {
 				t.FailNow()
 			}
 
-			assert.Equal(t, 200, w.Code)
+			assert.Equal(t, http.StatusOK, w.Code)
 			assert.ElementsMatch(t, expectedResp.Data, resp.Data)
 		})
 
@@ -230,7 +291,7 @@ func TestDistributionListController(t *testing.T) {
 			errorTemplate := "Distribution list %v not found"
 			expectedError := fmt.Sprintf(errorTemplate, missingDL)
 
-			assert.Equal(t, 404, w.Code)
+			assert.Equal(t, http.StatusNotFound, w.Code)
 			assert.Equal(t, expectedError, resp["error"])
 		})
 
@@ -273,26 +334,6 @@ func TestDistributionListController(t *testing.T) {
 
 	t.Run("TestAddRecipients", func(t *testing.T) {
 
-		addRecipients := func(dlName string, recipients []string) *httptest.ResponseRecorder {
-
-			w := httptest.NewRecorder()
-
-			body := make(map[string][]string)
-			body["recipients"] = recipients
-
-			marshalled, _ := json.Marshal(body)
-			reader := bytes.NewReader(marshalled)
-
-			url := fmt.Sprintf("/v0/distribution-lists/%v/recipients", dlName)
-
-			req, _ := http.NewRequest("PATCH", url, reader)
-			req.Header.Add("userId", userId)
-
-			router.ServeHTTP(w, req)
-
-			return w
-		}
-
 		err := storage.CreateDistributionList(context.TODO(), dl)
 
 		if err != nil {
@@ -316,15 +357,27 @@ func TestDistributionListController(t *testing.T) {
 				t.FailNow()
 			}
 
-			assert.Equal(t, 200, w.Code)
+			assert.Equal(t, http.StatusOK, w.Code)
 			assert.Equal(t, expectedSummary, resp)
 		})
 
 		t.Run("Should fail if the distribution list doesn't exists", func(t *testing.T) {
 
+			dlName := "Missing"
+
 			w := addRecipients("Missing", []string{})
 
-			assert.Equal(t, 400, w.Code)
+			resp := make(map[string]string, 0)
+
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.FailNow()
+			}
+
+			errTemplate := "Distribution list %v not found"
+			expectedMsg := fmt.Sprintf(errTemplate, dlName)
+
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			assert.Equal(t, expectedMsg, resp["error"])
 		})
 
 		t.Run("Should fail when adding empty recipients", func(t *testing.T) {
@@ -332,7 +385,15 @@ func TestDistributionListController(t *testing.T) {
 
 			w := addRecipients(dl.Name, newRecipients)
 
-			assert.Equal(t, 400, w.Code)
+			resp := make(map[string]string, 0)
+
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.FailNow()
+			}
+
+			errMsg := "Error:Field validation for 'Recipients[0]'"
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			assert.Contains(t, resp["error"], errMsg)
 		})
 
 		t.Run("Should fail when exceeding the number of recipients", func(t *testing.T) {
@@ -340,7 +401,15 @@ func TestDistributionListController(t *testing.T) {
 
 			w := addRecipients(dl.Name, newRecipients)
 
-			assert.Equal(t, 400, w.Code)
+			resp := make(map[string]string, 0)
+
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.FailNow()
+			}
+
+			errMsg := "validation for 'Recipients' failed on the 'max' tag"
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			assert.Contains(t, resp["error"], errMsg)
 		})
 
 		err = storage.DeleteDistributionList(context.TODO(), dl.Name)
@@ -351,26 +420,6 @@ func TestDistributionListController(t *testing.T) {
 	})
 
 	t.Run("TestRemoveRecipients", func(t *testing.T) {
-
-		deleteRecipients := func(dlName string, recipients []string) *httptest.ResponseRecorder {
-
-			w := httptest.NewRecorder()
-
-			body := make(map[string][]string)
-			body["recipients"] = recipients
-
-			marshalled, _ := json.Marshal(body)
-			reader := bytes.NewReader(marshalled)
-
-			url := fmt.Sprintf("/v0/distribution-lists/%v/recipients", dlName)
-
-			req, _ := http.NewRequest("DELETE", url, reader)
-			req.Header.Add("userId", userId)
-
-			router.ServeHTTP(w, req)
-
-			return w
-		}
 
 		err := storage.CreateDistributionList(context.TODO(), dl)
 
@@ -399,9 +448,21 @@ func TestDistributionListController(t *testing.T) {
 		})
 
 		t.Run("Should fail if the distribution list doesn't exists", func(t *testing.T) {
-			w := deleteRecipients("Missing", []string{})
+			dlName := "Missing"
 
-			assert.Equal(t, 400, w.Code)
+			w := deleteRecipients(dlName, []string{})
+
+			resp := make(map[string]string, 0)
+
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.FailNow()
+			}
+
+			errTemplate := "Distribution list %v not found"
+			errMsg := fmt.Sprintf(errTemplate, dlName)
+
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			assert.Equal(t, errMsg, resp["error"])
 		})
 
 		t.Run("Should fail when adding empty recipients", func(t *testing.T) {
@@ -409,7 +470,15 @@ func TestDistributionListController(t *testing.T) {
 
 			w := deleteRecipients(dl.Name, toDelete)
 
-			assert.Equal(t, 400, w.Code)
+			resp := make(map[string]string, 0)
+
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.FailNow()
+			}
+
+			errMsg := "Error:Field validation for 'Recipients[0]'"
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			assert.Contains(t, resp["error"], errMsg)
 		})
 
 		t.Run("Should fail when exceeding the number of recipients", func(t *testing.T) {
@@ -417,7 +486,15 @@ func TestDistributionListController(t *testing.T) {
 
 			w := deleteRecipients(dl.Name, toDelete)
 
-			assert.Equal(t, 400, w.Code)
+			resp := make(map[string]string, 0)
+
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.FailNow()
+			}
+
+			errMsg := "validation for 'Recipients' failed on the 'max' tag"
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			assert.Contains(t, resp["error"], errMsg)
 		})
 
 		err = storage.DeleteDistributionList(context.TODO(), dl.Name)
@@ -425,7 +502,61 @@ func TestDistributionListController(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to delete distribution list - %v", err)
 		}
+	})
 
+	t.Run("TestDuplicatedRecipients", func(t *testing.T) {
+
+		err := storage.CreateDistributionList(context.TODO(), dl)
+
+		if err != nil {
+			t.Fatalf("failed to create distribution list - %v", err)
+		}
+
+		t.Run("Should do nothing if users are already added", func(t *testing.T) {
+			recipients := dl.Recipients[:2]
+
+			expectedSummary := dto.DistributionListSummary{
+				Name:               dl.Name,
+				NumberOfRecipients: len(dl.Recipients),
+			}
+
+			w := addRecipients(dl.Name, recipients)
+
+			resp := dto.DistributionListSummary{}
+
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatal("failed to unmarshall dist list summary body")
+			}
+
+			assert.Equal(t, http.StatusOK, w.Code)
+			assert.Equal(t, expectedSummary, resp)
+		})
+
+		t.Run("Should do nothing if users are not recipients of dl", func(t *testing.T) {
+			recipients := []string{"-1", "-2"}
+
+			expectedSummary := dto.DistributionListSummary{
+				Name:               dl.Name,
+				NumberOfRecipients: len(dl.Recipients),
+			}
+
+			w := deleteRecipients(dl.Name, recipients)
+
+			resp := dto.DistributionListSummary{}
+
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatal("failed to unmarshall dist list summary body")
+			}
+
+			assert.Equal(t, http.StatusOK, w.Code)
+			assert.Equal(t, expectedSummary, resp)
+		})
+
+		err = storage.DeleteDistributionList(context.TODO(), dl.Name)
+
+		if err != nil {
+			t.Fatalf("failed to delete distribution list - %v", err)
+		}
 	})
 
 	t.Run("TestDeleteDistributionList", func(t *testing.T) {
