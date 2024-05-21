@@ -45,7 +45,7 @@ func (dl *distListRecipient) GetKey() (DynamoDBKey, error) {
 	}
 
 	key[DIST_LIST_RECIPIENT_HASH_KEY] = name
-	key["userId"] = userId
+	key[DIST_LIST_RECIPIENT_SORT_KEY] = userId
 
 	return key, nil
 }
@@ -59,7 +59,7 @@ func getSummaryKey(listName string) (DynamoDBKey, error) {
 		return key, fmt.Errorf("failed to marshall dl name - %w", err)
 	}
 
-	key["name"] = name
+	key[DIST_LIST_SUMMARY_HASH_KEY] = name
 
 	return key, nil
 }

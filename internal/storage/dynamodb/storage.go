@@ -34,6 +34,7 @@ type DynamoDBPageParams struct {
 }
 
 type DynamoDBKey map[string]types.AttributeValue
+type DynamoObj map[string]types.AttributeValue
 
 func marshallNextToken[T any](key *T, lastEvaluatedKey DynamoDBKey) (string, error) {
 	err := attributevalue.UnmarshalMap(lastEvaluatedKey, &key)
@@ -471,12 +472,12 @@ func (s *DynamoDBStorage) addRecipients(ctx context.Context, recipients []distLi
 	return len(recipients), nil
 }
 
-func (s *DynamoDBStorage) distListExists(ctx context.Context, listName string) (bool, error) {
+func (s *DynamoDBStorage) queryDistListSummary(ctx context.Context, listName string) (*map[string]types.AttributeValue, error) {
 	summary := distListSummary{Name: listName}
 	key, err := summary.GetKey()
 
 	if err != nil {
-		return false, err
+		return nil, fmt.Errorf("failed to get distribution list key - %w", err)
 	}
 
 	resp, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
@@ -485,10 +486,39 @@ func (s *DynamoDBStorage) distListExists(ctx context.Context, listName string) (
 	})
 
 	if err != nil {
+		return nil, fmt.Errorf("failed to get distribution list - %w", err)
+	}
+
+	return &resp.Item, nil
+}
+
+func (s *DynamoDBStorage) getDistListSummary(ctx context.Context, listName string) (*distListSummary, error) {
+	resp, err := s.queryDistListSummary(ctx, listName)
+
+	if err != nil {
+		return nil, err
+	}
+
+	summary := distListSummary{}
+
+	err = attributevalue.UnmarshalMap(*resp, &summary)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshall distribution list - %w", err)
+	}
+
+	return &summary, nil
+}
+
+func (s *DynamoDBStorage) distListExists(ctx context.Context, listName string) (bool, error) {
+
+	resp, err := s.queryDistListSummary(ctx, listName)
+
+	if err != nil {
 		return false, err
 	}
 
-	return len(resp.Item) != 0, nil
+	return len(*resp) != 0, nil
 }
 
 func (s *DynamoDBStorage) deleteSummary(ctx context.Context, listName string) error {
@@ -546,6 +576,10 @@ func (s *DynamoDBStorage) CreateDistributionList(ctx context.Context, dlReq dto.
 			DistListName: dlReq.Name,
 			UserId:       r,
 		})
+	}
+
+	if len(recipients) == 0 {
+		return nil
 	}
 
 	_, recipientsErr := s.addRecipients(ctx, recipients)
@@ -703,8 +737,18 @@ func (s *DynamoDBStorage) GetRecipients(ctx context.Context, distlistName string
 
 	page := dto.Page[string]{}
 
+	exists, err := s.distListExists(ctx, distlistName)
+
+	if err != nil {
+		return page, fmt.Errorf("failed to check if distribution list exists - %w", err)
+	}
+
+	if !exists {
+		return page, internal.DistributionListNotFound{Name: distlistName}
+	}
+
 	keyExp := expression.Key(DIST_LIST_RECIPIENT_HASH_KEY).Equal(expression.Value(distlistName))
-	projExp := expression.NamesList(expression.Name("userId"))
+	projExp := expression.NamesList(expression.Name(DIST_LIST_RECIPIENT_SORT_KEY))
 
 	builder := expression.NewBuilder()
 	expr, err := builder.WithKeyCondition(keyExp).WithProjection(projExp).Build()
@@ -713,7 +757,7 @@ func (s *DynamoDBStorage) GetRecipients(ctx context.Context, distlistName string
 		return page, fmt.Errorf("failed to build query - %w", err)
 	}
 
-	pageParams, err := makePageFilters(&userNotificationKey{}, filters)
+	pageParams, err := makePageFilters(&distListRecipient{}, filters)
 
 	if err != nil {
 		return page, fmt.Errorf("failed to make page params - %w", err)
@@ -874,16 +918,22 @@ func (s *DynamoDBStorage) getNewRecipients(recipientsInDL []distListRecipient, t
 	return newRecipients
 }
 
-func (s *DynamoDBStorage) AddRecipients(ctx context.Context, listName string, recipients []string) (dto.DistributionListSummary, error) {
+func (s *DynamoDBStorage) AddRecipients(ctx context.Context, listName string, recipients []string) (*dto.DistributionListSummary, error) {
 
-	summary := dto.DistributionListSummary{
-		Name: listName,
+	exists, err := s.distListExists(ctx, listName)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if distribution list exists - %w", err)
+	}
+
+	if !exists {
+		return nil, internal.DistributionListNotFound{Name: listName}
 	}
 
 	recipientsInDL, err := s.getRecipientsInDL(ctx, listName, recipients)
 
 	if err != nil {
-		return summary, fmt.Errorf("failed to retrieve recipients - %w", err)
+		return nil, fmt.Errorf("failed to retrieve recipients - %w", err)
 	}
 
 	newRecipients := s.getNewRecipients(recipientsInDL, recipients)
@@ -896,50 +946,92 @@ func (s *DynamoDBStorage) AddRecipients(ctx context.Context, listName string, re
 		})
 	}
 
+	if len(toAdd) == 0 {
+		summary, err := s.getDistListSummary(ctx, listName)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to get dist list summary - %w", err)
+		}
+
+		s := dto.DistributionListSummary{
+			Name:               listName,
+			NumberOfRecipients: summary.NumRecipients,
+		}
+
+		return &s, nil
+	}
+
 	_, err = s.addRecipients(ctx, toAdd)
 
 	if err != nil {
-		return summary, err
+		return nil, err
 	}
 
 	count, err := s.updateRecipientCount(ctx, listName, len(newRecipients))
 
 	if err != nil {
-		return summary, fmt.Errorf("failed to update summary count - %w", err)
+		return nil, fmt.Errorf("failed to update summary count - %w", err)
 	}
 
-	summary.NumberOfRecipients = count
+	summary := dto.DistributionListSummary{
+		Name:               listName,
+		NumberOfRecipients: count,
+	}
 
-	return summary, nil
+	return &summary, nil
 }
 
-func (s *DynamoDBStorage) DeleteRecipients(ctx context.Context, listName string, recipients []string) (dto.DistributionListSummary, error) {
+func (s *DynamoDBStorage) DeleteRecipients(ctx context.Context, listName string, recipients []string) (*dto.DistributionListSummary, error) {
 
-	summary := dto.DistributionListSummary{
-		Name: listName,
+	exists, err := s.distListExists(ctx, listName)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if distribution list exists - %w", err)
+	}
+
+	if !exists {
+		return nil, internal.DistributionListNotFound{Name: listName}
 	}
 
 	toRemove, err := s.getRecipientsInDL(ctx, listName, recipients)
 
 	if err != nil {
-		return summary, fmt.Errorf("failed to retrieve recipients - %w", err)
+		return nil, fmt.Errorf("failed to retrieve recipients - %w", err)
+	}
+
+	if len(toRemove) == 0 {
+		summary, err := s.getDistListSummary(ctx, listName)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to get dist list summary - %w", err)
+		}
+
+		s := dto.DistributionListSummary{
+			Name:               listName,
+			NumberOfRecipients: summary.NumRecipients,
+		}
+
+		return &s, nil
 	}
 
 	_, err = s.deleteRecipients(ctx, toRemove)
 
 	if err != nil {
-		return summary, err
+		return nil, err
 	}
 
 	count, err := s.updateRecipientCount(ctx, listName, -len(toRemove))
 
 	if err != nil {
-		return summary, fmt.Errorf("failed to update summary count - %w", err)
+		return nil, fmt.Errorf("failed to update summary count - %w", err)
 	}
 
-	summary.NumberOfRecipients = count
+	summary := dto.DistributionListSummary{
+		Name:               listName,
+		NumberOfRecipients: count,
+	}
 
-	return summary, nil
+	return &summary, nil
 }
 
 func (s *DynamoDBStorage) CreateUserNotification(ctx context.Context, userId string, un dto.UserNotification) error {

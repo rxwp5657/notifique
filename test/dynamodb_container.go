@@ -25,7 +25,7 @@ func setupDynamoDB(ctx context.Context) (*dynamodbContainer, error) {
 
 	req := testcontainers.ContainerRequest{
 		Image:      "amazon/dynamodb-local:2.4.0",
-		WaitingFor: wait.ForLog(`CorsParams.*`).AsRegexp(),
+		WaitingFor: wait.ForExposedPort(),
 	}
 
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{

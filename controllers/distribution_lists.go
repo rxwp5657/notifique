@@ -17,15 +17,15 @@ type DistributionListStorage interface {
 	GetDistributionLists(ctx context.Context, filter dto.PageFilter) (dto.Page[dto.DistributionListSummary], error)
 	DeleteDistributionList(ctx context.Context, distlistName string) error
 	GetRecipients(ctx context.Context, distlistName string, filter dto.PageFilter) (dto.Page[string], error)
-	AddRecipients(ctx context.Context, distlistName string, recipients []string) (dto.DistributionListSummary, error)
-	DeleteRecipients(ctx context.Context, distlistName string, recipients []string) (dto.DistributionListSummary, error)
+	AddRecipients(ctx context.Context, distlistName string, recipients []string) (*dto.DistributionListSummary, error)
+	DeleteRecipients(ctx context.Context, distlistName string, recipients []string) (*dto.DistributionListSummary, error)
 }
 
 type DistributionListController struct {
 	Storage DistributionListStorage
 }
 
-type recipientsHandler func(context.Context, string, []string) (dto.DistributionListSummary, error)
+type recipientsHandler func(context.Context, string, []string) (*dto.DistributionListSummary, error)
 
 func (dc DistributionListController) CreateDistributionList(c *gin.Context) {
 	var dl dto.DistributionList

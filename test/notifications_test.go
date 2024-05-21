@@ -2,6 +2,7 @@ package test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,46 +10,29 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	c "github.com/notifique/controllers"
 	"github.com/notifique/dto"
+	storage "github.com/notifique/internal/storage/dynamodb"
 	"github.com/notifique/routes"
 	"github.com/stretchr/testify/assert"
 )
 
-const userId = "12345"
+func TestNotificationsController(t *testing.T) {
 
-func makeNotificationRouter(ns c.NotificationStorage) *gin.Engine {
-	r := gin.Default()
-	routes.SetupNotificationRoutes(r, ns)
-	return r
-}
+	container, err := setupDynamoDB(context.TODO())
 
-func makeStrWithSize(size int) string {
-	field, i := "", 0
-
-	for i < size {
-		field += "+"
-		i += 1
+	if err != nil {
+		t.Fatalf("failed to create container - %s", err)
 	}
 
-	return field
-}
+	storage := storage.MakeDynamoDBStorage(&container.URI)
 
-func copyNotification(notification dto.NotificationReq) dto.NotificationReq {
-	cp := notification
-	cp.Recipients = make([]string, len(notification.Recipients))
-	cp.Channels = make([]string, len(notification.Channels))
+	router := gin.Default()
+	routes.SetupNotificationRoutes(router, &storage)
 
-	copy(cp.Recipients, notification.Recipients)
-	copy(cp.Channels, notification.Channels)
+	// Needed so we can apply the distribution list name validation
+	routes.SetupDistributionListRoutes(router, &storage)
 
-	return cp
-}
-
-func TestCreateNotification(t *testing.T) {
-
-	storage := getStorage()
-	router := makeNotificationRouter(&storage)
+	userId := "1234"
 
 	testNofitication := dto.NotificationReq{
 		Title:            "Notification 1",
