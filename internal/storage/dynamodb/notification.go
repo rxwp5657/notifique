@@ -1,7 +1,7 @@
 package storage
 
 const (
-	NOTIFICATIONS_TABLE   = "notifications"
+	NOTIFICATIONS_TABLE   = "Notifications"
 	NOTIFICATION_HASH_KEY = "id"
 )
 

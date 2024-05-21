@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	USER_NOTIFICATIONS_TABLE                  = "userNotifications"
+	USER_NOTIFICATIONS_TABLE                  = "UserNotifications"
 	USER_NOTIFICATIONS_CREATEDAT_IDX          = "createdAtIdx"
 	USER_NOTIFICATIONS_HASH_KEY               = "userId"
 	USER_NOTIFICATIONS_SORT_KEY               = "id"

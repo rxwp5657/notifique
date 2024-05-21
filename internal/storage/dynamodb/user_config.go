@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	USER_CONFIG_TABLE        = "userConfig"
+	USER_CONFIG_TABLE        = "UserConfig"
 	USER_CONFIG_HASH_KEY     = "userId"
 	USER_CONFIG_EMAIL_KEY    = "emailConfig"
 	USER_CONFIG_SMS_KEY      = "smsConfig"
