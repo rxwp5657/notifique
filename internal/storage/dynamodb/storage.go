@@ -20,8 +20,19 @@ import (
 	"github.com/notifique/internal"
 )
 
+type DynamoDBAPI interface {
+	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
+	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
+	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
+	DeleteItem(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error)
+
+	Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
+	Scan(ctx context.Context, params *dynamodb.ScanInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error)
+	BatchWriteItem(ctx context.Context, params *dynamodb.BatchWriteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.BatchWriteItemOutput, error)
+}
+
 type DynamoDBStorage struct {
-	client *dynamodb.Client
+	client DynamoDBAPI
 }
 
 type DynamodbPrimaryKey interface {
@@ -661,6 +672,10 @@ func (s *DynamoDBStorage) GetDistributionLists(ctx context.Context, filters dto.
 
 func (s *DynamoDBStorage) deleteRecipients(ctx context.Context, recipients []distListRecipient) (int, error) {
 
+	if len(recipients) == 0 {
+		return 0, nil
+	}
+
 	deleteReq := make([]types.WriteRequest, 0, len(recipients))
 
 	for _, distListRecipient := range recipients {
@@ -1086,8 +1101,7 @@ func (s *DynamoDBStorage) DeleteUserNotification(ctx context.Context, userId str
 	return err
 }
 
-func MakeDynamoDBStorage(baseEndpoint *string) DynamoDBStorage {
-
+func MakeClient(baseEndpoint *string) *dynamodb.Client {
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 
 	if err != nil {
@@ -1095,8 +1109,14 @@ func MakeDynamoDBStorage(baseEndpoint *string) DynamoDBStorage {
 	}
 
 	client := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
-		o.BaseEndpoint = baseEndpoint
+		if baseEndpoint != nil {
+			o.BaseEndpoint = baseEndpoint
+		}
 	})
 
+	return client
+}
+
+func MakeDynamoDBStorage(client DynamoDBAPI) DynamoDBStorage {
 	return DynamoDBStorage{client: client}
 }

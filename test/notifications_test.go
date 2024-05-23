@@ -24,7 +24,8 @@ func TestNotificationsController(t *testing.T) {
 		t.Fatalf("failed to create container - %s", err)
 	}
 
-	storage := storage.MakeDynamoDBStorage(&container.URI)
+	client := storage.MakeClient(&container.URI)
+	storage := storage.MakeDynamoDBStorage(client)
 
 	router := gin.Default()
 	routes.SetupNotificationRoutes(router, &storage)
