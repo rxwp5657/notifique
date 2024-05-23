@@ -1,7 +1,8 @@
-package main
+package test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -9,46 +10,30 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	c "github.com/notifique/controllers"
 	"github.com/notifique/dto"
+	storage "github.com/notifique/internal/storage/dynamodb"
 	"github.com/notifique/routes"
 	"github.com/stretchr/testify/assert"
 )
 
-const userId = "12345"
+func TestNotificationsController(t *testing.T) {
 
-func makeNotificationRouter(ns c.NotificationStorage) *gin.Engine {
-	r := gin.Default()
-	routes.SetupNotificationRoutes(r, ns)
-	return r
-}
+	container, err := setupDynamoDB(context.TODO())
 
-func makeStrWithSize(size int) string {
-	field, i := "", 0
-
-	for i < size {
-		field += "+"
-		i += 1
+	if err != nil {
+		t.Fatalf("failed to create container - %s", err)
 	}
 
-	return field
-}
+	client := storage.MakeClient(&container.URI)
+	storage := storage.MakeDynamoDBStorage(client)
 
-func copyNotification(notification dto.NotificationReq) dto.NotificationReq {
-	cp := notification
-	cp.Recipients = make([]string, len(notification.Recipients))
-	cp.Channels = make([]string, len(notification.Channels))
+	router := gin.Default()
+	routes.SetupNotificationRoutes(router, &storage)
 
-	copy(cp.Recipients, notification.Recipients)
-	copy(cp.Channels, notification.Channels)
+	// Needed so we can apply the distribution list name validation
+	routes.SetupDistributionListRoutes(router, &storage)
 
-	return cp
-}
-
-func TestCreateNotification(t *testing.T) {
-
-	storage := getStorage()
-	router := makeNotificationRouter(&storage)
+	userId := "1234"
 
 	testNofitication := dto.NotificationReq{
 		Title:            "Notification 1",
@@ -60,7 +45,7 @@ func TestCreateNotification(t *testing.T) {
 		Channels:         []string{"in-app", "e-mail"},
 	}
 
-	callWithNotification := func(notification dto.NotificationReq) (*http.Request, *httptest.ResponseRecorder) {
+	createNotification := func(notification dto.NotificationReq) *httptest.ResponseRecorder {
 		body, _ := json.Marshal(notification)
 		reader := bytes.NewReader(body)
 
@@ -71,12 +56,12 @@ func TestCreateNotification(t *testing.T) {
 
 		router.ServeHTTP(w, req)
 
-		return req, w
+		return w
 	}
 
 	t.Run("Can create new notifications", func(t *testing.T) {
 		notification := copyNotification(testNofitication)
-		_, w := callWithNotification(notification)
+		w := createNotification(notification)
 
 		assert.Equal(t, 204, w.Code)
 	})
@@ -85,53 +70,101 @@ func TestCreateNotification(t *testing.T) {
 		notification := copyNotification(testNofitication)
 		notification.Channels = append(notification.Channels, "Bad Channel")
 
-		_, w := callWithNotification(notification)
+		w := createNotification(notification)
 
-		assert.Equal(t, 400, w.Code)
+		resp := make(map[string]string, 0)
+
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.FailNow()
+		}
+
+		errMsg := "Error:Field validation for 'Channels[2]'"
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, resp["error"], errMsg)
 	})
 
 	t.Run("Should fail on long title", func(t *testing.T) {
 		notification := copyNotification(testNofitication)
 		notification.Title = makeStrWithSize(200)
 
-		_, w := callWithNotification(notification)
+		w := createNotification(notification)
 
-		assert.Equal(t, 400, w.Code)
+		resp := make(map[string]string, 0)
+
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.FailNow()
+		}
+
+		errMsg := "Error:Field validation for 'Title'"
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, resp["error"], errMsg)
 	})
 
 	t.Run("Should fail on long contents", func(t *testing.T) {
 		notification := copyNotification(testNofitication)
 		notification.Contents = makeStrWithSize(1025)
 
-		_, w := callWithNotification(notification)
+		w := createNotification(notification)
 
-		assert.Equal(t, 400, w.Code)
+		resp := make(map[string]string, 0)
+
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.FailNow()
+		}
+
+		errMsg := "Error:Field validation for 'Contents'"
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, resp["error"], errMsg)
 	})
 
 	t.Run("Should fail on long topic", func(t *testing.T) {
 		notification := copyNotification(testNofitication)
 		notification.Topic = makeStrWithSize(200)
 
-		_, w := callWithNotification(notification)
+		w := createNotification(notification)
 
-		assert.Equal(t, 400, w.Code)
+		resp := make(map[string]string, 0)
+
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.FailNow()
+		}
+
+		errMsg := "Error:Field validation for 'Topic'"
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, resp["error"], errMsg)
 	})
 
 	t.Run("Should fail on duplicated recipients", func(t *testing.T) {
 		notification := copyNotification(testNofitication)
 		notification.Recipients = append(notification.Recipients, userId)
 
-		_, w := callWithNotification(notification)
+		w := createNotification(notification)
 
-		assert.Equal(t, 400, w.Code)
+		resp := make(map[string]string, 0)
+
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.FailNow()
+		}
+
+		errMsg := "Error:Field validation for 'Recipients'"
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, resp["error"], errMsg)
 	})
 
 	t.Run("Should fail on invalid priority", func(t *testing.T) {
 		notification := copyNotification(testNofitication)
 		notification.Priority = "Bad Priority"
 
-		_, w := callWithNotification(notification)
+		w := createNotification(notification)
 
-		assert.Equal(t, 400, w.Code)
+		resp := make(map[string]string, 0)
+
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.FailNow()
+		}
+
+		errMsg := "Error:Field validation for 'Priority'"
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, resp["error"], errMsg)
 	})
 }

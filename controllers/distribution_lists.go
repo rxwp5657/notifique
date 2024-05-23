@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"golang.org/x/net/context"
@@ -16,15 +17,15 @@ type DistributionListStorage interface {
 	GetDistributionLists(ctx context.Context, filter dto.PageFilter) (dto.Page[dto.DistributionListSummary], error)
 	DeleteDistributionList(ctx context.Context, distlistName string) error
 	GetRecipients(ctx context.Context, distlistName string, filter dto.PageFilter) (dto.Page[string], error)
-	AddRecipients(ctx context.Context, distlistName string, recipients []string) (dto.DistributionListSummary, error)
-	DeleteRecipients(ctx context.Context, distlistName string, recipients []string) (dto.DistributionListSummary, error)
+	AddRecipients(ctx context.Context, distlistName string, recipients []string) (*dto.DistributionListSummary, error)
+	DeleteRecipients(ctx context.Context, distlistName string, recipients []string) (*dto.DistributionListSummary, error)
 }
 
 type DistributionListController struct {
 	Storage DistributionListStorage
 }
 
-type recipientsHandler func(context.Context, string, []string) (dto.DistributionListSummary, error)
+type recipientsHandler func(context.Context, string, []string) (*dto.DistributionListSummary, error)
 
 func (dc DistributionListController) CreateDistributionList(c *gin.Context) {
 	var dl dto.DistributionList
@@ -39,6 +40,7 @@ func (dc DistributionListController) CreateDistributionList(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		} else {
+			slog.Error(err.Error())
 			c.Status(http.StatusInternalServerError)
 		}
 	}
@@ -57,6 +59,7 @@ func (dc DistributionListController) GetDistributionLists(c *gin.Context) {
 	lists, err := dc.Storage.GetDistributionLists(c, filters)
 
 	if err != nil {
+		slog.Error(err.Error())
 		c.Status(http.StatusInternalServerError)
 		return
 	}
@@ -86,6 +89,7 @@ func (dc DistributionListController) GetRecipients(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		} else {
+			slog.Error(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
@@ -106,6 +110,7 @@ func (dc DistributionListController) DeleteDistributionList(c *gin.Context) {
 	err := dc.Storage.DeleteDistributionList(c, uriParams.Name)
 
 	if err != nil {
+		slog.Error(err.Error())
 		c.Status(http.StatusInternalServerError)
 		return
 	}
@@ -143,6 +148,7 @@ func (dc DistributionListController) handleRecipients(c *gin.Context, handler re
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		} else {
+			slog.Error(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}

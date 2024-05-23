@@ -2,17 +2,21 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/notifique/internal/storage"
+	storage "github.com/notifique/internal/storage/dynamodb"
 	"github.com/notifique/routes"
 )
 
 func main() {
 
-	storage := storage.MakeInMemoryStorage()
+	baseEndpoint := "http://localhost:8000"
+	client := storage.MakeClient(&baseEndpoint)
+
+	storage := storage.MakeDynamoDBStorage(client)
 	r := gin.Default()
 
 	routes.SetupNotificationRoutes(r, &storage)
 	routes.SetupDistributionListRoutes(r, &storage)
+	routes.SetupUsersRoutes(r, &storage)
 
 	r.Run() // listen and serve on 0.0.0.0:8080
 }

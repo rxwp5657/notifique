@@ -16,7 +16,6 @@ func SetupUsersRoutes(r *gin.Engine, us c.UserStorage) {
 	v0 := r.Group("/v0")
 	{
 		v0.GET("/users/me/notifications", controller.GetUserNotifications)
-		v0.POST("/users/:id/notifications", controller.CreateUserNotification)
 		v0.PATCH("/users/me/notifications/:id", controller.SetReadStatus)
 
 		v0.GET("/users/me/notifications/config", controller.GetUserConfig)

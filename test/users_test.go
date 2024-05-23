@@ -1,4 +1,4 @@
-package main
+package test
 
 import (
 	"bytes"
@@ -13,196 +13,231 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
-	c "github.com/notifique/controllers"
 	"github.com/notifique/dto"
+	storage "github.com/notifique/internal/storage/dynamodb"
 	"github.com/notifique/routes"
 	"github.com/stretchr/testify/assert"
 )
 
-func makeUsersRoute(us c.UserStorage) *gin.Engine {
-	r := gin.Default()
-	routes.SetupUsersRoutes(r, us)
-	return r
-}
+func TestUserController(t *testing.T) {
 
-func TestGetUserNotifications(t *testing.T) {
-	storage := getStorage()
-	router := makeUsersRoute(&storage)
+	container, err := setupDynamoDB(context.TODO())
 
-	testNofitication := dto.UserNotificationReq{
-		Title:    "Notification 1",
-		Contents: "Notification Contents 1",
-		Topic:    "Testing",
+	if err != nil {
+		t.Fatalf("failed to create container - %s", err)
 	}
 
-	ctx := context.Background()
-	notificationId, _ := storage.CreateUserNotification(ctx, userId, testNofitication)
+	client := storage.MakeClient(&container.URI)
+	storage := storage.MakeDynamoDBStorage(client)
 
-	w := httptest.NewRecorder()
+	router := gin.Default()
+	routes.SetupUsersRoutes(router, &storage)
 
-	req, _ := http.NewRequest("GET", "/v0/users/me/notifications", nil)
-	req.Header.Add("userId", userId)
+	userId := "1234"
 
-	router.ServeHTTP(w, req)
+	t.Run("TestGetUserNotifications", func(t *testing.T) {
 
-	page := dto.Page[dto.UserNotification]{}
+		numNotifications := 3
+		testNotifications, err := createTestUserNotifications(numNotifications, userId, &storage)
 
-	if err := json.Unmarshal(w.Body.Bytes(), &page); err != nil {
-		t.Fatalf("Failed to unmarshal response")
-	}
-
-	if len(page.Data) == 0 {
-		t.Fatalf("Num notifications is zero, expected at least one")
-	}
-
-	notification := page.Data[0]
-
-	assert.Equal(t, 200, w.Code)
-	assert.Equal(t, notification.Title, testNofitication.Title)
-	assert.Equal(t, notification.Contents, testNofitication.Contents)
-	assert.Equal(t, notification.Topic, testNofitication.Topic)
-	assert.Nil(t, notification.ReadAt)
-	assert.NotEmpty(t, notification.CreatedAt)
-
-	assert.Equal(t, 1, page.ResultCount)
-	assert.Nil(t, page.PrevToken)
-	assert.Equal(t, notificationId, *page.NextToken)
-}
-
-func TestGetUserConfiguration(t *testing.T) {
-	storage := getStorage()
-	router := makeUsersRoute(&storage)
-
-	expectedConfig := []dto.ChannelConfig{
-		{Channel: "e-mail", OptIn: true},
-		{Channel: "sms", OptIn: true},
-		{Channel: "in-app", OptIn: true},
-	}
-
-	w := httptest.NewRecorder()
-
-	req, _ := http.NewRequest("GET", "/v0/users/me/notifications/config", nil)
-	req.Header.Add("userId", userId)
-
-	router.ServeHTTP(w, req)
-
-	userConfig := make([]dto.ChannelConfig, 0)
-
-	if err := json.Unmarshal(w.Body.Bytes(), &userConfig); err != nil {
-		t.FailNow()
-	}
-
-	assert.Equal(t, 200, w.Code)
-	assert.ElementsMatch(t, expectedConfig, userConfig)
-}
-
-func TestSetReadStatus(t *testing.T) {
-	storage := getStorage()
-	router := makeUsersRoute(&storage)
-
-	testNofitication := dto.UserNotificationReq{
-		Title:    "Notification 1",
-		Contents: "Notification Contents 1",
-		Topic:    "Testing",
-	}
-
-	ctx := context.Background()
-	notificationId, _ := storage.CreateUserNotification(ctx, userId, testNofitication)
-
-	w := httptest.NewRecorder()
-
-	url := fmt.Sprintf("/v0/users/me/notifications/%s", notificationId)
-	req, _ := http.NewRequest("PATCH", url, nil)
-	req.Header.Add("userId", userId)
-
-	router.ServeHTTP(w, req)
-
-	assert.Equal(t, 200, w.Code)
-}
-
-func TestSetReadStatusOnMissingNotification(t *testing.T) {
-	storage := getStorage()
-	router := makeUsersRoute(&storage)
-
-	notificationId := uuid.NewString()
-
-	errorTemplate := "Notification %v not found"
-	expectedError := fmt.Sprintf(errorTemplate, notificationId)
-
-	w := httptest.NewRecorder()
-
-	url := fmt.Sprintf("/v0/users/me/notifications/%s", notificationId)
-	req, _ := http.NewRequest("PATCH", url, nil)
-	req.Header.Add("userId", userId)
-
-	router.ServeHTTP(w, req)
-
-	resp := make(map[string]string)
-
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.FailNow()
-	}
-
-	assert.Equal(t, 404, w.Code)
-	assert.Equal(t, expectedError, resp["error"])
-}
-
-func TestUpdateUserConfig(t *testing.T) {
-	storage := getStorage()
-	router := makeUsersRoute(&storage)
-
-	callWithUserConfig := func(config []dto.ChannelConfig) (*http.Request, *httptest.ResponseRecorder) {
-
-		w := httptest.NewRecorder()
-
-		body := make(map[string][]dto.ChannelConfig)
-		body["config"] = config
-
-		marshalled, _ := json.Marshal(body)
-		reader := bytes.NewReader(marshalled)
-
-		req, _ := http.NewRequest("PATCH", "/v0/users/me/notifications/config", reader)
-		req.Header.Add("userId", userId)
-
-		router.ServeHTTP(w, req)
-
-		return req, w
-	}
-
-	t.Run("Can update the user config", func(t *testing.T) {
-
-		snoozeUntil := time.Now().AddDate(0, 0, 10).Format(time.RFC3339)
-
-		userConfig := []dto.ChannelConfig{
-			{Channel: "e-mail", OptIn: false, SnoozeUntil: nil},
-			{Channel: "sms", OptIn: true, SnoozeUntil: &snoozeUntil},
+		if err != nil {
+			t.Fatalf("failed to create user notifications - %s", err)
 		}
 
-		_, w := callWithUserConfig(userConfig)
+		getUserNotifications := func(filters *dto.PageFilter) *httptest.ResponseRecorder {
 
-		assert.Equal(t, 200, w.Code)
+			w := httptest.NewRecorder()
+
+			req, _ := http.NewRequest("GET", "/v0/users/me/notifications", nil)
+			req.Header.Add("userId", userId)
+
+			addPaginationFilters(req, filters)
+
+			router.ServeHTTP(w, req)
+
+			return w
+		}
+
+		t.Run("Can get default page of user notifications", func(t *testing.T) {
+
+			w := getUserNotifications(nil)
+
+			page := dto.Page[dto.UserNotification]{}
+
+			if err := json.Unmarshal(w.Body.Bytes(), &page); err != nil {
+				t.Fatal("Failed to unmarshal response")
+			}
+
+			if len(page.Data) == 0 {
+				t.Fatal("Num notifications is zero, expected at least one")
+			}
+
+			assert.Equal(t, http.StatusOK, w.Code)
+			assert.Equal(t, reverse(testNotifications), page.Data)
+
+			assert.Nil(t, page.PrevToken)
+			assert.Nil(t, page.NextToken)
+			assert.Equal(t, numNotifications, page.ResultCount)
+		})
+
+		t.Run("Can paginate user notifications", func(t *testing.T) {
+
+			maxResults := 1
+			filters := dto.PageFilter{
+				NextToken:  nil,
+				MaxResults: &maxResults,
+			}
+
+			w := getUserNotifications(&filters)
+
+			page := dto.Page[dto.UserNotification]{}
+
+			if err := json.Unmarshal(w.Body.Bytes(), &page); err != nil {
+				t.Fatal("Failed to unmarshal response")
+			}
+
+			if len(page.Data) == 0 {
+				t.Fatal("Num notifications is zero, expected at least one")
+			}
+
+			assert.Equal(t, http.StatusOK, w.Code)
+			assert.Equal(t, reverse(testNotifications)[:1], page.Data)
+
+			assert.Nil(t, page.PrevToken)
+			assert.NotNil(t, page.NextToken)
+			assert.Equal(t, maxResults, page.ResultCount)
+		})
+
+		deleteTestUserNotifications(userId, testNotifications, &storage)
 	})
 
-	t.Run("Should fail on bad channel", func(t *testing.T) {
+	t.Run("TestSetReadStatus", func(t *testing.T) {
 
-		userConfig := []dto.ChannelConfig{
-			{Channel: "BadChannel", OptIn: true, SnoozeUntil: nil},
+		testNotifications, err := createTestUserNotifications(1, userId, &storage)
+
+		if err != nil {
+			t.Fatalf("failed to create user notifications - %s", err)
 		}
 
-		_, w := callWithUserConfig(userConfig)
+		testNotification := testNotifications[0]
 
-		assert.Equal(t, 400, w.Code)
+		setReadStatus := func(userId, notificationId string) *httptest.ResponseRecorder {
+
+			w := httptest.NewRecorder()
+
+			url := fmt.Sprintf("/v0/users/me/notifications/%s", notificationId)
+			req, _ := http.NewRequest("PATCH", url, nil)
+			req.Header.Add("userId", userId)
+
+			router.ServeHTTP(w, req)
+
+			return w
+		}
+
+		t.Run("Should be able to set the notification read status", func(t *testing.T) {
+			w := setReadStatus(userId, testNotification.Id)
+			assert.Equal(t, http.StatusOK, w.Code)
+		})
+
+		t.Run("Should fail to set the read status on a non-existing notification", func(t *testing.T) {
+			notificationId := uuid.NewString()
+			w := setReadStatus(userId, notificationId)
+
+			resp := make(map[string]string, 0)
+
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.FailNow()
+			}
+
+			errTemplate := "Notification %v not found"
+			errMsg := fmt.Sprintf(errTemplate, notificationId)
+
+			assert.Equal(t, http.StatusNotFound, w.Code)
+			assert.Equal(t, resp["error"], errMsg)
+		})
 	})
 
-	t.Run("Should fail when passing a snooze date in the past", func(t *testing.T) {
-		snoozeUntil := time.Now().AddDate(0, 0, -10).Format(time.RFC3339)
+	t.Run("TestUserConfig", func(t *testing.T) {
 
-		userConfig := []dto.ChannelConfig{
-			{Channel: "sms", OptIn: true, SnoozeUntil: &snoozeUntil},
+		getUserConfig := func(userId string) *httptest.ResponseRecorder {
+			w := httptest.NewRecorder()
+
+			req, _ := http.NewRequest("GET", "/v0/users/me/notifications/config", nil)
+			req.Header.Add("userId", userId)
+
+			router.ServeHTTP(w, req)
+
+			return w
 		}
 
-		_, w := callWithUserConfig(userConfig)
+		updateUserConfig := func(userId string, config dto.UserConfig) *httptest.ResponseRecorder {
 
-		assert.Equal(t, 400, w.Code)
+			w := httptest.NewRecorder()
+
+			marshalled, _ := json.Marshal(config)
+			reader := bytes.NewReader(marshalled)
+
+			req, _ := http.NewRequest("PATCH", "/v0/users/me/notifications/config", reader)
+			req.Header.Add("userId", userId)
+
+			router.ServeHTTP(w, req)
+
+			return w
+		}
+
+		t.Run("CanGetUserConfig", func(t *testing.T) {
+
+			expectedConfig := dto.UserConfig{
+				EmailConfig: dto.ChannelConfig{OptIn: true, SnoozeUntil: nil},
+				SMSConfig:   dto.ChannelConfig{OptIn: true, SnoozeUntil: nil},
+				InAppConfig: dto.ChannelConfig{OptIn: true, SnoozeUntil: nil},
+			}
+
+			w := getUserConfig(userId)
+
+			var userConfig dto.UserConfig
+
+			if err := json.Unmarshal(w.Body.Bytes(), &userConfig); err != nil {
+				t.FailNow()
+			}
+
+			assert.Equal(t, 200, w.Code)
+			assert.Equal(t, expectedConfig, userConfig)
+		})
+
+		t.Run("CanUpdateUserConfig", func(t *testing.T) {
+
+			snoozeUntil := time.Now().AddDate(0, 0, 10).Format(time.RFC3339)
+
+			userConfig := dto.UserConfig{
+				EmailConfig: dto.ChannelConfig{OptIn: false, SnoozeUntil: nil},
+				SMSConfig:   dto.ChannelConfig{OptIn: true, SnoozeUntil: &snoozeUntil},
+			}
+
+			w := updateUserConfig(userId, userConfig)
+
+			assert.Equal(t, 200, w.Code)
+		})
+
+		t.Run("ShouldFailOnSnoozeTimeInThePast", func(t *testing.T) {
+			snoozeUntil := time.Now().AddDate(0, 0, -10).Format(time.RFC3339)
+
+			userConfig := dto.UserConfig{
+				SMSConfig: dto.ChannelConfig{OptIn: true, SnoozeUntil: &snoozeUntil},
+			}
+
+			w := updateUserConfig(userId, userConfig)
+
+			resp := make(map[string]string, 0)
+
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.FailNow()
+			}
+
+			errMsg := "Error:Field validation for 'SnoozeUntil' failed"
+
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			assert.Contains(t, resp["error"], errMsg)
+		})
 	})
 }

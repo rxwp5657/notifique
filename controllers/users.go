@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"golang.org/x/net/context"
@@ -12,9 +13,8 @@ import (
 )
 
 type UserStorage interface {
-	CreateUserNotification(ctx context.Context, userId string, notification dto.UserNotificationReq) (string, error)
 	GetUserNotifications(ctx context.Context, filters dto.UserNotificationFilters) (dto.Page[dto.UserNotification], error)
-	GetUserConfig(ctx context.Context, userId string) ([]dto.ChannelConfig, error)
+	GetUserConfig(ctx context.Context, userId string) (dto.UserConfig, error)
 	SetReadStatus(ctx context.Context, userId, notificationId string) error
 	UpdateUserConfig(ctx context.Context, userId string, config dto.UserConfig) error
 }
@@ -35,6 +35,7 @@ func (nc UserController) GetUserNotifications(c *gin.Context) {
 	notifications, err := nc.Storage.GetUserNotifications(c, filters)
 
 	if err != nil {
+		slog.Error(err.Error())
 		c.Status(http.StatusInternalServerError)
 		return
 	}
@@ -42,36 +43,12 @@ func (nc UserController) GetUserNotifications(c *gin.Context) {
 	c.JSON(http.StatusOK, notifications)
 }
 
-func (nc UserController) CreateUserNotification(c *gin.Context) {
-	var uriParam dto.UserNotificationUriParam
-
-	if err := c.ShouldBindUri(&uriParam); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	var userNotification dto.UserNotificationReq
-
-	if err := c.ShouldBindJSON(&userNotification); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	_, err := nc.Storage.CreateUserNotification(c, uriParam.Id, userNotification)
-
-	if err != nil {
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-
-	c.Status(http.StatusCreated)
-}
-
 func (nc UserController) GetUserConfig(c *gin.Context) {
 	userId := c.GetHeader(USER_ID_HEADER_KEY)
 	cfg, err := nc.Storage.GetUserConfig(c, userId)
 
 	if err != nil {
+		slog.Error(err.Error())
 		c.Status(http.StatusInternalServerError)
 		return
 	}
@@ -95,6 +72,7 @@ func (nc UserController) SetReadStatus(c *gin.Context) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		} else {
+			slog.Error(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
@@ -109,6 +87,14 @@ func (nc UserController) UpdateUserConfig(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&userConfig); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userId := c.GetHeader(USER_ID_HEADER_KEY)
+
+	if err := nc.Storage.UpdateUserConfig(c, userId, userConfig); err != nil {
+		slog.Error(err.Error())
+		c.Status(http.StatusInternalServerError)
 		return
 	}
 

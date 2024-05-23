@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   notifique:
     image: notifique:v0.1.0
@@ -7,3 +5,12 @@ services:
       - GIN_MODE=release
     ports:
       - 8080:8080
+
+  dynamodb-local:
+    image: amazon/dynamodb-local:2.4.0
+    environment:
+      - name=value
+    ports:
+      - 8000:8000
+    volumes:
+      - "./volumes/dynamodb:/home/dynamodblocal/data"
