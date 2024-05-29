@@ -20,10 +20,14 @@ run: vet
 	go run ./cmd/app/main.go
 .PHONY:run
 
+test: vet
+	go test ./test
+.PHONY:test
+
 deploy-dynamodb: vet
 	go run ./cmd/deployments/dynamodb/main.go
 .PHONY:deploy-dynamodb
 
-test: vet
-	go test ./test
-.PHONY:test
+deploy-postgres: vet
+	go run ./cmd/deployments/postgres/main.go
+.PHONY:deploy-postgres

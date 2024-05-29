@@ -13,4 +13,14 @@ services:
     ports:
       - 8000:8000
     volumes:
-      - "./volumes/dynamodb:/home/dynamodblocal/data"
+      - ./volumes/dynamodb:/home/dynamodblocal/data
+
+  postgres:
+    image: postgres:16.3
+    ports:
+      - 5432:5432
+    volumes:
+      - ./volumes/postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=notifique
+      - POSTGRES_PASSWORD=postgres

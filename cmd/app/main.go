@@ -1,6 +1,8 @@
 package main
 
 import (
+	"log"
+
 	"github.com/gin-gonic/gin"
 	storage "github.com/notifique/internal/storage/dynamodb"
 	"github.com/notifique/routes"
@@ -9,7 +11,11 @@ import (
 func main() {
 
 	baseEndpoint := "http://localhost:8000"
-	client := storage.MakeClient(&baseEndpoint)
+	client, err := storage.MakeClient(&baseEndpoint)
+
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
 
 	storage := storage.MakeDynamoDBStorage(client)
 	r := gin.Default()

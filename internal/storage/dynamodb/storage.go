@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -1101,11 +1100,11 @@ func (s *DynamoDBStorage) DeleteUserNotification(ctx context.Context, userId str
 	return err
 }
 
-func MakeClient(baseEndpoint *string) *dynamodb.Client {
+func MakeClient(baseEndpoint *string) (*dynamodb.Client, error) {
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to load default config - %w", err)
 	}
 
 	client := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
@@ -1114,7 +1113,7 @@ func MakeClient(baseEndpoint *string) *dynamodb.Client {
 		}
 	})
 
-	return client
+	return client, nil
 }
 
 func MakeDynamoDBStorage(client DynamoDBAPI) DynamoDBStorage {

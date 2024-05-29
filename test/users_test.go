@@ -13,32 +13,67 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/notifique/controllers"
 	"github.com/notifique/dto"
 	storage "github.com/notifique/internal/storage/dynamodb"
+	pstorage "github.com/notifique/internal/storage/postgres"
 	"github.com/notifique/routes"
 	"github.com/stretchr/testify/assert"
 )
 
+type UserNotificationsTester interface {
+	controllers.UserStorage
+	CreateUserNotification(ctx context.Context, userId string, un dto.UserNotification) error
+	DeleteUserNotification(ctx context.Context, userId string, un dto.UserNotification) error
+}
+
+func makeUserStorage(t storageType, uri string) (UserNotificationsTester, error) {
+	switch t {
+	case DYNAMODB:
+		client, err := storage.MakeClient(&uri)
+		if err != nil {
+			return nil, err
+		}
+		storage := storage.MakeDynamoDBStorage(client)
+		return &storage, nil
+	case POSTGRES:
+		container, err := pstorage.MakePostgresStorage(uri)
+		if err != nil {
+			return nil, err
+		}
+		return container, err
+	default:
+		return nil, fmt.Errorf("invalid option - %s", t)
+	}
+}
+
 func TestUserController(t *testing.T) {
 
-	container, err := setupDynamoDB(context.TODO())
+	var container Container
+
+	container, err := setupContainer(POSTGRES)
 
 	if err != nil {
 		t.Fatalf("failed to create container - %s", err)
 	}
 
-	client := storage.MakeClient(&container.URI)
-	storage := storage.MakeDynamoDBStorage(client)
+	uri := container.GetURI()
+
+	storage, err := makeUserStorage(POSTGRES, uri)
+
+	if err != nil {
+		t.Fatalf("failed to create storage - %s", err)
+	}
 
 	router := gin.Default()
-	routes.SetupUsersRoutes(router, &storage)
+	routes.SetupUsersRoutes(router, storage)
 
 	userId := "1234"
 
 	t.Run("TestGetUserNotifications", func(t *testing.T) {
 
 		numNotifications := 3
-		testNotifications, err := createTestUserNotifications(numNotifications, userId, &storage)
+		testNotifications, err := createTestUserNotifications(numNotifications, userId, storage)
 
 		if err != nil {
 			t.Fatalf("failed to create user notifications - %s", err)
@@ -108,12 +143,12 @@ func TestUserController(t *testing.T) {
 			assert.Equal(t, maxResults, page.ResultCount)
 		})
 
-		deleteTestUserNotifications(userId, testNotifications, &storage)
+		deleteTestUserNotifications(userId, testNotifications, storage)
 	})
 
 	t.Run("TestSetReadStatus", func(t *testing.T) {
 
-		testNotifications, err := createTestUserNotifications(1, userId, &storage)
+		testNotifications, err := createTestUserNotifications(1, userId, storage)
 
 		if err != nil {
 			t.Fatalf("failed to create user notifications - %s", err)
