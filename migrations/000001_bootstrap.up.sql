@@ -7,10 +7,10 @@ CREATE TYPE notification_priority AS ENUM (
 );
 
 CREATE TYPE notification_channel AS ENUM (
-    'IN_APP',
-    'E_MAIL',
-    'SMS',
-    'PUSH'
+    'in-app',
+    'e-mail',
+    'sms',
+    'push'
 );
 
 CREATE TABLE IF NOT EXISTS distribution_lists (

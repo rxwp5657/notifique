@@ -20,3 +20,44 @@ type notificationChannels struct {
 	NotificationId string
 	Channel        string
 }
+
+const INSERT_NOTIFICATION = `
+INSERT INTO notifications (
+	title,
+	contents,
+	image_url,
+	topic,
+	priority,
+	distribution_list,
+	created_at
+) VALUES (
+	@title,
+	@contents,
+	@imageUrl,
+	@topic,
+	@priority,
+	@distributionList,
+	@createdAt
+) RETURNING
+	id;
+`
+
+const INSERT_RECIPIENTS = `
+INSERT INTO notification_recipients (
+	notification_id,
+	recipient
+) VALUES (
+	@notificationId,
+	@recipient
+);
+`
+
+const INSERT_CHANNELS = `
+INSERT INTO notification_channels (
+	notification_id,
+	channel
+) VALUES (
+	@notificationId,
+	@channel
+);
+`

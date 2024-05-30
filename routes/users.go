@@ -19,7 +19,7 @@ func SetupUsersRoutes(r *gin.Engine, us c.UserStorage) {
 		v0.PATCH("/users/me/notifications/:id", controller.SetReadStatus)
 
 		v0.GET("/users/me/notifications/config", controller.GetUserConfig)
-		v0.PATCH("/users/me/notifications/config", controller.UpdateUserConfig)
+		v0.PUT("/users/me/notifications/config", controller.UpdateUserConfig)
 	}
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {

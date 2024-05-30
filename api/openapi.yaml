@@ -100,7 +100,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserConfig'
-    patch:
+    put:
       summary: Update the user's notification configuration.
       tags:
         - notifications
@@ -117,7 +117,6 @@ paths:
           description: OK
         "400":
           description: |
-            If the supplied channel is not a valid channel.
             If the snoozed at parameter is on the past.
 
   /distribution-lists:

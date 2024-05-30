@@ -2,41 +2,70 @@ package test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/notifique/controllers"
 	"github.com/notifique/dto"
 	storage "github.com/notifique/internal/storage/dynamodb"
+	pstorage "github.com/notifique/internal/storage/postgres"
 	"github.com/notifique/routes"
 	"github.com/stretchr/testify/assert"
 )
 
+type NotificationStorage interface {
+	controllers.NotificationStorage
+	controllers.DistributionListStorage
+}
+
+func makeNotificationStorage(t storageType, uri string) (NotificationStorage, error) {
+	switch t {
+	case DYNAMODB:
+		client, err := storage.MakeClient(&uri)
+		if err != nil {
+			return nil, err
+		}
+		storage := storage.MakeDynamoDBStorage(client)
+		return &storage, nil
+	case POSTGRES:
+		container, err := pstorage.MakePostgresStorage(uri)
+		if err != nil {
+			return nil, err
+		}
+		return container, err
+	default:
+		return nil, fmt.Errorf("invalid option - %s", t)
+	}
+}
+
 func TestNotificationsController(t *testing.T) {
 
-	container, err := setupDynamoDB(context.TODO())
+	var container Container
+
+	container, err := setupContainer(POSTGRES)
 
 	if err != nil {
 		t.Fatalf("failed to create container - %s", err)
 	}
 
-	client, err := storage.MakeClient(&container.URI)
+	uri := container.GetURI()
+
+	storage, err := makeNotificationStorage(POSTGRES, uri)
 
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatalf("failed to create storage - %s", err)
 	}
 
-	storage := storage.MakeDynamoDBStorage(client)
-
 	router := gin.Default()
-	routes.SetupNotificationRoutes(router, &storage)
+	routes.SetupNotificationRoutes(router, storage)
 
 	// Needed so we can apply the distribution list name validation
-	routes.SetupDistributionListRoutes(router, &storage)
+	routes.SetupDistributionListRoutes(router, storage)
 
 	userId := "1234"
 

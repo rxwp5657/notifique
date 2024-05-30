@@ -212,7 +212,7 @@ func TestUserController(t *testing.T) {
 			marshalled, _ := json.Marshal(config)
 			reader := bytes.NewReader(marshalled)
 
-			req, _ := http.NewRequest("PATCH", "/v0/users/me/notifications/config", reader)
+			req, _ := http.NewRequest("PUT", "/v0/users/me/notifications/config", reader)
 			req.Header.Add("userId", userId)
 
 			router.ServeHTTP(w, req)
