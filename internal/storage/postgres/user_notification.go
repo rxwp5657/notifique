@@ -1,9 +1,6 @@
 package storage
 
 import (
-	b64 "encoding/base64"
-	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/notifique/dto"
@@ -25,18 +22,6 @@ type userNotificationKey struct {
 	CreatedAt string `json:"createdAt"`
 }
 
-func (k *userNotificationKey) marshal() (string, error) {
-	jsonMarshal, err := json.Marshal(k)
-
-	if err != nil {
-		return "", fmt.Errorf("failed to json marshall key - %w", err)
-	}
-
-	base64Encoded := b64.StdEncoding.EncodeToString(jsonMarshal)
-
-	return base64Encoded, nil
-}
-
 func (n *userNotification) toDTO() dto.UserNotification {
 	var readAt *string = nil
 
@@ -56,24 +41,6 @@ func (n *userNotification) toDTO() dto.UserNotification {
 	}
 
 	return notification
-}
-
-func unmarshallNotificationKey(key string) (*userNotificationKey, error) {
-	base64Decoded, err := b64.StdEncoding.DecodeString(key)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode base64 key - %w", err)
-	}
-
-	var ukey userNotificationKey
-
-	err = json.Unmarshal(base64Decoded, &ukey)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to json unmarshall key - %w", err)
-	}
-
-	return &ukey, nil
 }
 
 const GET_USER_NOTIFICATIONS = `
@@ -117,5 +84,20 @@ INSERT INTO user_notifications(
 `
 
 const DELETE_USER_NOTIFICATION = `
-DELETE FROM user_notifications WHERE id = @id;
+DELETE FROM 
+	ser_notifications
+WHERE
+	id = @id;
+`
+
+const UPDATE_READ_AT = `
+UPDATE
+	user_notifications
+SET
+	read_at = NOW()
+WHERE
+	id = @id AND
+	user_id = @userId
+RETURNING
+	id;
 `

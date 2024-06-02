@@ -42,7 +42,7 @@ INSERT INTO notifications (
 	id;
 `
 
-const INSERT_RECIPIENTS = `
+const INSERT_NOTIFICATION_RECIPIENTS = `
 INSERT INTO notification_recipients (
 	notification_id,
 	recipient
