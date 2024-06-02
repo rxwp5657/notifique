@@ -19,6 +19,10 @@ type dynamodbContainer struct {
 	URI string
 }
 
+func (ddbc *dynamodbContainer) GetURI() string {
+	return ddbc.URI
+}
+
 func setupDynamoDB(ctx context.Context) (*dynamodbContainer, error) {
 
 	port := "8000"

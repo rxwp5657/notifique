@@ -12,11 +12,6 @@ import (
 	"github.com/notifique/dto"
 )
 
-type UserNotificationsTester interface {
-	CreateUserNotification(ctx context.Context, userId string, un dto.UserNotification) error
-	DeleteUserNotification(ctx context.Context, userId string, un dto.UserNotification) error
-}
-
 func reverse[T any](data []T) []T {
 	dataLen := len(data)
 	reversed := make([]T, 0, dataLen)
