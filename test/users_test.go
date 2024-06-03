@@ -30,7 +30,7 @@ type UserNotificationsTester interface {
 func makeUserStorage(t storageType, uri string) (UserNotificationsTester, error) {
 	switch t {
 	case DYNAMODB:
-		client, err := storage.MakeClient(&uri)
+		client, err := storage.MakeDynamoDBClient(&uri)
 		if err != nil {
 			return nil, err
 		}
@@ -49,15 +49,13 @@ func makeUserStorage(t storageType, uri string) (UserNotificationsTester, error)
 
 func TestUserController(t *testing.T) {
 
-	var container Container
-
-	container, err := setupContainer(POSTGRES)
+	dbContainer, closer, err := setupContainer(POSTGRES)
 
 	if err != nil {
 		t.Fatalf("failed to create container - %s", err)
 	}
 
-	uri := container.GetURI()
+	uri := dbContainer.GetURI()
 
 	storage, err := makeUserStorage(POSTGRES, uri)
 
@@ -69,6 +67,12 @@ func TestUserController(t *testing.T) {
 	routes.SetupUsersRoutes(router, storage)
 
 	userId := "1234"
+
+	defer func() {
+		if err := closer(); err != nil {
+			t.Fatalf("failed to terminate db container")
+		}
+	}()
 
 	t.Run("TestGetUserNotifications", func(t *testing.T) {
 

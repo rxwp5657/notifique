@@ -23,7 +23,7 @@ func (ddbc *dynamodbContainer) GetURI() string {
 	return ddbc.URI
 }
 
-func setupDynamoDB(ctx context.Context) (*dynamodbContainer, error) {
+func setupDynamoDB(ctx context.Context) (*dynamodbContainer, func() error, error) {
 
 	port := "8000"
 
@@ -38,19 +38,19 @@ func setupDynamoDB(ctx context.Context) (*dynamodbContainer, error) {
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to init the dynamodb container - %w", err)
+		return nil, nil, fmt.Errorf("failed to init the dynamodb container - %w", err)
 	}
 
 	ip, err := container.Host(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get the dynamodb's host - %w", err)
+		return nil, nil, fmt.Errorf("failed to get the dynamodb's host - %w", err)
 	}
 
 	mappedPort, err := container.MappedPort(ctx, nat.Port(port))
 
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("failed to acquire mapped port")
 	}
 
 	uri := fmt.Sprintf("http://%s:%s", ip, mappedPort.Port())
@@ -58,7 +58,7 @@ func setupDynamoDB(ctx context.Context) (*dynamodbContainer, error) {
 	cfg, err := config.LoadDefaultConfig(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to load default config - %w", err)
+		return nil, nil, fmt.Errorf("failed to load default config - %w", err)
 	}
 
 	client := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
@@ -68,8 +68,9 @@ func setupDynamoDB(ctx context.Context) (*dynamodbContainer, error) {
 	err = ddb.CreateTables(client)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create tables - %v", err)
+		return nil, nil, fmt.Errorf("failed to create tables - %v", err)
 	}
 
-	return &dynamodbContainer{Container: container, URI: uri}, nil
+	closer := func() error { return container.Terminate(ctx) }
+	return &dynamodbContainer{Container: container, URI: uri}, closer, nil
 }

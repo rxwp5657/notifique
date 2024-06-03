@@ -26,7 +26,7 @@ func (pc *postgresContainer) GetURI() string {
 	return pc.URI
 }
 
-func setupPostgres(ctx context.Context) (*postgresContainer, error) {
+func setupPostgres(ctx context.Context) (*postgresContainer, func() error, error) {
 
 	port := "5432"
 
@@ -46,19 +46,19 @@ func setupPostgres(ctx context.Context) (*postgresContainer, error) {
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to init the postgres container - %w", err)
+		return nil, nil, fmt.Errorf("failed to init the postgres container - %w", err)
 	}
 
 	ip, err := container.Host(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get the dynamodb's host - %w", err)
+		return nil, nil, fmt.Errorf("failed to get the dynamodb's host - %w", err)
 	}
 
 	mappedPort, err := container.MappedPort(ctx, nat.Port(port))
 
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("failed to acquire mapped port - %w", err)
 	}
 
 	uriTemplate := "postgres://%s:%s@%s:%s/%s?sslmode=disable"
@@ -75,8 +75,9 @@ func setupPostgres(ctx context.Context) (*postgresContainer, error) {
 	err = p.RunMigrations(uri)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to run migrations - %w", err)
+		return nil, nil, fmt.Errorf("failed to run migrations - %w", err)
 	}
 
-	return &postgresContainer{URI: uri}, nil
+	closer := func() error { return container.Terminate(ctx) }
+	return &postgresContainer{URI: uri}, closer, nil
 }

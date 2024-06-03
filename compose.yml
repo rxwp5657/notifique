@@ -24,3 +24,10 @@ services:
     environment:
       - POSTGRES_DB=notifique
       - POSTGRES_PASSWORD=postgres
+
+  local-stack:
+    image: localstack/localstack:3.4
+    ports:
+      - 4566:4566
+    environment:
+      - SERVICES=sqs

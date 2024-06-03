@@ -1,5 +1,7 @@
 package storage
 
+import "time"
+
 type notification struct {
 	Id               string
 	Title            string
@@ -8,7 +10,8 @@ type notification struct {
 	Topic            string
 	Priority         string
 	DistributionList *string
-	CreatedAt        string
+	CreatedAt        time.Time
+	status           string
 }
 
 type notificationRecipients struct {
@@ -21,6 +24,13 @@ type notificationChannels struct {
 	Channel        string
 }
 
+type notificationStatusLog struct {
+	NotificationId string    `db:"notification_id"`
+	Status         string    `db:"status"`
+	StatusDate     time.Time `db:"status_date"`
+	Error          *string   `db:"error_message"`
+}
+
 const INSERT_NOTIFICATION = `
 INSERT INTO notifications (
 	title,
@@ -29,7 +39,8 @@ INSERT INTO notifications (
 	topic,
 	priority,
 	distribution_list,
-	created_at
+	created_at,
+	status
 ) VALUES (
 	@title,
 	@contents,
@@ -37,7 +48,8 @@ INSERT INTO notifications (
 	@topic,
 	@priority,
 	@distributionList,
-	@createdAt
+	@createdAt,
+	@status
 ) RETURNING
 	id;
 `
@@ -60,4 +72,26 @@ INSERT INTO notification_channels (
 	@notificationId,
 	@channel
 );
+`
+
+const INSERT_NOTIFICATION_STATUS_LOG = `
+INSERT INTO notification_status_log (
+	notification_id,
+    status_date,
+    "status",
+    error_message
+) VALUES (
+	@notificationId,
+	@statusDate,
+	@status,
+	@errorMessage
+);
+`
+const UPDATE_NOTIFICATION_STATUS = `
+UPDATE
+	notifications
+SET
+	status = @status
+WHERE
+	id = @id;
 `
