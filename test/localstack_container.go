@@ -17,7 +17,7 @@ type localStackContainer struct {
 	SQSUrls publisher.SQSUrls
 }
 
-func setupLocalStack(ctx context.Context) (*localStackContainer, error) {
+func setupLocalStack(ctx context.Context) (*localStackContainer, func() error, error) {
 
 	port := "4566"
 
@@ -30,19 +30,19 @@ func setupLocalStack(ctx context.Context) (*localStackContainer, error) {
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create sqs container - %w", err)
+		return nil, nil, fmt.Errorf("failed to create sqs container - %w", err)
 	}
 
 	ip, err := container.Host(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get the sqs host - %w", err)
+		return nil, nil, fmt.Errorf("failed to get the sqs host - %w", err)
 	}
 
 	mappedPort, err := container.MappedPort(ctx, nat.Port(port))
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	uri := fmt.Sprintf("http://%s:%s", ip, mappedPort.Port())
@@ -50,14 +50,15 @@ func setupLocalStack(ctx context.Context) (*localStackContainer, error) {
 	client, err := publisher.MakeSQSClient(&uri)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create sqs client")
+		return nil, nil, fmt.Errorf("failed to create sqs client")
 	}
 
 	urls, err := deployments.MakeQueues(client)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create queues - %w", err)
+		return nil, nil, fmt.Errorf("failed to create queues - %w", err)
 	}
 
-	return &localStackContainer{Container: container, URI: uri, SQSUrls: urls}, nil
+	closer := func() error { return container.Terminate(ctx) }
+	return &localStackContainer{Container: container, URI: uri, SQSUrls: urls}, closer, nil
 }

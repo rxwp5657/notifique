@@ -53,13 +53,13 @@ func makeNotificationStorage(t storageType, uri string) (NotificationStorage, er
 
 func TestNotificationsController(t *testing.T) {
 
-	dbContainer, closer, err := setupContainer(POSTGRES)
+	dbContainer, dbCloser, err := setupContainer(POSTGRES)
 
 	if err != nil {
 		t.Fatalf("failed to create db container - %s", err)
 	}
 
-	sqsContainer, err := setupLocalStack(context.TODO())
+	sqsContainer, sqsCloser, err := setupLocalStack(context.TODO())
 
 	if err != nil {
 		t.Fatalf("failed to create sqs container - %s", err)
@@ -89,11 +89,11 @@ func TestNotificationsController(t *testing.T) {
 	userId := "1234"
 
 	defer func() {
-		if err := closer(); err != nil {
+		if err := dbCloser(); err != nil {
 			t.Fatalf("failed to terminate db container")
 		}
 
-		if err := sqsContainer.Terminate(context.TODO()); err != nil {
+		if err := sqsCloser(); err != nil {
 			t.Fatalf("failed to terminate sqs container")
 		}
 	}()
