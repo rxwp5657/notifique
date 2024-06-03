@@ -2,6 +2,7 @@ package test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,10 +13,17 @@ import (
 
 	"github.com/notifique/controllers"
 	"github.com/notifique/dto"
+	"github.com/notifique/internal/publisher"
 	storage "github.com/notifique/internal/storage/dynamodb"
 	pstorage "github.com/notifique/internal/storage/postgres"
 	"github.com/notifique/routes"
 	"github.com/stretchr/testify/assert"
+)
+
+type publisherType string
+
+const (
+	SQS publisherType = "SQS"
 )
 
 type NotificationStorage interface {
@@ -26,7 +34,7 @@ type NotificationStorage interface {
 func makeNotificationStorage(t storageType, uri string) (NotificationStorage, error) {
 	switch t {
 	case DYNAMODB:
-		client, err := storage.MakeClient(&uri)
+		client, err := storage.MakeDynamoDBClient(&uri)
 		if err != nil {
 			return nil, err
 		}
@@ -45,29 +53,50 @@ func makeNotificationStorage(t storageType, uri string) (NotificationStorage, er
 
 func TestNotificationsController(t *testing.T) {
 
-	var container Container
-
-	container, err := setupContainer(POSTGRES)
+	dbContainer, dbCloser, err := setupContainer(POSTGRES)
 
 	if err != nil {
-		t.Fatalf("failed to create container - %s", err)
+		t.Fatalf("failed to create db container - %s", err)
 	}
 
-	uri := container.GetURI()
+	sqsContainer, sqsCloser, err := setupLocalStack(context.TODO())
 
+	if err != nil {
+		t.Fatalf("failed to create sqs container - %s", err)
+	}
+
+	uri := dbContainer.GetURI()
 	storage, err := makeNotificationStorage(POSTGRES, uri)
 
 	if err != nil {
 		t.Fatalf("failed to create storage - %s", err)
 	}
 
+	sqsClient, err := publisher.MakeSQSClient(&sqsContainer.URI)
+
+	if err != nil {
+		t.Fatalf("failed to create sqs client - %s", err)
+	}
+
+	sqsPublisher := publisher.MakeSQSPublisher(sqsClient, sqsContainer.SQSUrls)
+
 	router := gin.Default()
-	routes.SetupNotificationRoutes(router, storage)
+	routes.SetupNotificationRoutes(router, storage, &sqsPublisher)
 
 	// Needed so we can apply the distribution list name validation
 	routes.SetupDistributionListRoutes(router, storage)
 
 	userId := "1234"
+
+	defer func() {
+		if err := dbCloser(); err != nil {
+			t.Fatalf("failed to terminate db container")
+		}
+
+		if err := sqsCloser(); err != nil {
+			t.Fatalf("failed to terminate sqs container")
+		}
+	}()
 
 	testNofitication := dto.NotificationReq{
 		Title:            "Notification 1",

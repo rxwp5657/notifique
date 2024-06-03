@@ -31,3 +31,7 @@ deploy-dynamodb: vet
 deploy-postgres: vet
 	go run ./cmd/deployments/postgres/main.go
 .PHONY:deploy-postgres
+
+deploy-sqs: vet
+	go run ./cmd/deployments/sqs/main.go
+.PHONY:deploy-sqs

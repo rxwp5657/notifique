@@ -10,12 +10,31 @@ import (
 	"github.com/notifique/dto"
 )
 
+type NotificationStatus string
+
+const (
+	CREATED        NotificationStatus = "CREATED"
+	PUBLISHED      NotificationStatus = "PUBLISHED"
+	PUBLISH_FAILED NotificationStatus = "FAILED"
+)
+
+type Notification struct {
+	dto.NotificationReq
+	Id string `json:"id"`
+}
+
 type NotificationStorage interface {
 	SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error)
+	CreateNotificationStatusLog(ctx context.Context, notificationId string, status NotificationStatus, errMsg *string) error
+}
+
+type NotificationPublisher interface {
+	Publish(ctx context.Context, notification Notification, storage NotificationStorage) error
 }
 
 type NotificationController struct {
-	Storage NotificationStorage
+	Storage   NotificationStorage
+	Publisher NotificationPublisher
 }
 
 func (nc NotificationController) CreateNotification(c *gin.Context) {
@@ -28,7 +47,22 @@ func (nc NotificationController) CreateNotification(c *gin.Context) {
 
 	userId := c.GetHeader(USER_ID_HEADER_KEY)
 
-	if _, err := nc.Storage.SaveNotification(c, userId, notification); err != nil {
+	notificationId, err := nc.Storage.SaveNotification(c, userId, notification)
+
+	if err != nil {
+		slog.Error(err.Error())
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	notificationWithId := Notification{
+		NotificationReq: notification,
+		Id:              notificationId,
+	}
+
+	err = nc.Publisher.Publish(c, notificationWithId, nc.Storage)
+
+	if err != nil {
 		slog.Error(err.Error())
 		c.Status(http.StatusInternalServerError)
 		return

@@ -15,6 +15,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/google/uuid"
+
+	c "github.com/notifique/controllers"
 	"github.com/notifique/dto"
 	"github.com/notifique/internal"
 )
@@ -28,6 +30,7 @@ type DynamoDBAPI interface {
 	Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
 	Scan(ctx context.Context, params *dynamodb.ScanInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error)
 	BatchWriteItem(ctx context.Context, params *dynamodb.BatchWriteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.BatchWriteItemOutput, error)
+	TransactWriteItems(ctx context.Context, params *dynamodb.TransactWriteItemsInput, optFns ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error)
 }
 
 type DynamoDBStorage struct {
@@ -153,7 +156,6 @@ func (s *DynamoDBStorage) SaveNotification(ctx context.Context, createdBy string
 		DistributionList: notificationReq.DistributionList,
 		Recipients:       notificationReq.Recipients,
 		Channels:         notificationReq.Channels,
-		Logs:             []notificationLog{},
 	}
 
 	item, err := attributevalue.MarshalMap(notification)
@@ -162,13 +164,41 @@ func (s *DynamoDBStorage) SaveNotification(ctx context.Context, createdBy string
 		return "", fmt.Errorf("failed to marshall notification - %w", err)
 	}
 
-	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(NOTIFICATIONS_TABLE),
-		Item:      item,
+	statusLog := notificationStatusLog{
+		NotificationId: id,
+		Status:         string(c.CREATED),
+		StatusDate:     time.Now().Format(time.RFC3339Nano),
+		Error:          nil,
+	}
+
+	statusLogItem, err := attributevalue.MarshalMap(statusLog)
+
+	if err != nil {
+		return "", fmt.Errorf("failed to marshall notification status log - %w", err)
+	}
+
+	_, err = s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: []types.TransactWriteItem{{
+			Put: &types.Put{
+				TableName: aws.String(NOTIFICATIONS_TABLE),
+				Item:      item,
+			},
+		}, {
+			Put: &types.Put{
+				TableName: aws.String(NOTIFICATION_STATUS_LOG_TABLE),
+				Item:      statusLogItem,
+			},
+		}},
 	})
 
 	if err != nil {
 		return "", fmt.Errorf("failed to store notification - %w", err)
+	}
+
+	err = s.CreateNotificationStatusLog(ctx, id, c.CREATED, nil)
+
+	if err != nil {
+		return "", err
 	}
 
 	return id, nil
@@ -1048,6 +1078,33 @@ func (s *DynamoDBStorage) DeleteRecipients(ctx context.Context, listName string,
 	return &summary, nil
 }
 
+func (s *DynamoDBStorage) CreateNotificationStatusLog(ctx context.Context, notificationId string, status c.NotificationStatus, errMsg *string) error {
+
+	statusLog := notificationStatusLog{
+		NotificationId: notificationId,
+		Status:         string(status),
+		StatusDate:     time.Now().Format(time.RFC3339Nano),
+		Error:          errMsg,
+	}
+
+	item, err := attributevalue.MarshalMap(statusLog)
+
+	if err != nil {
+		return fmt.Errorf("failed to marshall the user config - %w", err)
+	}
+
+	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(NOTIFICATION_STATUS_LOG_TABLE),
+		Item:      item,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to store notification status log - %w", err)
+	}
+
+	return nil
+}
+
 func (s *DynamoDBStorage) CreateUserNotification(ctx context.Context, userId string, un dto.UserNotification) error {
 
 	notification := userNotification{
@@ -1100,7 +1157,7 @@ func (s *DynamoDBStorage) DeleteUserNotification(ctx context.Context, userId str
 	return err
 }
 
-func MakeClient(baseEndpoint *string) (*dynamodb.Client, error) {
+func MakeDynamoDBClient(baseEndpoint *string) (*dynamodb.Client, error) {
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 
 	if err != nil {

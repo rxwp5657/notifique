@@ -16,15 +16,15 @@ const (
 	POSTGRES storageType = "POSTGTES"
 )
 
-func setupContainer(t storageType) (Container, error) {
+func setupContainer(t storageType) (Container, func() error, error) {
 	switch t {
 	case DYNAMODB:
-		container, err := setupDynamoDB(context.TODO())
-		return container, err
+		container, f, err := setupDynamoDB(context.TODO())
+		return container, f, err
 	case POSTGRES:
-		container, err := setupPostgres(context.TODO())
-		return container, err
+		container, f, err := setupPostgres(context.TODO())
+		return container, f, err
 	default:
-		return nil, fmt.Errorf("invalid option - %s", t)
+		return nil, nil, fmt.Errorf("invalid option - %s", t)
 	}
 }

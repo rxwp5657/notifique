@@ -1,27 +1,20 @@
 package main
 
 import (
-	"context"
 	"log"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-
 	ddb "github.com/notifique/deployments/dynamodb"
+	storage "github.com/notifique/internal/storage/dynamodb"
 )
 
 func main() {
 
-	cfg, err := config.LoadDefaultConfig(context.TODO())
+	url := "http://localhost:8000"
+	client, err := storage.MakeDynamoDBClient(&url)
 
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("failed to create dynamo client - %v", err)
 	}
-
-	client := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
-		o.BaseEndpoint = aws.String("http://localhost:8000")
-	})
 
 	err = ddb.CreateTables(client)
 

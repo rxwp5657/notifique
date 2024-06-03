@@ -13,6 +13,15 @@ CREATE TYPE notification_channel AS ENUM (
     'push'
 );
 
+CREATE TYPE notification_status AS ENUM (
+    'CREATED',
+    'PUBLISHED',
+    'PUBLISHED_FAILED',
+    'PROCESSING',
+    'PROCESSING_FAILED',
+    'SENT'
+);
+
 CREATE TABLE IF NOT EXISTS distribution_lists (
     "name" VARCHAR PRIMARY KEY,
     recipient VARCHAR NOT NULL
@@ -30,11 +39,24 @@ CREATE TABLE IF NOT EXISTS notifications (
     "priority" notification_priority DEFAULT 'LOW',
     distribution_list VARCHAR,
     created_at TIMESTAMPTZ NOT NULL,
+    status notification_status NOT NULL,
     CONSTRAINT distribution_list_fk FOREIGN KEY (distribution_list) REFERENCES distribution_lists("name")
 );
 
 CREATE INDEX IF NOT EXISTS notifications_idx
 ON notifications(id, created_at);
+
+CREATE TABLE IF NOT EXISTS notification_status_log(
+    notification_id uuid NOT NULL,
+    status_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    "status" notification_status NOT NULL,
+    error_message VARCHAR,
+    CONSTRAINT notification_id_fk FOREIGN KEY (notification_id) REFERENCES notifications(id),
+    CONSTRAINT notification_status_log_pk PRIMARY KEY(notification_id, status_date)
+);
+
+CREATE INDEX IF NOT EXISTS notification_status_idx
+ON notification_status_log(notification_id, status_date);
 
 CREATE TABLE IF NOT EXISTS user_notifications (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

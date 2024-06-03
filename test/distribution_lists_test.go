@@ -17,13 +17,13 @@ import (
 )
 
 func TestDistributionListController(t *testing.T) {
-	container, err := setupDynamoDB(context.TODO())
+	dbContainer, closer, err := setupDynamoDB(context.TODO())
 
 	if err != nil {
 		t.Fatalf("failed to create container - %s", err)
 	}
 
-	client, err := storage.MakeClient(&container.URI)
+	client, err := storage.MakeDynamoDBClient(&dbContainer.URI)
 
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -35,6 +35,12 @@ func TestDistributionListController(t *testing.T) {
 	routes.SetupDistributionListRoutes(router, &storage)
 
 	userId := "1234"
+
+	defer func() {
+		if err := closer(); err != nil {
+			t.Fatalf("failed to terminate db container")
+		}
+	}()
 
 	dl := dto.DistributionList{
 		Name:       "TestDL",

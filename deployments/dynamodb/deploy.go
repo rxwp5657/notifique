@@ -202,6 +202,34 @@ func createDLSummaryTable(client *dynamodb.Client) error {
 	return createTable(client, tableName, &tableInput)
 }
 
+func createNotificationStatusLogTable(client *dynamodb.Client) error {
+	tableName := sdb.NOTIFICATION_STATUS_LOG_TABLE
+
+	tableInput := dynamodb.CreateTableInput{
+		AttributeDefinitions: []types.AttributeDefinition{{
+			AttributeName: aws.String(sdb.NOTIFICATION_STATUS_LOG_HASH_KEY),
+			AttributeType: types.ScalarAttributeTypeS,
+		}, {
+			AttributeName: aws.String(sdb.NOTIFICATION_STATUS_LOG_SORT_KEY),
+			AttributeType: types.ScalarAttributeTypeS,
+		}},
+		KeySchema: []types.KeySchemaElement{{
+			AttributeName: aws.String(sdb.NOTIFICATION_STATUS_LOG_HASH_KEY),
+			KeyType:       types.KeyTypeHash,
+		}, {
+			AttributeName: aws.String(sdb.NOTIFICATION_STATUS_LOG_SORT_KEY),
+			KeyType:       types.KeyTypeRange,
+		}},
+		TableName: aws.String(tableName),
+		ProvisionedThroughput: &types.ProvisionedThroughput{
+			ReadCapacityUnits:  aws.Int64(10),
+			WriteCapacityUnits: aws.Int64(10),
+		},
+	}
+
+	return createTable(client, tableName, &tableInput)
+}
+
 func CreateTables(client *dynamodb.Client) error {
 
 	if err := createNotificationTable(client); err != nil {
@@ -222,6 +250,10 @@ func CreateTables(client *dynamodb.Client) error {
 
 	if err := createDLSummaryTable(client); err != nil {
 		return fmt.Errorf("distribution lists table - %w", err)
+	}
+
+	if err := createNotificationStatusLogTable(client); err != nil {
+		return fmt.Errorf("notification status log table - %w", err)
 	}
 
 	return nil
