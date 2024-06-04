@@ -20,23 +20,23 @@ type PostgresStorage struct {
 	conn *pgxpool.Pool
 }
 
+type RowQuerier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
 type namedArgsBuilder[T any] func(val T) pgx.NamedArgs
 
 func (ps *PostgresStorage) GetUserNotifications(ctx context.Context, filters dto.UserNotificationFilters) (dto.Page[dto.UserNotification], error) {
 
 	page := dto.Page[dto.UserNotification]{}
 
-	args := pgx.NamedArgs{}
+	args := pgx.NamedArgs{"limit": 25}
 	whereFilters := make([]string, 0)
 
-	limit := 25
-
 	if filters.MaxResults != nil {
-		limit = *filters.MaxResults
+		limit := *filters.MaxResults
+		args["limit"] = limit
 	}
-
-	limit += 1
-	args["limit"] = limit
 
 	if filters.NextToken != nil {
 		nextTokenFilter := "(id, user_id, created_at) <= (@id, @user_id, @created_at)"
@@ -93,7 +93,7 @@ func (ps *PostgresStorage) GetUserNotifications(ctx context.Context, filters dto
 
 	numUserNotifications := len(userNotifications)
 
-	if numUserNotifications == limit {
+	if numUserNotifications == args["limit"] {
 		lastNotification := userNotifications[numUserNotifications-1]
 
 		lastNotificationKey := userNotificationKey{
@@ -109,7 +109,6 @@ func (ps *PostgresStorage) GetUserNotifications(ctx context.Context, filters dto
 		}
 
 		page.NextToken = &key
-		userNotifications = userNotifications[:numUserNotifications-1]
 	}
 
 	page.PrevToken = filters.NextToken
@@ -398,13 +397,13 @@ func (ps *PostgresStorage) SetReadStatus(ctx context.Context, userId, notificati
 	return nil
 }
 
-func (ps *PostgresStorage) getDistributionList(ctx context.Context, listName string) (*dto.DistributionListSummary, error) {
+func getDistributionListSummary(ctx context.Context, listName string, rQuerier RowQuerier) (*dto.DistributionListSummary, error) {
 
 	args := pgx.NamedArgs{"name": listName}
 
 	var summary dto.DistributionListSummary
 
-	err := ps.conn.QueryRow(ctx, GET_DISTRIBUTION_LIST, args).Scan(
+	err := rQuerier.QueryRow(ctx, GET_DISTRIBUTION_LIST, args).Scan(
 		&summary.Name,
 		&summary.NumberOfRecipients,
 	)
@@ -422,7 +421,7 @@ func (ps *PostgresStorage) getDistributionList(ctx context.Context, listName str
 
 func (ps *PostgresStorage) CreateDistributionList(ctx context.Context, distributionList dto.DistributionList) error {
 
-	list, err := ps.getDistributionList(ctx, distributionList.Name)
+	list, err := getDistributionListSummary(ctx, distributionList.Name, ps.conn)
 
 	if err != nil {
 		return err
@@ -438,6 +437,18 @@ func (ps *PostgresStorage) CreateDistributionList(ctx context.Context, distribut
 
 	if err != nil {
 		return fmt.Errorf("failed to start transaction - %w", err)
+	}
+
+	args := pgx.NamedArgs{
+		"name":          distributionList.Name,
+		"numRecipients": len(distributionList.Recipients),
+	}
+
+	_, err = tx.Exec(ctx, INSERT_DISTRIBUTION_LIST, args)
+
+	if err != nil {
+		tx.Rollback(ctx)
+		return fmt.Errorf("failed to create distribution list - %w", err)
 	}
 
 	recipientBuilder := func(recipient string) pgx.NamedArgs {
@@ -473,20 +484,17 @@ func (ps *PostgresStorage) GetDistributionLists(ctx context.Context, filters dto
 
 	page := dto.Page[dto.DistributionListSummary]{}
 
-	args := pgx.NamedArgs{}
+	args := pgx.NamedArgs{"limit": 25}
+
 	nextTokenFilter := ""
 
-	limit := 25
-
 	if filters.MaxResults != nil {
-		limit = *filters.MaxResults
+		limit := *filters.MaxResults
+		args["limit"] = limit
 	}
 
-	limit += 1
-	args["limit"] = limit
-
 	if filters.NextToken != nil {
-		nextTokenFilter = "WHERE name <= @name"
+		nextTokenFilter = `WHERE ("name") > (@name)`
 
 		var unmarsalledKey distributionListKey
 		err := unmarsallKey(*filters.NextToken, &unmarsalledKey)
@@ -498,12 +506,7 @@ func (ps *PostgresStorage) GetDistributionLists(ctx context.Context, filters dto
 		args["name"] = unmarsalledKey.Name
 	}
 
-	query := GET_DISTRIBUTION_LISTS
-
-	if len(nextTokenFilter) != 0 {
-		query = fmt.Sprintf(GET_DISTRIBUTION_LISTS, nextTokenFilter)
-	}
-
+	query := fmt.Sprintf(GET_DISTRIBUTION_LISTS, nextTokenFilter)
 	rows, err := ps.conn.Query(ctx, query, args)
 
 	if err != nil {
@@ -512,7 +515,7 @@ func (ps *PostgresStorage) GetDistributionLists(ctx context.Context, filters dto
 
 	defer rows.Close()
 
-	summaries, err := pgx.CollectRows(rows, pgx.RowToStructByName[dto.DistributionListSummary])
+	summaries, err := pgx.CollectRows(rows, pgx.RowToStructByName[distributionListSummary])
 
 	if err != nil {
 		return page, fmt.Errorf("failed to collect rows - %w", err)
@@ -520,7 +523,7 @@ func (ps *PostgresStorage) GetDistributionLists(ctx context.Context, filters dto
 
 	numSummaries := len(summaries)
 
-	if numSummaries == limit {
+	if numSummaries == args["limit"] {
 		lastSummary := summaries[numSummaries-1]
 
 		lastSummaryKey := distributionListKey{
@@ -534,12 +537,22 @@ func (ps *PostgresStorage) GetDistributionLists(ctx context.Context, filters dto
 		}
 
 		page.NextToken = &key
-		summaries = summaries[:numSummaries-1]
+	}
+
+	dtoSummaries := make([]dto.DistributionListSummary, 0, len(summaries))
+
+	for _, summary := range summaries {
+		s := dto.DistributionListSummary{
+			Name:               summary.Name,
+			NumberOfRecipients: summary.NumberOfRecipients,
+		}
+
+		dtoSummaries = append(dtoSummaries, s)
 	}
 
 	page.PrevToken = filters.NextToken
-	page.ResultCount = len(summaries)
-	page.Data = summaries
+	page.ResultCount = len(dtoSummaries)
+	page.Data = dtoSummaries
 
 	return page, nil
 }
@@ -554,11 +567,12 @@ func (ps *PostgresStorage) DeleteDistributionList(ctx context.Context, distlistN
 
 	args := pgx.NamedArgs{"name": distlistName}
 
+	// Should also delete its recipients
 	_, err = tx.Exec(ctx, DELETE_DISTRIBUTION_LIST, args)
 
 	if err != nil {
 		tx.Rollback(ctx)
-		return fmt.Errorf("failed to delete distribution list recipients - %w", err)
+		return fmt.Errorf("failed to delete distribution list - %w", err)
 	}
 
 	err = tx.Commit(ctx)
@@ -574,20 +588,28 @@ func (ps *PostgresStorage) GetRecipients(ctx context.Context, distlistName strin
 
 	page := dto.Page[string]{}
 
-	args := pgx.NamedArgs{}
-	whereFilters := make([]string, 0)
+	summary, err := getDistributionListSummary(ctx, distlistName, ps.conn)
 
-	limit := 25
-
-	if filters.MaxResults != nil {
-		limit = *filters.MaxResults
+	if err != nil {
+		return page, fmt.Errorf("failed to get summary - %w", err)
 	}
 
-	limit += 1
-	args["limit"] = limit
+	if summary == nil {
+		return page, internal.DistributionListNotFound{
+			Name: distlistName,
+		}
+	}
+
+	args := pgx.NamedArgs{"limit": 25}
+	whereFilters := make([]string, 0)
+
+	if filters.MaxResults != nil {
+		limit := *filters.MaxResults
+		args["limit"] = limit
+	}
 
 	if filters.NextToken != nil {
-		filter := `("name", recipient) <= (@name, @recipient)`
+		filter := `("name", recipient) > (@name, @recipient)`
 		whereFilters = append(whereFilters, filter)
 
 		var unmarsalledKey distributionList
@@ -597,8 +619,12 @@ func (ps *PostgresStorage) GetRecipients(ctx context.Context, distlistName strin
 			return page, err
 		}
 
+		if unmarsalledKey.Name != distlistName {
+			return page, fmt.Errorf("invalid key %s", *filters.NextToken)
+		}
+
 		args["name"] = unmarsalledKey.Name
-		args["recipients"] = unmarsalledKey.Recipient
+		args["recipient"] = unmarsalledKey.Recipient
 	} else {
 		filter := "name = @name"
 		whereFilters = append(whereFilters, filter)
@@ -616,7 +642,7 @@ func (ps *PostgresStorage) GetRecipients(ctx context.Context, distlistName strin
 
 	defer rows.Close()
 
-	recipients, err := pgx.CollectRows(rows, pgx.RowToStructByName[distributionList])
+	recipients, err := pgx.CollectRows(rows, pgx.RowToStructByName[recipient])
 
 	if err != nil {
 		return page, fmt.Errorf("failed to collect rows - %w", err)
@@ -624,17 +650,21 @@ func (ps *PostgresStorage) GetRecipients(ctx context.Context, distlistName strin
 
 	numRecipients := len(recipients)
 
-	if numRecipients == limit {
-		lastSummary := recipients[numRecipients-1]
+	if numRecipients == args["limit"] {
+		lastRecipient := recipients[numRecipients-1]
 
-		key, err := marshallKey(lastSummary)
+		dl := distributionList{
+			Name:      distlistName,
+			Recipient: lastRecipient.Recipient,
+		}
+
+		key, err := marshallKey(dl)
 
 		if err != nil {
 			return page, err
 		}
 
 		page.NextToken = &key
-		recipients = recipients[:numRecipients-1]
 	}
 
 	recipientsNames := make([]string, 0, len(recipients))
@@ -651,6 +681,18 @@ func (ps *PostgresStorage) GetRecipients(ctx context.Context, distlistName strin
 }
 
 func (ps *PostgresStorage) AddRecipients(ctx context.Context, distlistName string, recipients []string) (*dto.DistributionListSummary, error) {
+
+	exists, err := getDistributionListSummary(ctx, distlistName, ps.conn)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get summary - %w", err)
+	}
+
+	if exists == nil {
+		return nil, internal.DistributionListNotFound{
+			Name: distlistName,
+		}
+	}
 
 	tx, err := ps.conn.Begin(ctx)
 
@@ -678,16 +720,47 @@ func (ps *PostgresStorage) AddRecipients(ctx context.Context, distlistName strin
 		return nil, fmt.Errorf("failed add recipients - %w", err)
 	}
 
+	summary, err := getDistributionListSummary(ctx, distlistName, tx)
+
+	if err != nil {
+		tx.Rollback(ctx)
+		return nil, fmt.Errorf("failed to get summary - %w", err)
+	}
+
+	countArgs := pgx.NamedArgs{
+		"numRecipients": summary.NumberOfRecipients,
+		"name":          distlistName,
+	}
+
+	_, err = tx.Exec(ctx, UPDATE_RECIPIENTS_COUNT, countArgs)
+
+	if err != nil {
+		tx.Rollback(ctx)
+		return nil, fmt.Errorf("failed to update recipients count - %w", err)
+	}
+
 	err = tx.Commit(ctx)
 
 	if err != nil {
 		return nil, fmt.Errorf("commit failed - %w", err)
 	}
 
-	return nil, nil
+	return summary, nil
 }
 
 func (ps *PostgresStorage) DeleteRecipients(ctx context.Context, distlistName string, recipients []string) (*dto.DistributionListSummary, error) {
+
+	exists, err := getDistributionListSummary(ctx, distlistName, ps.conn)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get summary - %w", err)
+	}
+
+	if exists == nil {
+		return nil, internal.DistributionListNotFound{
+			Name: distlistName,
+		}
+	}
 
 	tx, err := ps.conn.Begin(ctx)
 
@@ -707,19 +780,32 @@ func (ps *PostgresStorage) DeleteRecipients(ctx context.Context, distlistName st
 		return nil, fmt.Errorf("failed delete recipients - %w", err)
 	}
 
+	summary, err := getDistributionListSummary(ctx, distlistName, tx)
+
+	if err != nil {
+		tx.Rollback(ctx)
+		return nil, fmt.Errorf("failed to get summary - %w", err)
+	}
+
+	countArgs := pgx.NamedArgs{
+		"numRecipients": summary.NumberOfRecipients,
+		"name":          distlistName,
+	}
+
+	_, err = tx.Exec(ctx, UPDATE_RECIPIENTS_COUNT, countArgs)
+
+	if err != nil {
+		tx.Rollback(ctx)
+		return nil, fmt.Errorf("failed to update recipients count - %w", err)
+	}
+
 	err = tx.Commit(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("commit failed - %w", err)
+		return nil, fmt.Errorf("failed to commit delete recipients - %w", err)
 	}
 
-	list, err := ps.getDistributionList(ctx, distlistName)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return list, nil
+	return summary, nil
 }
 
 func (ps *PostgresStorage) CreateNotificationStatusLog(ctx context.Context, notificationId string, status c.NotificationStatus, errMsg *string) error {

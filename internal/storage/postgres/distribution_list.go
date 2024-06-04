@@ -5,17 +5,31 @@ type distributionList struct {
 	Recipient string `db:"recipient"`
 }
 
+type recipient struct {
+	Recipient string `db:"recipient"`
+}
+
 type distributionListSummary struct {
-	Name               string
-	NumberOfRecipients string
+	Name               string `db:"name"`
+	NumberOfRecipients int    `db:"num_recipients"`
 }
 
 type distributionListKey struct {
 	Name string `json:"name"`
 }
 
+const INSERT_DISTRIBUTION_LIST = `
+INSERT INTO distribution_lists (
+	"name",
+	num_recipients
+) VALUES (
+	@name,
+	@numRecipients
+);
+`
+
 const INSERT_DISTRIBUTION_LIST_RECIPIENT = `
-INSERT INTO distribution_lists(
+INSERT INTO distribution_list_recipients(
 	"name",
 	recipient
 ) VALUES (
@@ -31,7 +45,7 @@ SELECT
 	"name",
 	COUNT(*) AS num_recipients
 FROM
-	distribution_lists
+	distribution_list_recipients
 WHERE
 	"name" = @name
 GROUP BY
@@ -40,13 +54,10 @@ GROUP BY
 
 const GET_DISTRIBUTION_LISTS = `
 SELECT
-	"name",
-	COUNT(*) AS num_recipients
+	*
 FROM
 	distribution_lists
 %s
-GROUP BY
-	"name"
 ORDER BY
 	"name"
 LIMIT
@@ -60,23 +71,39 @@ WHERE
 	"name" = @name;
 `
 
+const DELETE_ALL_RECIPIENTS_DISTRIBUTION_LIST = `
+DELETE FROM
+	distribution_list_recipients
+WHERE
+	"name" = @name;
+`
+
 const DELETE_DISTRIBUTION_LIST_RECIPIENTS = `
 DELETE FROM
-	distribution_lists
+	distribution_list_recipients
 WHERE
 	"name" = @name AND
-	recipient ANY (@recipients);
+	recipient = ANY (@recipients);
 `
 
 const GET_DISTRIBUTION_LIST_RECIPIENTS = `
 SELECT
 	recipient
 FROM
-	distribution_lists
+	distribution_list_recipients
 WHERE
 	%s
 ORDER BY
 	recipient
 LIMIT
 	@limit;
+`
+
+const UPDATE_RECIPIENTS_COUNT = `
+UPDATE
+	distribution_lists
+SET
+	num_recipients = @numRecipients
+WHERE
+	"name" = @name;
 `
