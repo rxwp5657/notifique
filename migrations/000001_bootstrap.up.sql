@@ -24,11 +24,22 @@ CREATE TYPE notification_status AS ENUM (
 
 CREATE TABLE IF NOT EXISTS distribution_lists (
     "name" VARCHAR PRIMARY KEY,
-    recipient VARCHAR NOT NULL
+    num_recipients INT NOT NULL DEFAULT 0
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS distribution_lists_idx
-ON distribution_lists("name", recipient);
+CREATE TABLE IF NOT EXISTS distribution_list_recipients (
+    "name" VARCHAR,
+    recipient VARCHAR NOT NULL,
+    CONSTRAINT distribution_lists_pk
+        PRIMARY KEY("name", recipient),
+    CONSTRAINT distribution_list_fk
+        FOREIGN KEY("name")
+        REFERENCES distribution_lists("name")
+        ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS distribution_list_recipients_idx
+ON distribution_list_recipients("name", recipient);
 
 CREATE TABLE IF NOT EXISTS notifications (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -40,7 +51,10 @@ CREATE TABLE IF NOT EXISTS notifications (
     distribution_list VARCHAR,
     created_at TIMESTAMPTZ NOT NULL,
     status notification_status NOT NULL,
-    CONSTRAINT distribution_list_fk FOREIGN KEY (distribution_list) REFERENCES distribution_lists("name")
+    CONSTRAINT distribution_list_fk
+        FOREIGN KEY (distribution_list)
+        REFERENCES distribution_lists("name")
+        ON DELETE SET NULL (distribution_list)
 );
 
 CREATE INDEX IF NOT EXISTS notifications_idx
@@ -51,8 +65,11 @@ CREATE TABLE IF NOT EXISTS notification_status_log(
     status_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     "status" notification_status NOT NULL,
     error_message VARCHAR,
-    CONSTRAINT notification_id_fk FOREIGN KEY (notification_id) REFERENCES notifications(id),
-    CONSTRAINT notification_status_log_pk PRIMARY KEY(notification_id, status_date)
+    CONSTRAINT notification_id_fk
+        FOREIGN KEY (notification_id)
+        REFERENCES notifications(id),
+    CONSTRAINT notification_status_log_pk
+        PRIMARY KEY(notification_id, status_date)
 );
 
 CREATE INDEX IF NOT EXISTS notification_status_idx
@@ -75,7 +92,9 @@ ON user_notifications(id, user_id, created_at);
 CREATE TABLE IF NOT EXISTS notification_recipients (
     notification_id uuid NOT NULL,
     recipient VARCHAR NOT NULL,
-    CONSTRAINT notification_id_fk FOREIGN KEY (notification_id) REFERENCES notifications(id)
+    CONSTRAINT notification_id_fk
+        FOREIGN KEY (notification_id)
+        REFERENCES notifications(id)
 );
 
 CREATE INDEX IF NOT EXISTS notification_recipients_idx

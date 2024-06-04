@@ -10,29 +10,51 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/notifique/controllers"
 	"github.com/notifique/dto"
 	storage "github.com/notifique/internal/storage/dynamodb"
+	pstorage "github.com/notifique/internal/storage/postgres"
 	"github.com/notifique/routes"
 	"github.com/stretchr/testify/assert"
 )
 
+func makeDistributionListStorage(t storageType, uri string) (controllers.DistributionListStorage, error) {
+	switch t {
+	case DYNAMODB:
+		client, err := storage.MakeDynamoDBClient(&uri)
+		if err != nil {
+			return nil, err
+		}
+		storage := storage.MakeDynamoDBStorage(client)
+		return &storage, nil
+	case POSTGRES:
+		container, err := pstorage.MakePostgresStorage(uri)
+		if err != nil {
+			return nil, err
+		}
+		return container, err
+	default:
+		return nil, fmt.Errorf("invalid option - %s", t)
+	}
+}
+
 func TestDistributionListController(t *testing.T) {
-	dbContainer, closer, err := setupDynamoDB(context.TODO())
+	dbContainer, closer, err := setupContainer(POSTGRES)
 
 	if err != nil {
 		t.Fatalf("failed to create container - %s", err)
 	}
 
-	client, err := storage.MakeDynamoDBClient(&dbContainer.URI)
+	uri := dbContainer.GetURI()
+
+	storage, err := makeDistributionListStorage(POSTGRES, uri)
 
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatalf("failed to create storage - %s", err)
 	}
 
-	storage := storage.MakeDynamoDBStorage(client)
-
 	router := gin.Default()
-	routes.SetupDistributionListRoutes(router, &storage)
+	routes.SetupDistributionListRoutes(router, storage)
 
 	userId := "1234"
 
@@ -177,7 +199,7 @@ func TestDistributionListController(t *testing.T) {
 			return w
 		}
 
-		distributionLists, err := crateTestDistributionLists(3, &storage)
+		distributionLists, err := crateTestDistributionLists(3, storage)
 
 		if err != nil {
 			t.Fatalf("failed to create distribution lists - %v", err)
@@ -224,7 +246,7 @@ func TestDistributionListController(t *testing.T) {
 					t.Fatal("failed to unmarshall distribution list page")
 				}
 
-				if resp.NextToken == nil {
+				if len(resp.Data) == 0 {
 					break
 				}
 
@@ -235,7 +257,7 @@ func TestDistributionListController(t *testing.T) {
 			assert.Equal(t, len(distributionLists), len(pages))
 		})
 
-		err = deleteDistributionLists(distributionLists, &storage)
+		err = deleteDistributionLists(distributionLists, storage)
 
 		if err != nil {
 			t.Fatalf("failed to delete distribution lists - %v", err)
@@ -326,7 +348,7 @@ func TestDistributionListController(t *testing.T) {
 					t.Fatal("failed to unmarshall recipients")
 				}
 
-				if resp.NextToken == nil {
+				if len(resp.Data) == 0 {
 					break
 				}
 
