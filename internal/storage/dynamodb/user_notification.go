@@ -31,7 +31,7 @@ type userNotificationKey struct {
 	CreatedAt string `dynamodbav:"createdAt" json:"createdAt"`
 }
 
-func (n *userNotification) GetKey() (DynamoDBKey, error) {
+func (n *userNotification) GetKey() (DynamoKey, error) {
 	key := make(map[string]types.AttributeValue)
 
 	userId, err := attributevalue.Marshal(n.UserId)
@@ -52,7 +52,7 @@ func (n *userNotification) GetKey() (DynamoDBKey, error) {
 	return key, nil
 }
 
-func (n *userNotification) GetSecondaryIdxKey() (DynamoDBKey, error) {
+func (n *userNotification) GetSecondaryIdxKey() (DynamoKey, error) {
 	key := make(map[string]types.AttributeValue)
 
 	id, err := attributevalue.Marshal(n.UserId)
@@ -73,7 +73,7 @@ func (n *userNotification) GetSecondaryIdxKey() (DynamoDBKey, error) {
 	return key, nil
 }
 
-func (n *userNotificationKey) GetKey() (DynamoDBKey, error) {
+func (n *userNotificationKey) GetKey() (DynamoKey, error) {
 	un := userNotification{UserId: n.UserId, Id: n.UserId}
 
 	return un.GetKey()

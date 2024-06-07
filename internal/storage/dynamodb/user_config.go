@@ -29,7 +29,7 @@ type userConfig struct {
 	InAppConfig channelConfig `dynamodbav:"inAppConfig"`
 }
 
-func (cfg *userConfig) GetKey() (DynamoDBKey, error) {
+func (cfg *userConfig) GetKey() (DynamoKey, error) {
 	key := make(map[string]types.AttributeValue)
 
 	userId, err := attributevalue.Marshal(cfg.UserId)

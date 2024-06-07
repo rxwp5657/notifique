@@ -23,6 +23,10 @@ aws dynamodb scan \
     --table-name notifications
 ```
 
+```bash
+go run github.com/google/wire/cmd/wire
+```
+
 ## Useful Links
 
 * https://swagger.io/resources/articles/best-practices-in-api-design/

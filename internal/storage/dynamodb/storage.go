@@ -38,7 +38,7 @@ type DynamoDBStorage struct {
 }
 
 type DynamodbPrimaryKey interface {
-	GetKey() (DynamoDBKey, error)
+	GetKey() (DynamoKey, error)
 }
 
 type DynamoDBPageParams struct {
@@ -46,10 +46,11 @@ type DynamoDBPageParams struct {
 	ExclusiveStartKey map[string]types.AttributeValue
 }
 
-type DynamoDBKey map[string]types.AttributeValue
+type DynamoKey map[string]types.AttributeValue
 type DynamoObj map[string]types.AttributeValue
+type DynamoEndpoint string
 
-func marshallNextToken[T any](key *T, lastEvaluatedKey DynamoDBKey) (string, error) {
+func marshallNextToken[T any](key *T, lastEvaluatedKey DynamoKey) (string, error) {
 	err := attributevalue.UnmarshalMap(lastEvaluatedKey, &key)
 
 	if err != nil {
@@ -1157,22 +1158,22 @@ func (s *DynamoDBStorage) DeleteUserNotification(ctx context.Context, userId str
 	return err
 }
 
-func MakeDynamoDBClient(baseEndpoint *string) (*dynamodb.Client, error) {
+func MakeDynamoDBClient(baseEndpoint *DynamoEndpoint) (client *dynamodb.Client, err error) {
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to load default config - %w", err)
+		return client, fmt.Errorf("failed to load default config - %w", err)
 	}
 
-	client := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
+	client = dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
 		if baseEndpoint != nil {
-			o.BaseEndpoint = baseEndpoint
+			o.BaseEndpoint = (*string)(baseEndpoint)
 		}
 	})
 
-	return client, nil
+	return
 }
 
-func MakeDynamoDBStorage(client DynamoDBAPI) DynamoDBStorage {
-	return DynamoDBStorage{client: client}
+func MakeDynamoDBStorage(client DynamoDBAPI) *DynamoDBStorage {
+	return &DynamoDBStorage{client: client}
 }

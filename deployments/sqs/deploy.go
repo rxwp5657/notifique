@@ -48,10 +48,10 @@ func createQueue(c *sqs.Client, queueName string) (queueUrl string, err error) {
 	return
 }
 
-func MakeQueues(c *sqs.Client) (publisher.SQSUrls, error) {
+func MakeQueues(c *sqs.Client) (publisher.SQSEndpoints, error) {
 
 	queueUrls, err := getQueues(c)
-	urls := publisher.SQSUrls{}
+	urls := publisher.SQSEndpoints{}
 
 	if err != nil {
 		return urls, err
