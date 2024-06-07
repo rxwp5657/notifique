@@ -10,14 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
 	"github.com/notifique/controllers"
+	di "github.com/notifique/dependency_injection"
 	"github.com/notifique/dto"
-	storage "github.com/notifique/internal/storage/dynamodb"
-	pstorage "github.com/notifique/internal/storage/postgres"
-	"github.com/notifique/routes"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,57 +24,26 @@ type UserNotificationsTester interface {
 	DeleteUserNotification(ctx context.Context, userId string, un dto.UserNotification) error
 }
 
-func makeUserStorage(t storageType, uri string) (UserNotificationsTester, error) {
-	switch t {
-	case DYNAMODB:
-		client, err := storage.MakeDynamoDBClient(&uri)
-		if err != nil {
-			return nil, err
-		}
-		storage := storage.MakeDynamoDBStorage(client)
-		return &storage, nil
-	case POSTGRES:
-		container, err := pstorage.MakePostgresStorage(uri)
-		if err != nil {
-			return nil, err
-		}
-		return container, err
-	default:
-		return nil, fmt.Errorf("invalid option - %s", t)
-	}
-}
-
 func TestUserController(t *testing.T) {
 
-	dbContainer, closer, err := setupContainer(POSTGRES)
+	testApp, err := di.InjectPostgresSQSContainerTesting(context.TODO())
 
 	if err != nil {
-		t.Fatalf("failed to create container - %s", err)
+		t.Fatalf("failed to create container app - %v", err)
 	}
-
-	uri := dbContainer.GetURI()
-
-	storage, err := makeUserStorage(POSTGRES, uri)
-
-	if err != nil {
-		t.Fatalf("failed to create storage - %s", err)
-	}
-
-	router := gin.Default()
-	routes.SetupUsersRoutes(router, storage)
 
 	userId := "1234"
 
 	defer func() {
-		if err := closer(); err != nil {
-			t.Fatalf("failed to terminate db container")
+		if err := testApp.Cleanup(); err != nil {
+			t.Fatal(err)
 		}
 	}()
 
 	t.Run("TestGetUserNotifications", func(t *testing.T) {
 
 		numNotifications := 3
-		testNotifications, err := createTestUserNotifications(numNotifications, userId, storage)
+		testNotifications, err := createTestUserNotifications(numNotifications, userId, testApp.Storage)
 
 		if err != nil {
 			t.Fatalf("failed to create user notifications - %s", err)
@@ -92,7 +58,7 @@ func TestUserController(t *testing.T) {
 
 			addPaginationFilters(req, filters)
 
-			router.ServeHTTP(w, req)
+			testApp.Engine.ServeHTTP(w, req)
 
 			return w
 		}
@@ -147,12 +113,12 @@ func TestUserController(t *testing.T) {
 			assert.Equal(t, maxResults, page.ResultCount)
 		})
 
-		deleteTestUserNotifications(userId, testNotifications, storage)
+		deleteTestUserNotifications(userId, testNotifications, testApp.Storage)
 	})
 
 	t.Run("TestSetReadStatus", func(t *testing.T) {
 
-		testNotifications, err := createTestUserNotifications(1, userId, storage)
+		testNotifications, err := createTestUserNotifications(1, userId, testApp.Storage)
 
 		if err != nil {
 			t.Fatalf("failed to create user notifications - %s", err)
@@ -168,7 +134,7 @@ func TestUserController(t *testing.T) {
 			req, _ := http.NewRequest("PATCH", url, nil)
 			req.Header.Add("userId", userId)
 
-			router.ServeHTTP(w, req)
+			testApp.Engine.ServeHTTP(w, req)
 
 			return w
 		}
@@ -204,7 +170,7 @@ func TestUserController(t *testing.T) {
 			req, _ := http.NewRequest("GET", "/v0/users/me/notifications/config", nil)
 			req.Header.Add("userId", userId)
 
-			router.ServeHTTP(w, req)
+			testApp.Engine.ServeHTTP(w, req)
 
 			return w
 		}
@@ -219,7 +185,7 @@ func TestUserController(t *testing.T) {
 			req, _ := http.NewRequest("PUT", "/v0/users/me/notifications/config", reader)
 			req.Header.Add("userId", userId)
 
-			router.ServeHTTP(w, req)
+			testApp.Engine.ServeHTTP(w, req)
 
 			return w
 		}

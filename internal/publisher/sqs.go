@@ -13,14 +13,25 @@ import (
 	c "github.com/notifique/controllers"
 )
 
+const (
+	LOW_QUEUE_URL_ENV    string = "SQS_LOW"
+	MEDIUM_QUEUE_URL_ENV string = "SQS_MEDIUM"
+	HIGH_QUEUE_URL_ENV   string = "SQS_HIGH"
+)
+
 type SQSAPI interface {
 	SendMessage(ctx context.Context, params *sqs.SendMessageInput, optFns ...func(*sqs.Options)) (*sqs.SendMessageOutput, error)
 }
 
-type SQSUrls struct {
+type SQSEndpoints struct {
 	Low    *string
 	Medium *string
 	High   *string
+}
+
+type SQSConfig struct {
+	Client SQSAPI
+	Urls   SQSEndpoints
 }
 
 type SQSPublisher struct {
@@ -31,6 +42,7 @@ type SQSPublisher struct {
 }
 
 type Priority string
+type SQSEndpoint string
 
 const (
 	LOW    Priority = "LOW"
@@ -89,7 +101,7 @@ func (p *SQSPublisher) Publish(ctx context.Context, notification c.Notification,
 	return nil
 }
 
-func MakeSQSClient(baseEndpoint *string) (*sqs.Client, error) {
+func MakeSQSClient(baseEndpoint *SQSEndpoint) (client *sqs.Client, err error) {
 
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 
@@ -97,20 +109,24 @@ func MakeSQSClient(baseEndpoint *string) (*sqs.Client, error) {
 		return nil, fmt.Errorf("failed to load default config - %w", err)
 	}
 
-	client := sqs.NewFromConfig(cfg, func(o *sqs.Options) {
+	client = sqs.NewFromConfig(cfg, func(o *sqs.Options) {
 		if baseEndpoint != nil {
-			o.BaseEndpoint = baseEndpoint
+			o.BaseEndpoint = (*string)(baseEndpoint)
 		}
 	})
 
-	return client, nil
+	return
 }
 
-func MakeSQSPublisher(client SQSAPI, uris SQSUrls) SQSPublisher {
-	return SQSPublisher{
-		client:    client,
-		lowUrl:    uris.Low,
-		mediumUrl: uris.Medium,
-		highUrl:   uris.High,
+func MakeUrlConfigFromEnv() (urls SQSEndpoints, err error) {
+	return
+}
+
+func MakeSQSPublisher(cfg SQSConfig) *SQSPublisher {
+	return &SQSPublisher{
+		client:    cfg.Client,
+		lowUrl:    cfg.Urls.Medium,
+		mediumUrl: cfg.Urls.Medium,
+		highUrl:   cfg.Urls.High,
 	}
 }

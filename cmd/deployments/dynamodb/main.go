@@ -10,7 +10,8 @@ import (
 func main() {
 
 	url := "http://localhost:8000"
-	client, err := storage.MakeDynamoDBClient(&url)
+	endpoint := (storage.DynamoEndpoint)(url)
+	client, err := storage.MakeDynamoDBClient(&endpoint)
 
 	if err != nil {
 		log.Fatalf("failed to create dynamo client - %v", err)

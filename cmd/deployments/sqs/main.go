@@ -11,7 +11,8 @@ func main() {
 
 	url := "http://localhost:4566"
 
-	client, err := publisher.MakeSQSClient(&url)
+	baseUrl := (publisher.SQSEndpoint)(url)
+	client, err := publisher.MakeSQSClient(&baseUrl)
 
 	if err != nil {
 		log.Fatalf("failed to make sqs client - %v", err)

@@ -29,7 +29,7 @@ type distListSummaryKey struct {
 	Name string `dynamodbav:"name" json:"name"`
 }
 
-func (dl *distListRecipient) GetKey() (DynamoDBKey, error) {
+func (dl *distListRecipient) GetKey() (DynamoKey, error) {
 	key := make(map[string]types.AttributeValue)
 
 	name, err := attributevalue.Marshal(dl.DistListName)
@@ -50,7 +50,7 @@ func (dl *distListRecipient) GetKey() (DynamoDBKey, error) {
 	return key, nil
 }
 
-func getSummaryKey(listName string) (DynamoDBKey, error) {
+func getSummaryKey(listName string) (DynamoKey, error) {
 	key := make(map[string]types.AttributeValue)
 
 	name, err := attributevalue.Marshal(listName)
@@ -64,10 +64,10 @@ func getSummaryKey(listName string) (DynamoDBKey, error) {
 	return key, nil
 }
 
-func (dl *distListSummary) GetKey() (DynamoDBKey, error) {
+func (dl *distListSummary) GetKey() (DynamoKey, error) {
 	return getSummaryKey(dl.Name)
 }
 
-func (dl *distListSummaryKey) GetKey() (DynamoDBKey, error) {
+func (dl *distListSummaryKey) GetKey() (DynamoKey, error) {
 	return getSummaryKey(dl.Name)
 }

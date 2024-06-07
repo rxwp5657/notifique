@@ -24,6 +24,8 @@ type RowQuerier interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
+type PostgresURL string
+
 type namedArgsBuilder[T any] func(val T) pgx.NamedArgs
 
 func (ps *PostgresStorage) GetUserNotifications(ctx context.Context, filters dto.UserNotificationFilters) (dto.Page[dto.UserNotification], error) {
@@ -913,8 +915,8 @@ func (ps *PostgresStorage) DeleteUserNotification(ctx context.Context, userId st
 	return nil
 }
 
-func MakePostgresStorage(url string) (*PostgresStorage, error) {
-	conn, err := pgxpool.New(context.TODO(), url)
+func MakePostgresStorage(url PostgresURL) (*PostgresStorage, error) {
+	conn, err := pgxpool.New(context.TODO(), (string)(url))
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create pool - %w", err)

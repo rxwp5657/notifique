@@ -1,4 +1,4 @@
-package test
+package containers
 
 import (
 	"context"
@@ -14,16 +14,19 @@ import (
 	ddb "github.com/notifique/deployments/dynamodb"
 )
 
-type dynamodbContainer struct {
+type DynamoCleanup func() error
+
+type DynamoContainer struct {
 	testcontainers.Container
-	URI string
+	URI       string
+	CleanupFn DynamoCleanup
 }
 
-func (ddbc *dynamodbContainer) GetURI() string {
+func (ddbc *DynamoContainer) GetURI() string {
 	return ddbc.URI
 }
 
-func setupDynamoDB(ctx context.Context) (*dynamodbContainer, func() error, error) {
+func MakeDynamoContainer(ctx context.Context) (*DynamoContainer, error) {
 
 	port := "8000"
 
@@ -38,19 +41,19 @@ func setupDynamoDB(ctx context.Context) (*dynamodbContainer, func() error, error
 	})
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to init the dynamodb container - %w", err)
+		return nil, fmt.Errorf("failed to init the dynamodb container - %w", err)
 	}
 
 	ip, err := container.Host(ctx)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get the dynamodb's host - %w", err)
+		return nil, fmt.Errorf("failed to get the dynamodb's host - %w", err)
 	}
 
 	mappedPort, err := container.MappedPort(ctx, nat.Port(port))
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to acquire mapped port")
+		return nil, fmt.Errorf("failed to acquire mapped port")
 	}
 
 	uri := fmt.Sprintf("http://%s:%s", ip, mappedPort.Port())
@@ -58,7 +61,7 @@ func setupDynamoDB(ctx context.Context) (*dynamodbContainer, func() error, error
 	cfg, err := config.LoadDefaultConfig(ctx)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to load default config - %w", err)
+		return nil, fmt.Errorf("failed to load default config - %w", err)
 	}
 
 	client := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
@@ -68,9 +71,16 @@ func setupDynamoDB(ctx context.Context) (*dynamodbContainer, func() error, error
 	err = ddb.CreateTables(client)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create tables - %v", err)
+		return nil, fmt.Errorf("failed to create tables - %v", err)
 	}
 
-	closer := func() error { return container.Terminate(ctx) }
-	return &dynamodbContainer{Container: container, URI: uri}, closer, nil
+	cleanup := func() error { return container.Terminate(ctx) }
+
+	dc := DynamoContainer{
+		Container: container,
+		URI:       uri,
+		CleanupFn: cleanup,
+	}
+
+	return &dc, nil
 }
