@@ -44,3 +44,7 @@ go run github.com/google/wire/cmd/wire
 * https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/dynamodb#GetItemOutput
 
 * https://www.alexdebrie.com/posts/dynamodb-single-table/
+
+//go:build wireinject
+// +build wireinject
+postgres://postgres:postgres@localhost:5432/notifique?sslmode=disable

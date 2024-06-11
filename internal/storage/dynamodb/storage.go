@@ -46,9 +46,13 @@ type DynamoDBPageParams struct {
 	ExclusiveStartKey map[string]types.AttributeValue
 }
 
+type DynamoClientConfig struct {
+	BaseEndpoint *string
+	Region       *string
+}
+
 type DynamoKey map[string]types.AttributeValue
 type DynamoObj map[string]types.AttributeValue
-type DynamoEndpoint string
 
 func marshallNextToken[T any](key *T, lastEvaluatedKey DynamoKey) (string, error) {
 	err := attributevalue.UnmarshalMap(lastEvaluatedKey, &key)
@@ -231,6 +235,8 @@ func makeInFilter(expName string, values []string) *expression.ConditionBuilder 
 func makePageFilters[T DynamodbPrimaryKey](key T, filters dto.PageFilter) (DynamoDBPageParams, error) {
 
 	params := DynamoDBPageParams{}
+
+	params.Limit = aws.Int32(internal.PAGE_SIZE)
 
 	if filters.MaxResults != nil {
 		limit := int32(*filters.MaxResults)
@@ -1158,7 +1164,8 @@ func (s *DynamoDBStorage) DeleteUserNotification(ctx context.Context, userId str
 	return err
 }
 
-func MakeDynamoDBClient(baseEndpoint *DynamoEndpoint) (client *dynamodb.Client, err error) {
+func MakeDynamoDBClient(clientCfg DynamoClientConfig) (client *dynamodb.Client, err error) {
+
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 
 	if err != nil {
@@ -1166,8 +1173,12 @@ func MakeDynamoDBClient(baseEndpoint *DynamoEndpoint) (client *dynamodb.Client, 
 	}
 
 	client = dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
-		if baseEndpoint != nil {
-			o.BaseEndpoint = (*string)(baseEndpoint)
+		if clientCfg.BaseEndpoint != nil {
+			o.BaseEndpoint = clientCfg.BaseEndpoint
+		}
+
+		if clientCfg.Region != nil {
+			o.Region = *clientCfg.Region
 		}
 	})
 

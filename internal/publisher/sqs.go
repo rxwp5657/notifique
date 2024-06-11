@@ -41,8 +41,12 @@ type SQSPublisher struct {
 	highUrl   *string
 }
 
+type SQSClientConfig struct {
+	BaseEndpoint *string
+	Region       *string
+}
+
 type Priority string
-type SQSEndpoint string
 
 const (
 	LOW    Priority = "LOW"
@@ -101,7 +105,7 @@ func (p *SQSPublisher) Publish(ctx context.Context, notification c.Notification,
 	return nil
 }
 
-func MakeSQSClient(baseEndpoint *SQSEndpoint) (client *sqs.Client, err error) {
+func MakeSQSClient(clientCfg SQSClientConfig) (client *sqs.Client, err error) {
 
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 
@@ -110,15 +114,15 @@ func MakeSQSClient(baseEndpoint *SQSEndpoint) (client *sqs.Client, err error) {
 	}
 
 	client = sqs.NewFromConfig(cfg, func(o *sqs.Options) {
-		if baseEndpoint != nil {
-			o.BaseEndpoint = (*string)(baseEndpoint)
+		if clientCfg.BaseEndpoint != nil {
+			o.BaseEndpoint = clientCfg.BaseEndpoint
+		}
+
+		if clientCfg.Region != nil {
+			o.Region = *clientCfg.Region
 		}
 	})
 
-	return
-}
-
-func MakeUrlConfigFromEnv() (urls SQSEndpoints, err error) {
 	return
 }
 

@@ -18,7 +18,10 @@ require (
 	golang.org/x/net v0.22.0
 )
 
-require github.com/google/subcommands v1.2.0 // indirect
+require (
+	github.com/google/subcommands v1.2.0 // indirect
+	github.com/joho/godotenv v1.5.1 // indirect
+)
 
 require (
 	dario.cat/mergo v1.0.0 // indirect

@@ -32,7 +32,7 @@ func (ps *PostgresStorage) GetUserNotifications(ctx context.Context, filters dto
 
 	page := dto.Page[dto.UserNotification]{}
 
-	args := pgx.NamedArgs{"limit": 25}
+	args := pgx.NamedArgs{"limit": internal.PAGE_SIZE}
 	whereFilters := make([]string, 0)
 
 	if filters.MaxResults != nil {
@@ -486,7 +486,7 @@ func (ps *PostgresStorage) GetDistributionLists(ctx context.Context, filters dto
 
 	page := dto.Page[dto.DistributionListSummary]{}
 
-	args := pgx.NamedArgs{"limit": 25}
+	args := pgx.NamedArgs{"limit": internal.PAGE_SIZE}
 
 	nextTokenFilter := ""
 
@@ -602,7 +602,7 @@ func (ps *PostgresStorage) GetRecipients(ctx context.Context, distlistName strin
 		}
 	}
 
-	args := pgx.NamedArgs{"limit": 25}
+	args := pgx.NamedArgs{"limit": internal.PAGE_SIZE}
 	whereFilters := make([]string, 0)
 
 	if filters.MaxResults != nil {

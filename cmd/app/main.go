@@ -4,11 +4,18 @@ import (
 	"log"
 
 	di "github.com/notifique/dependency_injection"
-	"github.com/notifique/internal/publisher"
+	"github.com/notifique/internal/config"
 )
 
 func main() {
-	r, err := di.InjectDynamoSQSEngine(nil, nil, publisher.SQSEndpoints{})
+
+	loader, err := config.MakeEnvConfig(".env")
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	r, err := di.InjectDynamoSQSEngine(loader)
 
 	if err != nil {
 		log.Fatalf("failed to create engine - %v", err)
