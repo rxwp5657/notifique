@@ -23,32 +23,35 @@ import (
 
 // Injectors from wire.go:
 
-func InjectDynamoSQSEngine(dynamoEndpoint *storage.DynamoEndpoint, sqsEndpoint *publisher.SQSEndpoint, urls publisher.SQSEndpoints) (*gin.Engine, error) {
-	client, err := storage.MakeDynamoDBClient(dynamoEndpoint)
+func InjectDynamoSQSEngine(cfg ConfigLoader) (*gin.Engine, error) {
+	dynamoClientConfig := MakeDynamoClientConfig(cfg)
+	client, err := storage.MakeDynamoDBClient(dynamoClientConfig)
 	if err != nil {
 		return nil, err
 	}
 	dynamoDBStorage := storage.MakeDynamoDBStorage(client)
-	sqsClient, err := publisher.MakeSQSClient(sqsEndpoint)
+	sqsConfig, err := MakeSQSConfig(cfg)
 	if err != nil {
 		return nil, err
 	}
-	sqsConfig := MakeSQSConfig(sqsClient, urls)
 	sqsPublisher := publisher.MakeSQSPublisher(sqsConfig)
 	engine := MakeEngine(dynamoDBStorage, sqsPublisher)
 	return engine, nil
 }
 
-func InjectPostgresSQSEngine(postgresUrl storage2.PostgresURL, sqsEndpoint *publisher.SQSEndpoint, urls publisher.SQSEndpoints) (*gin.Engine, error) {
-	postgresStorage, err := storage2.MakePostgresStorage(postgresUrl)
+func InjectPostgresSQSEngine(cfg ConfigLoader) (*gin.Engine, error) {
+	postgresURL, err := GetPostgresUrl(cfg)
 	if err != nil {
 		return nil, err
 	}
-	client, err := publisher.MakeSQSClient(sqsEndpoint)
+	postgresStorage, err := storage2.MakePostgresStorage(postgresURL)
 	if err != nil {
 		return nil, err
 	}
-	sqsConfig := MakeSQSConfig(client, urls)
+	sqsConfig, err := MakeSQSConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
 	sqsPublisher := publisher.MakeSQSPublisher(sqsConfig)
 	engine := MakeEngine(postgresStorage, sqsPublisher)
 	return engine, nil
@@ -63,7 +66,7 @@ func InjectPostgresSQSContainerTesting(ctx context.Context) (*PostgresSQSIntegra
 	if err != nil {
 		return nil, err
 	}
-	postgresURL, err := MakePostgresUrl(postgresContainer)
+	postgresURL, err := MakePostgresUrlFromContainer(postgresContainer)
 	if err != nil {
 		return nil, err
 	}
@@ -71,19 +74,10 @@ func InjectPostgresSQSContainerTesting(ctx context.Context) (*PostgresSQSIntegra
 	if err != nil {
 		return nil, err
 	}
-	sqsEndpoint, err := MakeSQSEndpoint(sqsContainer)
+	sqsConfig, err := MakeSQSConfigFromContainer(sqsContainer)
 	if err != nil {
 		return nil, err
 	}
-	client, err := publisher.MakeSQSClient(sqsEndpoint)
-	if err != nil {
-		return nil, err
-	}
-	sqsEndpoints, err := MakeSQSEndpoints(sqsContainer)
-	if err != nil {
-		return nil, err
-	}
-	sqsConfig := MakeSQSConfig(client, sqsEndpoints)
 	sqsPublisher := publisher.MakeSQSPublisher(sqsConfig)
 	engine := MakeEngine(postgresStorage, sqsPublisher)
 	postgresSQSIntegrationTest := &PostgresSQSIntegrationTest{
@@ -105,28 +99,19 @@ func InjectDynamoSQSContainerTesting(ctx context.Context) (*DynamoSQSIntegration
 	if err != nil {
 		return nil, err
 	}
-	dynamoEndpoint, err := MakeDynamoEndpoint(dynamoContainer)
+	dynamoClientConfig, err := MakeDynamoConfigFromContainer(dynamoContainer)
 	if err != nil {
 		return nil, err
 	}
-	client, err := storage.MakeDynamoDBClient(dynamoEndpoint)
+	client, err := storage.MakeDynamoDBClient(dynamoClientConfig)
 	if err != nil {
 		return nil, err
 	}
 	dynamoDBStorage := storage.MakeDynamoDBStorage(client)
-	sqsEndpoint, err := MakeSQSEndpoint(sqsContainer)
+	sqsConfig, err := MakeSQSConfigFromContainer(sqsContainer)
 	if err != nil {
 		return nil, err
 	}
-	sqsClient, err := publisher.MakeSQSClient(sqsEndpoint)
-	if err != nil {
-		return nil, err
-	}
-	sqsEndpoints, err := MakeSQSEndpoints(sqsContainer)
-	if err != nil {
-		return nil, err
-	}
-	sqsConfig := MakeSQSConfig(sqsClient, sqsEndpoints)
 	sqsPublisher := publisher.MakeSQSPublisher(sqsConfig)
 	engine := MakeEngine(dynamoDBStorage, sqsPublisher)
 	dynamoSQSIntegrationTest := &DynamoSQSIntegrationTest{
@@ -141,25 +126,38 @@ func InjectDynamoSQSContainerTesting(ctx context.Context) (*DynamoSQSIntegration
 
 // wire.go:
 
+const (
+	SQS_BASE_ENDPOINT       = "SQS_BASE_ENDPOINT"
+	SQS_REGION              = "SQS_REGION"
+	DYNAMO_BASE_ENDPOINT    = "DYNAMO_BASE_ENDPOINT"
+	DYNAMO_REGION           = "DYNAMO_REGION"
+	PRIORITY_SQS_LOW_URL    = "SQS_LOW_URL"
+	PRIORITY_SQS_MEDIUM_URL = "SQS_MEDIUM_URL"
+	PRIORITY_SQS_HIGH_URL   = "SQS_HIGH_URL"
+	POSTGRES_URL            = "POSTGRES_URL"
+)
+
 type Storage interface {
 	controllers.NotificationStorage
 	controllers.UserStorage
 	controllers.DistributionListStorage
 }
 
+type ConfigLoader interface {
+	GetConfigValue(key string) (string, bool)
+}
+
 var DynamoSet = wire.NewSet(storage.MakeDynamoDBClient, storage.MakeDynamoDBStorage, wire.Bind(new(storage.DynamoDBAPI), new(*dynamodb.Client)), wire.Bind(new(Storage), new(*storage.DynamoDBStorage)))
 
 var PostgresSet = wire.NewSet(storage2.MakePostgresStorage, wire.Bind(new(Storage), new(*storage2.PostgresStorage)))
 
-var SQSSet = wire.NewSet(publisher.MakeSQSClient, MakeSQSConfig, publisher.MakeSQSPublisher, wire.Bind(new(publisher.SQSAPI), new(*sqs.Client)), wire.Bind(new(controllers.NotificationPublisher), new(*publisher.SQSPublisher)))
+var SQSSet = wire.NewSet(publisher.MakeSQSClient, publisher.MakeSQSPublisher, wire.Bind(new(publisher.SQSAPI), new(*sqs.Client)), wire.Bind(new(controllers.NotificationPublisher), new(*publisher.SQSPublisher)))
 
-var PostgresContainerSet = wire.NewSet(containers.MakePostgresContainer, MakePostgresUrl)
+var PostgresContainerSet = wire.NewSet(containers.MakePostgresContainer, MakePostgresUrlFromContainer)
 
-var SQSContainerSet = wire.NewSet(containers.MakeSQSContainer, MakeSQSEndpoint,
-	MakeSQSEndpoints,
-)
+var SQSContainerSet = wire.NewSet(containers.MakeSQSContainer, MakeSQSConfigFromContainer)
 
-var DynamoContainerSet = wire.NewSet(containers.MakeDynamoContainer, MakeDynamoEndpoint)
+var DynamoContainerSet = wire.NewSet(containers.MakeDynamoContainer, MakeDynamoConfigFromContainer)
 
 type PostgresSQSIntegrationTest struct {
 	PostgresContainer *containers.PostgresContainer
@@ -201,45 +199,73 @@ func (app *DynamoSQSIntegrationTest) Cleanup() error {
 	return nil
 }
 
-func MakePostgresUrl(container *containers.PostgresContainer) (storage2.PostgresURL, error) {
+func MakePostgresUrlFromContainer(container *containers.PostgresContainer) (storage2.PostgresURL, error) {
+
 	if container == nil {
 		return "", fmt.Errorf("postgres container is null")
 	}
+
 	return (storage2.PostgresURL)(container.URI), nil
 }
 
-func MakeSQSEndpoint(container *containers.SQSContainer) (*publisher.SQSEndpoint, error) {
+func MakeSQSConfigFromContainer(container *containers.SQSContainer) (cfg publisher.SQSConfig, err error) {
 
 	if container == nil {
-		return nil, fmt.Errorf("sqs container is null")
+		return cfg, fmt.Errorf("sqs container is null")
 	}
 
-	return (*publisher.SQSEndpoint)(&container.URI), nil
+	clientCfg := publisher.SQSClientConfig{BaseEndpoint: &container.URI}
+	client, err := publisher.MakeSQSClient(clientCfg)
+
+	if err != nil {
+		return cfg, fmt.Errorf("failed to create client - %w", err)
+	}
+
+	cfg.Client = client
+	cfg.Urls = container.SQSEndpoints
+
+	return
 }
 
-func MakeSQSEndpoints(container *containers.SQSContainer) (publisher.SQSEndpoints, error) {
+func MakeDynamoConfigFromContainer(container *containers.DynamoContainer) (cfg storage.DynamoClientConfig, err error) {
 
 	if container == nil {
-		return publisher.SQSEndpoints{}, fmt.Errorf("sqs container is null")
+		return cfg, fmt.Errorf("sqs container is null")
 	}
 
-	return container.SQSEndpoints, nil
+	cfg.BaseEndpoint = &container.URI
+
+	return
 }
 
-func MakeDynamoEndpoint(container *containers.DynamoContainer) (*storage.DynamoEndpoint, error) {
+func MakeSQSClient(cfg ConfigLoader) (publisher.SQSAPI, error) {
+	clientCfg := publisher.SQSClientConfig{}
 
-	if container == nil {
-		return nil, fmt.Errorf("sqs container is null")
+	if baseEndpoint, ok := cfg.GetConfigValue(SQS_BASE_ENDPOINT); ok {
+		clientCfg.BaseEndpoint = &baseEndpoint
 	}
 
-	return (*storage.DynamoEndpoint)(&container.URI), nil
+	if region, ok := cfg.GetConfigValue(SQS_REGION); ok {
+		clientCfg.Region = &region
+	}
+
+	return publisher.MakeSQSClient(clientCfg)
 }
 
-func MakeSQSConfig(client publisher.SQSAPI, urls publisher.SQSEndpoints) publisher.SQSConfig {
-	return publisher.SQSConfig{
-		Client: client,
-		Urls:   urls,
+func MakeSQSConfig(cfg ConfigLoader) (sqsCfg publisher.SQSConfig, err error) {
+
+	client, err := MakeSQSClient(cfg)
+
+	if err != nil {
+		return sqsCfg, err
 	}
+
+	urls := MakeSQSUrls(cfg)
+
+	sqsCfg.Client = client
+	sqsCfg.Urls = urls
+
+	return
 }
 
 func MakeEngine(storage3 Storage, pub controllers.NotificationPublisher) *gin.Engine {
@@ -250,4 +276,42 @@ func MakeEngine(storage3 Storage, pub controllers.NotificationPublisher) *gin.En
 	routes.SetupUsersRoutes(r, storage3)
 
 	return r
+}
+
+func MakeSQSUrls(cfg ConfigLoader) (endpoints publisher.SQSEndpoints) {
+
+	low, _ := cfg.GetConfigValue(PRIORITY_SQS_LOW_URL)
+	medium, _ := cfg.GetConfigValue(PRIORITY_SQS_MEDIUM_URL)
+	high, _ := cfg.GetConfigValue(PRIORITY_SQS_HIGH_URL)
+
+	endpoints.Low = &low
+	endpoints.Medium = &medium
+	endpoints.High = &high
+
+	return
+}
+
+func GetPostgresUrl(cfg ConfigLoader) (storage2.PostgresURL, error) {
+	url, ok := cfg.GetConfigValue(POSTGRES_URL)
+
+	if !ok {
+		return "", fmt.Errorf("%s is not set", POSTGRES_URL)
+	}
+
+	return storage2.PostgresURL(url), nil
+}
+
+func MakeDynamoClientConfig(cfg ConfigLoader) (dynamoCfg storage.DynamoClientConfig) {
+
+	clientCfg := storage.DynamoClientConfig{}
+
+	if baseEndpoint, ok := cfg.GetConfigValue(DYNAMO_BASE_ENDPOINT); ok {
+		clientCfg.BaseEndpoint = &baseEndpoint
+	}
+
+	if region, ok := cfg.GetConfigValue(DYNAMO_REGION); ok {
+		clientCfg.Region = &region
+	}
+
+	return
 }

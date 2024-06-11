@@ -50,8 +50,8 @@ func MakeSQSContainer(ctx context.Context) (*SQSContainer, error) {
 
 	uri := fmt.Sprintf("http://%s:%s", ip, mappedPort.Port())
 
-	baseEndpoint := (publisher.SQSEndpoint)(uri)
-	client, err := publisher.MakeSQSClient(&baseEndpoint)
+	cfg := publisher.SQSClientConfig{BaseEndpoint: &uri}
+	client, err := publisher.MakeSQSClient(cfg)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sqs client")

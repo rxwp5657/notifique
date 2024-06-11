@@ -20,10 +20,25 @@ import (
 	c "github.com/notifique/test/containers"
 )
 
+const (
+	SQS_BASE_ENDPOINT       = "SQS_BASE_ENDPOINT"
+	SQS_REGION              = "SQS_REGION"
+	DYNAMO_BASE_ENDPOINT    = "DYNAMO_BASE_ENDPOINT"
+	DYNAMO_REGION           = "DYNAMO_REGION"
+	PRIORITY_SQS_LOW_URL    = "SQS_LOW_URL"
+	PRIORITY_SQS_MEDIUM_URL = "SQS_MEDIUM_URL"
+	PRIORITY_SQS_HIGH_URL   = "SQS_HIGH_URL"
+	POSTGRES_URL            = "POSTGRES_URL"
+)
+
 type Storage interface {
 	controllers.NotificationStorage
 	controllers.UserStorage
 	controllers.DistributionListStorage
+}
+
+type ConfigLoader interface {
+	GetConfigValue(key string) (string, bool)
 }
 
 var DynamoSet = wire.NewSet(
@@ -40,7 +55,6 @@ var PostgresSet = wire.NewSet(
 
 var SQSSet = wire.NewSet(
 	pub.MakeSQSClient,
-	MakeSQSConfig,
 	pub.MakeSQSPublisher,
 	wire.Bind(new(pub.SQSAPI), new(*sqs.Client)),
 	wire.Bind(new(controllers.NotificationPublisher), new(*pub.SQSPublisher)),
@@ -48,18 +62,17 @@ var SQSSet = wire.NewSet(
 
 var PostgresContainerSet = wire.NewSet(
 	c.MakePostgresContainer,
-	MakePostgresUrl,
+	MakePostgresUrlFromContainer,
 )
 
 var SQSContainerSet = wire.NewSet(
 	c.MakeSQSContainer,
-	MakeSQSEndpoint,
-	MakeSQSEndpoints,
+	MakeSQSConfigFromContainer,
 )
 
 var DynamoContainerSet = wire.NewSet(
 	c.MakeDynamoContainer,
-	MakeDynamoEndpoint,
+	MakeDynamoConfigFromContainer,
 )
 
 type PostgresSQSIntegrationTest struct {
@@ -102,45 +115,73 @@ func (app *DynamoSQSIntegrationTest) Cleanup() error {
 	return nil
 }
 
-func MakePostgresUrl(container *c.PostgresContainer) (pg.PostgresURL, error) {
+func MakePostgresUrlFromContainer(container *c.PostgresContainer) (pg.PostgresURL, error) {
+
 	if container == nil {
 		return "", fmt.Errorf("postgres container is null")
 	}
+
 	return (pg.PostgresURL)(container.URI), nil
 }
 
-func MakeSQSEndpoint(container *c.SQSContainer) (*pub.SQSEndpoint, error) {
+func MakeSQSConfigFromContainer(container *c.SQSContainer) (cfg pub.SQSConfig, err error) {
 
 	if container == nil {
-		return nil, fmt.Errorf("sqs container is null")
+		return cfg, fmt.Errorf("sqs container is null")
 	}
 
-	return (*pub.SQSEndpoint)(&container.URI), nil
+	clientCfg := pub.SQSClientConfig{BaseEndpoint: &container.URI}
+	client, err := pub.MakeSQSClient(clientCfg)
+
+	if err != nil {
+		return cfg, fmt.Errorf("failed to create client - %w", err)
+	}
+
+	cfg.Client = client
+	cfg.Urls = container.SQSEndpoints
+
+	return
 }
 
-func MakeSQSEndpoints(container *c.SQSContainer) (pub.SQSEndpoints, error) {
+func MakeDynamoConfigFromContainer(container *c.DynamoContainer) (cfg ddb.DynamoClientConfig, err error) {
 
 	if container == nil {
-		return pub.SQSEndpoints{}, fmt.Errorf("sqs container is null")
+		return cfg, fmt.Errorf("sqs container is null")
 	}
 
-	return container.SQSEndpoints, nil
+	cfg.BaseEndpoint = &container.URI
+
+	return
 }
 
-func MakeDynamoEndpoint(container *c.DynamoContainer) (*ddb.DynamoEndpoint, error) {
+func MakeSQSClient(cfg ConfigLoader) (pub.SQSAPI, error) {
+	clientCfg := pub.SQSClientConfig{}
 
-	if container == nil {
-		return nil, fmt.Errorf("sqs container is null")
+	if baseEndpoint, ok := cfg.GetConfigValue(SQS_BASE_ENDPOINT); ok {
+		clientCfg.BaseEndpoint = &baseEndpoint
 	}
 
-	return (*ddb.DynamoEndpoint)(&container.URI), nil
+	if region, ok := cfg.GetConfigValue(SQS_REGION); ok {
+		clientCfg.Region = &region
+	}
+
+	return pub.MakeSQSClient(clientCfg)
 }
 
-func MakeSQSConfig(client pub.SQSAPI, urls pub.SQSEndpoints) pub.SQSConfig {
-	return pub.SQSConfig{
-		Client: client,
-		Urls:   urls,
+func MakeSQSConfig(cfg ConfigLoader) (sqsCfg pub.SQSConfig, err error) {
+
+	client, err := MakeSQSClient(cfg)
+
+	if err != nil {
+		return sqsCfg, err
 	}
+
+	urls := MakeSQSUrls(cfg)
+
+	sqsCfg.Client = client
+	sqsCfg.Urls = urls
+
+	return
 }
 
 func MakeEngine(storage Storage, pub controllers.NotificationPublisher) *gin.Engine {
@@ -154,17 +195,72 @@ func MakeEngine(storage Storage, pub controllers.NotificationPublisher) *gin.Eng
 	return r
 }
 
-func InjectDynamoSQSEngine(dynamoEndpoint *ddb.DynamoEndpoint, sqsEndpoint *pub.SQSEndpoint, urls pub.SQSEndpoints) (*gin.Engine, error) {
-	wire.Build(wire.NewSet(DynamoSet, SQSSet, MakeEngine))
+func MakeSQSUrls(cfg ConfigLoader) (endpoints pub.SQSEndpoints) {
+
+	low, _ := cfg.GetConfigValue(PRIORITY_SQS_LOW_URL)
+	medium, _ := cfg.GetConfigValue(PRIORITY_SQS_MEDIUM_URL)
+	high, _ := cfg.GetConfigValue(PRIORITY_SQS_HIGH_URL)
+
+	endpoints.Low = &low
+	endpoints.Medium = &medium
+	endpoints.High = &high
+
+	return
+}
+
+func GetPostgresUrl(cfg ConfigLoader) (pg.PostgresURL, error) {
+	url, ok := cfg.GetConfigValue(POSTGRES_URL)
+
+	if !ok {
+		return "", fmt.Errorf("%s is not set", POSTGRES_URL)
+	}
+
+	return pg.PostgresURL(url), nil
+}
+
+func MakeDynamoClientConfig(cfg ConfigLoader) (dynamoCfg ddb.DynamoClientConfig) {
+
+	clientCfg := ddb.DynamoClientConfig{}
+
+	if baseEndpoint, ok := cfg.GetConfigValue(DYNAMO_BASE_ENDPOINT); ok {
+		clientCfg.BaseEndpoint = &baseEndpoint
+	}
+
+	if region, ok := cfg.GetConfigValue(DYNAMO_REGION); ok {
+		clientCfg.Region = &region
+	}
+
+	return
+}
+
+func InjectDynamoSQSEngine(cfg ConfigLoader) (*gin.Engine, error) {
+
+	wire.Build(
+		MakeSQSConfig,
+		MakeDynamoClientConfig,
+		DynamoSet,
+		SQSSet,
+		MakeEngine,
+	)
+
 	return nil, nil
 }
 
-func InjectPostgresSQSEngine(postgresUrl pg.PostgresURL, sqsEndpoint *pub.SQSEndpoint, urls pub.SQSEndpoints) (*gin.Engine, error) {
-	wire.Build(wire.NewSet(PostgresSet, SQSSet, MakeEngine))
+func InjectPostgresSQSEngine(cfg ConfigLoader) (*gin.Engine, error) {
+
+	wire.Build(
+		MakeSQSConfig,
+		GetPostgresUrl,
+		PostgresSet,
+		SQSSet,
+		MakeEngine,
+	)
+
 	return nil, nil
 }
 
 func InjectPostgresSQSContainerTesting(ctx context.Context) (*PostgresSQSIntegrationTest, error) {
+
 	wire.Build(
 		PostgresContainerSet,
 		SQSContainerSet,
@@ -178,6 +274,7 @@ func InjectPostgresSQSContainerTesting(ctx context.Context) (*PostgresSQSIntegra
 }
 
 func InjectDynamoSQSContainerTesting(ctx context.Context) (*DynamoSQSIntegrationTest, error) {
+
 	wire.Build(
 		DynamoContainerSet,
 		SQSContainerSet,
