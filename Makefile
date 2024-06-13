@@ -35,3 +35,7 @@ deploy-postgres: vet
 deploy-sqs: vet
 	go run ./cmd/deployments/sqs/main.go
 .PHONY:deploy-sqs
+
+deploy-rabbitmq: vet
+	go run ./cmd/deployments/rabbitmq/main.go
+.PHONY:deploy-rabbitmq

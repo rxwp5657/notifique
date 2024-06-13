@@ -15,7 +15,7 @@ import (
 
 func TestNotificationsController(t *testing.T) {
 
-	testApp, err := di.InjectPostgresSQSContainerTesting(context.TODO())
+	testApp, err := di.InjectPostgresRabbitMQPriorityContainerTesting(context.TODO())
 
 	if err != nil {
 		t.Fatalf("failed to create container app - %v", err)

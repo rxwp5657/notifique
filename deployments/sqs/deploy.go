@@ -5,15 +5,8 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/notifique/internal/publisher"
-)
-
-const (
-	LOW    = "notifique-low"
-	MEDIUM = "notifique-medium"
-	HIGH   = "notifique-high"
 )
 
 func getQueues(c *sqs.Client) (queueUrls []string, err error) {
@@ -48,10 +41,9 @@ func createQueue(c *sqs.Client, queueName string) (queueUrl string, err error) {
 	return
 }
 
-func MakeQueues(c *sqs.Client) (publisher.SQSEndpoints, error) {
+func MakePriorityQueues(c *sqs.Client, queueNames publisher.PriorityQueues) (urls publisher.PriorityQueues, err error) {
 
 	queueUrls, err := getQueues(c)
-	urls := publisher.SQSEndpoints{}
 
 	if err != nil {
 		return urls, err
@@ -64,24 +56,43 @@ func MakeQueues(c *sqs.Client) (publisher.SQSEndpoints, error) {
 		existingQueues[queueName] = queueUrl
 	}
 
-	queuesToCreate := []string{LOW, MEDIUM, HIGH}
+	createQueueIfNotExists := func(name *string) (*string, error) {
 
-	for _, queue := range queuesToCreate {
-
-		if _, ok := existingQueues[queue]; !ok {
-			url, err := createQueue(c, queue)
-
-			if err != nil {
-				return urls, fmt.Errorf("failed to create queue %s - %w", queue, err)
-			}
-
-			existingQueues[queue] = url
+		if name == nil {
+			return nil, nil
 		}
+
+		url, ok := existingQueues[*name]
+
+		if !ok {
+			url, err := createQueue(c, *name)
+			return &url, err
+		}
+
+		return &url, nil
 	}
 
-	urls.Low = aws.String(existingQueues[LOW])
-	urls.Medium = aws.String(existingQueues[MEDIUM])
-	urls.High = aws.String(existingQueues[HIGH])
+	low, err := createQueueIfNotExists(queueNames.Low)
 
-	return urls, nil
+	if err != nil {
+		return urls, fmt.Errorf("failed to create low priority queue - %w", err)
+	}
+
+	medium, err := createQueueIfNotExists(queueNames.Medium)
+
+	if err != nil {
+		return urls, fmt.Errorf("failed to create medium priority queue - %w", err)
+	}
+
+	high, err := createQueueIfNotExists(queueNames.High)
+
+	if err != nil {
+		return urls, fmt.Errorf("failed to create high priority queue - %w", err)
+	}
+
+	urls.Low = low
+	urls.Medium = medium
+	urls.High = high
+
+	return
 }

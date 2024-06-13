@@ -15,9 +15,9 @@ type SQSContainerCleanupFn func() error
 
 type SQSContainer struct {
 	testcontainers.Container
-	URI          string
-	SQSEndpoints publisher.SQSEndpoints
-	CleanupFn    SQSContainerCleanupFn
+	URI       string
+	SQSQueues publisher.PriorityQueues
+	CleanupFn SQSContainerCleanupFn
 }
 
 func MakeSQSContainer(ctx context.Context) (*SQSContainer, error) {
@@ -57,7 +57,17 @@ func MakeSQSContainer(ctx context.Context) (*SQSContainer, error) {
 		return nil, fmt.Errorf("failed to create sqs client")
 	}
 
-	urls, err := deployments.MakeQueues(client)
+	low := PRIORITY_QUEUE_LOW_NAME
+	medium := PRIORITY_QUEUE_MEDIUM_NAME
+	high := PRIORITY_QUEUE_HIGH_NAME
+
+	queues := publisher.PriorityQueues{
+		Low:    &low,
+		Medium: &medium,
+		High:   &high,
+	}
+
+	urls, err := deployments.MakePriorityQueues(client, queues)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queues - %w", err)
@@ -66,10 +76,10 @@ func MakeSQSContainer(ctx context.Context) (*SQSContainer, error) {
 	cleanup := func() error { return container.Terminate(ctx) }
 
 	sqsContainer := SQSContainer{
-		Container:    container,
-		URI:          uri,
-		SQSEndpoints: urls,
-		CleanupFn:    cleanup,
+		Container: container,
+		URI:       uri,
+		SQSQueues: urls,
+		CleanupFn: cleanup,
 	}
 
 	return &sqsContainer, nil
