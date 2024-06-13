@@ -15,17 +15,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	deployment, err := di.InjectSQSPriorityQueueDeployment(loader)
+	deployment, err := di.InjectRabbitMQPriorityQueueDeployment(loader)
 
 	if err != nil {
 		log.Fatalf("failed to create deployment - %v", err)
 	}
 
-	_, err = deployment.Deploy()
+	defer deployment.Client.Close()
+
+	err = deployment.Deploy()
 
 	if err != nil {
 		log.Fatalf("failed to deploy queues - %v", err)
 	}
 
-	log.Println("queues created!")
+	log.Print("queues deployed")
 }

@@ -31,3 +31,8 @@ services:
       - 4566:4566
     environment:
       - SERVICES=sqs
+
+  rabbitmq:
+    image: rabbitmq:3.13.3
+    ports:
+      - 5672:5672
