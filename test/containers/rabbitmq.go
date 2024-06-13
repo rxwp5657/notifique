@@ -104,17 +104,17 @@ func MakeRabbitMQClient(container *RabbitMQContainer) (*publisher.RabbitMQClient
 		return nil, fmt.Errorf("failed to create rabbitmq client - %w", err)
 	}
 
-	return &client, err
+	return client, err
 }
 
 func MakeRabbitMQPriorityPub(client *publisher.RabbitMQClient, deployer *RabbitMQPriorityDeployer) (*publisher.RabbitMQPriorityPublisher, error) {
 
-	cfg := publisher.RabbitMQPriorityPublisherConfg{
+	cfg := publisher.RabbitMQPriorityPublisherConfig{
 		Publisher: client,
 		Queues:    deployer.Queues,
 	}
 
 	pub := publisher.MakeRabbitMQPriorityPub(cfg)
 
-	return &pub, nil
+	return pub, nil
 }

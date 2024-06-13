@@ -30,7 +30,7 @@ type RabbitMQPriorityPublisher struct {
 	queues    PriorityQueues
 }
 
-type RabbitMQPriorityPublisherConfg struct {
+type RabbitMQPriorityPublisherConfig struct {
 	Publisher RabbitMQAPI
 	Queues    PriorityQueues
 }
@@ -54,18 +54,18 @@ func (p *RabbitMQPublisher) PublishMsg(ctx context.Context, queue string, messag
 	)
 }
 
-func MakeRabbitMQClient(url RabbitMQURL) (client RabbitMQClient, err error) {
+func MakeRabbitMQClient(url RabbitMQURL) (*RabbitMQClient, error) {
 
 	conn, err := amqp.Dial(string(url))
 
 	if err != nil {
-		return client, fmt.Errorf("failed to connect to rabbitmq - %w", err)
+		return nil, fmt.Errorf("failed to connect to rabbitmq - %w", err)
 	}
 
 	ch, err := conn.Channel()
 
 	if err != nil {
-		return client, fmt.Errorf("failed to create channel - %w", err)
+		return nil, fmt.Errorf("failed to create channel - %w", err)
 	}
 
 	close := func() error {
@@ -81,14 +81,14 @@ func MakeRabbitMQClient(url RabbitMQURL) (client RabbitMQClient, err error) {
 		return nil
 	}
 
-	client = RabbitMQClient{Channel: ch, conn: conn, Close: close}
+	client := RabbitMQClient{Channel: ch, conn: conn, Close: close}
 
-	return client, nil
+	return &client, nil
 }
 
-func MakeRabbitMQPriorityPub(cfg RabbitMQPriorityPublisherConfg) RabbitMQPriorityPublisher {
+func MakeRabbitMQPriorityPub(cfg RabbitMQPriorityPublisherConfig) *RabbitMQPriorityPublisher {
 	pub := RabbitMQPublisher{ch: cfg.Publisher}
 	ppub := RabbitMQPriorityPublisher{publisher: pub, queues: cfg.Queues}
 
-	return ppub
+	return &ppub
 }

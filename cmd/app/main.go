@@ -15,7 +15,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	r, err := di.InjectDynamoSQSEngine(loader)
+	r, err := di.InjectDynamoRabbitMQPriorityQueueEngine(loader)
 
 	if err != nil {
 		log.Fatalf("failed to create engine - %v", err)
