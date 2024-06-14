@@ -51,6 +51,10 @@ type DynamoClientConfig struct {
 	Region       *string
 }
 
+type DynamoConfigurator interface {
+	GetDynamoClientConfig() DynamoClientConfig
+}
+
 type DynamoKey map[string]types.AttributeValue
 type DynamoObj map[string]types.AttributeValue
 
@@ -1164,7 +1168,9 @@ func (s *DynamoDBStorage) DeleteUserNotification(ctx context.Context, userId str
 	return err
 }
 
-func MakeDynamoDBClient(clientCfg DynamoClientConfig) (client *dynamodb.Client, err error) {
+func MakeDynamoDBClient(c DynamoConfigurator) (client *dynamodb.Client, err error) {
+
+	clientCfg := c.GetDynamoClientConfig()
 
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 
@@ -1185,6 +1191,6 @@ func MakeDynamoDBClient(clientCfg DynamoClientConfig) (client *dynamodb.Client, 
 	return
 }
 
-func MakeDynamoDBStorage(client DynamoDBAPI) *DynamoDBStorage {
-	return &DynamoDBStorage{client: client}
+func MakeDynamoDBStorage(a DynamoDBAPI) *DynamoDBStorage {
+	return &DynamoDBStorage{client: a}
 }

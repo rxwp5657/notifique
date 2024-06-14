@@ -15,11 +15,6 @@ type SQSAPI interface {
 	SendMessage(ctx context.Context, params *sqs.SendMessageInput, optFns ...func(*sqs.Options)) (*sqs.SendMessageOutput, error)
 }
 
-type SQSConfig struct {
-	Client SQSAPI
-	Queues PriorityQueues
-}
-
 type SQSPublisher struct {
 	client SQSAPI
 	queues PriorityQueues
@@ -30,21 +25,27 @@ type SQSClientConfig struct {
 	Region       *string
 }
 
-func (p *SQSPublisher) Publish(ctx context.Context, notification c.Notification, storage c.NotificationStorage) error {
-	return publishByPriority(ctx, notification, storage, p, p.queues)
+type SQSConfigurator interface {
+	GetSQSClientConfig() SQSClientConfig
 }
 
-func (p *SQSPublisher) PublishMsg(ctx context.Context, queue string, message []byte) error {
+func (p *SQSPublisher) Publish(ctx context.Context, n c.Notification, s c.NotificationStorage) error {
+	return publishByPriority(ctx, n, s, p, p.queues)
+}
+
+func (p *SQSPublisher) PublishMsg(ctx context.Context, q string, m []byte) error {
 
 	_, err := p.client.SendMessage(ctx, &sqs.SendMessageInput{
-		MessageBody: aws.String(string(message)),
-		QueueUrl:    &queue,
+		MessageBody: aws.String(string(m)),
+		QueueUrl:    &q,
 	})
 
 	return err
 }
 
-func MakeSQSClient(clientCfg SQSClientConfig) (client *sqs.Client, err error) {
+func MakeSQSClient(c SQSConfigurator) (client *sqs.Client, err error) {
+
+	clientCfg := c.GetSQSClientConfig()
 
 	cfg, err := config.LoadDefaultConfig(context.TODO())
 
@@ -65,9 +66,9 @@ func MakeSQSClient(clientCfg SQSClientConfig) (client *sqs.Client, err error) {
 	return
 }
 
-func MakeSQSPublisher(cfg SQSConfig) *SQSPublisher {
+func MakeSQSPublisher(a SQSAPI, c PriorityQueueConfigurator) *SQSPublisher {
 	return &SQSPublisher{
-		client: cfg.Client,
-		queues: cfg.Queues,
+		client: a,
+		queues: c.GetPriorityQueues(),
 	}
 }

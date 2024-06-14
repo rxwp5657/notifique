@@ -9,16 +9,6 @@ import (
 	c "github.com/notifique/controllers"
 )
 
-type PriorityQueues struct {
-	Low    *string
-	Medium *string
-	High   *string
-}
-
-type Publisher interface {
-	PublishMsg(ctx context.Context, queue string, message []byte) error
-}
-
 type Priority string
 
 const (
@@ -27,36 +17,50 @@ const (
 	HIGH   Priority = "HIGH"
 )
 
-func publishByPriority(ctx context.Context, notification c.Notification, storage c.NotificationStorage, publisher Publisher, queues PriorityQueues) error {
+type PriorityQueues struct {
+	Low    *string
+	Medium *string
+	High   *string
+}
+
+type Publisher interface {
+	PublishMsg(ctx context.Context, queueName string, message []byte) error
+}
+
+type PriorityQueueConfigurator interface {
+	GetPriorityQueues() PriorityQueues
+}
+
+func publishByPriority(ctx context.Context, n c.Notification, s c.NotificationStorage, p Publisher, pq PriorityQueues) error {
 
 	var queueUri *string = nil
 
-	switch notification.Priority {
+	switch n.Priority {
 	case string(LOW):
-		queueUri = queues.Low
+		queueUri = pq.Low
 	case string(MEDIUM):
-		queueUri = queues.Medium
+		queueUri = pq.Medium
 	case string(HIGH):
-		queueUri = queues.High
+		queueUri = pq.High
 	default:
 		return fmt.Errorf("invalid priority")
 	}
 
 	if queueUri == nil {
-		return fmt.Errorf("queue for %s priority not found", notification.Priority)
+		return fmt.Errorf("queue for %s priority not found", n.Priority)
 	}
 
-	message, err := json.Marshal(notification)
+	message, err := json.Marshal(n)
 
 	if err != nil {
 		return fmt.Errorf("failed to marshall message body - %w", err)
 	}
 
-	err = publisher.PublishMsg(ctx, *queueUri, message)
+	err = p.PublishMsg(ctx, *queueUri, message)
 
 	if err != nil {
 		errMsg := err.Error()
-		statuslogErr := storage.CreateNotificationStatusLog(ctx, notification.Id, c.PUBLISH_FAILED, &errMsg)
+		statuslogErr := s.CreateNotificationStatusLog(ctx, n.Id, c.PUBLISH_FAILED, &errMsg)
 
 		if statuslogErr != nil {
 			errs := errors.Join(err, statuslogErr)
@@ -66,7 +70,7 @@ func publishByPriority(ctx context.Context, notification c.Notification, storage
 		return fmt.Errorf("failed to publish notification - %w", err)
 	}
 
-	err = storage.CreateNotificationStatusLog(ctx, notification.Id, c.PUBLISHED, nil)
+	err = s.CreateNotificationStatusLog(ctx, n.Id, c.PUBLISHED, nil)
 
 	if err != nil {
 		return fmt.Errorf("failed to create notification status log - %w", err)

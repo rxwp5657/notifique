@@ -17,16 +17,14 @@ const (
 	POSTGRES_PASSWORD = "postgres"
 )
 
-type PostgresContainerCleanupFn func() error
-
 type PostgresContainer struct {
 	testcontainers.Container
-	URI       string
-	CleanupFn PostgresContainerCleanupFn
+	URI     string
+	Cleanup func() error
 }
 
-func (pc *PostgresContainer) GetURI() string {
-	return pc.URI
+func (pc *PostgresContainer) GetPostgresUrl() (string, error) {
+	return pc.URI, nil
 }
 
 func MakePostgresContainer(ctx context.Context) (*PostgresContainer, error) {
@@ -82,5 +80,5 @@ func MakePostgresContainer(ctx context.Context) (*PostgresContainer, error) {
 	}
 
 	cleanup := func() error { return container.Terminate(ctx) }
-	return &PostgresContainer{URI: uri, CleanupFn: cleanup}, nil
+	return &PostgresContainer{URI: uri, Cleanup: cleanup}, nil
 }

@@ -26,7 +26,7 @@ type UserNotificationsTester interface {
 
 func TestUserController(t *testing.T) {
 
-	testApp, err := di.InjectPostgresSQSContainerTesting(context.TODO())
+	testApp, err := di.InjectPgPrioritySQSIntegrationTest(context.TODO())
 
 	if err != nil {
 		t.Fatalf("failed to create container app - %v", err)

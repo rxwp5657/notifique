@@ -12,14 +12,13 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 
 	ddb "github.com/notifique/deployments/dynamodb"
+	storage "github.com/notifique/internal/storage/dynamodb"
 )
-
-type DynamoCleanup func() error
 
 type DynamoContainer struct {
 	testcontainers.Container
-	URI       string
-	CleanupFn DynamoCleanup
+	URI     string
+	Cleanup func() error
 }
 
 func (ddbc *DynamoContainer) GetURI() string {
@@ -79,8 +78,14 @@ func MakeDynamoContainer(ctx context.Context) (*DynamoContainer, error) {
 	dc := DynamoContainer{
 		Container: container,
 		URI:       uri,
-		CleanupFn: cleanup,
+		Cleanup:   cleanup,
 	}
 
 	return &dc, nil
+}
+
+func (dc *DynamoContainer) GetDynamoClientConfig() storage.DynamoClientConfig {
+	return storage.DynamoClientConfig{
+		BaseEndpoint: &dc.URI,
+	}
 }
