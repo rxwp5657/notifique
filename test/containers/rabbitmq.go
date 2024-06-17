@@ -88,6 +88,11 @@ func MakeRabbitMQPriorityContainer(ctx context.Context) (*RabbitMQPriorityContai
 	}
 
 	deployer, cleanup, err := deployments.MakeRabbitMQPriorityDeployer(&pc)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to make rabbitmq deployer - %w", err)
+	}
+
 	defer cleanup()
 
 	deployer.Deploy()
