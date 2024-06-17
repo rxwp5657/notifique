@@ -88,12 +88,13 @@ func (cfg EnvConfig) GetSQSClientConfig() (sqsCfg publisher.SQSClientConfig) {
 	return
 }
 
-func MakeEnvConfig(envFile string) (cfg *EnvConfig, err error) {
-	err = godotenv.Load(envFile)
+func MakeEnvConfig(envFile string) (*EnvConfig, error) {
+	err := godotenv.Load(envFile)
 
 	if err != nil {
-		return cfg, fmt.Errorf("failed to load env file %s - %w", envFile, err)
+		return nil, fmt.Errorf("failed to load env file %s - %w", envFile, err)
 	}
 
-	return
+	cfg := EnvConfig{}
+	return &cfg, nil
 }
