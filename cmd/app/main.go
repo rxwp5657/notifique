@@ -4,18 +4,11 @@ import (
 	"log"
 
 	di "github.com/notifique/dependency_injection"
-	"github.com/notifique/internal/config"
 )
 
 func main() {
 
-	loader, err := config.MakeEnvConfig(".env")
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	r, err := di.InjectDynamoPriorityRabbitMQ(&loader)
+	r, err := di.InjectDynamoPriorityRabbitMQ(".env")
 
 	if err != nil {
 		log.Fatalf("failed to create engine - %v", err)

@@ -9,6 +9,71 @@ import (
 	"github.com/notifique/internal/publisher"
 )
 
+type SQSDeployer interface {
+	Deploy() (publisher.PriorityQueues, error)
+}
+
+type SQSPriorityDeployer struct {
+	Client *sqs.Client
+	Queues publisher.PriorityQueues
+}
+
+func (d *SQSPriorityDeployer) Deploy() (urls publisher.PriorityQueues, err error) {
+
+	availableQueues, err := getQueues(d.Client)
+
+	if err != nil {
+		return urls, err
+	}
+
+	availableQueuesMap := make(map[string]string)
+
+	for _, queueUrl := range availableQueues {
+		queueName := path.Base(queueUrl)
+		availableQueuesMap[queueName] = queueUrl
+	}
+
+	getQueueUrl := func(name *string) (*string, error) {
+
+		if name == nil {
+			return nil, nil
+		}
+
+		url, ok := availableQueuesMap[*name]
+
+		if !ok {
+			url, err := createQueue(d.Client, *name)
+			return &url, err
+		}
+
+		return &url, nil
+	}
+
+	lowUrl, err := getQueueUrl(d.Queues.Low)
+
+	if err != nil {
+		return urls, err
+	}
+
+	midUrl, err := getQueueUrl(d.Queues.Medium)
+
+	if err != nil {
+		return urls, err
+	}
+
+	highUrl, err := getQueueUrl(d.Queues.High)
+
+	if err != nil {
+		return urls, err
+	}
+
+	urls.Low = lowUrl
+	urls.Medium = midUrl
+	urls.High = highUrl
+
+	return
+}
+
 func getQueues(c *sqs.Client) (queueUrls []string, err error) {
 
 	paginator := sqs.NewListQueuesPaginator(c, &sqs.ListQueuesInput{})
@@ -41,58 +106,19 @@ func createQueue(c *sqs.Client, queueName string) (queueUrl string, err error) {
 	return
 }
 
-func MakePriorityQueues(c *sqs.Client, queueNames publisher.PriorityQueues) (urls publisher.PriorityQueues, err error) {
-
-	queueUrls, err := getQueues(c)
-
-	if err != nil {
-		return urls, err
-	}
-
-	existingQueues := make(map[string]string)
-
-	for _, queueUrl := range queueUrls {
-		queueName := path.Base(queueUrl)
-		existingQueues[queueName] = queueUrl
-	}
-
-	createQueueIfNotExists := func(name *string) (*string, error) {
-
-		if name == nil {
-			return nil, nil
-		}
-
-		url, ok := existingQueues[*name]
-
-		if !ok {
-			url, err := createQueue(c, *name)
-			return &url, err
-		}
-
-		return &url, nil
-	}
-
-	low, err := createQueueIfNotExists(queueNames.Low)
+func MakeSQSPriorityDeployer(c publisher.SQSPriorityConfigurator) (*SQSPriorityDeployer, func(), error) {
+	client, err := publisher.MakeSQSClient(c)
 
 	if err != nil {
-		return urls, fmt.Errorf("failed to create low priority queue - %w", err)
+		return nil, nil, nil
 	}
 
-	medium, err := createQueueIfNotExists(queueNames.Medium)
+	cleanup := func() {}
 
-	if err != nil {
-		return urls, fmt.Errorf("failed to create medium priority queue - %w", err)
+	deployer := SQSPriorityDeployer{
+		Client: client,
+		Queues: c.GetPriorityQueues(),
 	}
 
-	high, err := createQueueIfNotExists(queueNames.High)
-
-	if err != nil {
-		return urls, fmt.Errorf("failed to create high priority queue - %w", err)
-	}
-
-	urls.Low = low
-	urls.Medium = medium
-	urls.High = high
-
-	return
+	return &deployer, cleanup, nil
 }

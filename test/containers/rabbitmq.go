@@ -24,37 +24,12 @@ type RabbitMQPriorityContainer struct {
 	Queues    publisher.PriorityQueues
 }
 
-type RabbitMQDeployer interface {
-	Deploy(c publisher.RabbitMQConfigurator) error
-}
-
-type RabbitMQPriorityDeployer struct {
-	Queues publisher.PriorityQueues
-}
-
 func (rc *RabbitMQPriorityContainer) GetRabbitMQUrl() (string, error) {
 	return rc.Container.URI, nil
 }
 
 func (rc *RabbitMQPriorityContainer) GetPriorityQueues() publisher.PriorityQueues {
 	return rc.Queues
-}
-
-func (d RabbitMQPriorityDeployer) Deploy(c publisher.RabbitMQConfigurator) error {
-
-	client, err := publisher.MakeRabbitMQClient(c)
-
-	if err != nil {
-		return err
-	}
-
-	err = deployments.MakeRabbitMQPriorityQueues(*client, d.Queues)
-
-	if err != nil {
-		return fmt.Errorf("failed to deploy priority queues - %w", err)
-	}
-
-	return nil
 }
 
 func MakeRabbitMQContainer(ctx context.Context) (RabbitMQContainer, error) {
@@ -112,8 +87,10 @@ func MakeRabbitMQPriorityContainer(ctx context.Context) (*RabbitMQPriorityContai
 		Queues:    queues,
 	}
 
-	deployer := RabbitMQPriorityDeployer{Queues: queues}
-	deployer.Deploy(&pc)
+	deployer, cleanup, err := deployments.MakeRabbitMQPriorityDeployer(&pc)
+	defer cleanup()
+
+	deployer.Deploy()
 
 	return &pc, nil
 }

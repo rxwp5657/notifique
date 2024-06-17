@@ -34,6 +34,11 @@ type RabbitMQConfigurator interface {
 	GetRabbitMQUrl() (string, error)
 }
 
+type RabbitMQPriorityConfigurator interface {
+	RabbitMQConfigurator
+	PriorityQueueConfigurator
+}
+
 func (p *RabbitMQPriorityPublisher) Publish(ctx context.Context, n c.Notification, s c.NotificationStorage) error {
 	return publishByPriority(ctx, n, s, &p.publisher, p.queues)
 }

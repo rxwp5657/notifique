@@ -22,14 +22,6 @@ type SQSPriorityContainer struct {
 	Queues    publisher.PriorityQueues
 }
 
-type SQSDeployer interface {
-	Deploy(c publisher.SQSConfigurator) (publisher.PriorityQueues, error)
-}
-
-type SQSPriorityDeployer struct {
-	Queues publisher.PriorityQueues
-}
-
 func (sc *SQSPriorityContainer) GetSQSClientConfig() publisher.SQSClientConfig {
 	return publisher.SQSClientConfig{
 		BaseEndpoint: &sc.Container.URI,
@@ -38,23 +30,6 @@ func (sc *SQSPriorityContainer) GetSQSClientConfig() publisher.SQSClientConfig {
 
 func (sc *SQSPriorityContainer) GetPriorityQueues() publisher.PriorityQueues {
 	return sc.Queues
-}
-
-func (d *SQSPriorityDeployer) Deploy(c publisher.SQSConfigurator) (publisher.PriorityQueues, error) {
-
-	client, err := publisher.MakeSQSClient(c)
-
-	if err != nil {
-		return publisher.PriorityQueues{}, err
-	}
-
-	queues, err := deployments.MakePriorityQueues(client, d.Queues)
-
-	if err != nil {
-		return publisher.PriorityQueues{}, fmt.Errorf("failed to deploy priority queues - %w", err)
-	}
-
-	return queues, nil
 }
 
 func MakeSQSContainer(ctx context.Context) (SQSContainer, error) {
@@ -111,8 +86,15 @@ func MakeSQSPriorityContainer(ctx context.Context) (*SQSPriorityContainer, error
 		Queues:    queues,
 	}
 
-	deployer := SQSPriorityDeployer{Queues: queues}
-	deployedQueues, err := deployer.Deploy(&pc)
+	deployer, cleanup, err := deployments.MakeSQSPriorityDeployer(&pc)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer cleanup()
+
+	deployedQueues, err := deployer.Deploy()
 
 	if err != nil {
 		return nil, err

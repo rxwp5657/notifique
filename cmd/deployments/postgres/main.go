@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 
-	di "github.com/notifique/dependency_injection"
 	cfg "github.com/notifique/internal/config"
 
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -20,10 +19,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	url, ok := loader.GetConfigValue(di.POSTGRES_URL)
+	url, err := loader.GetPostgresUrl()
 
-	if !ok {
-		log.Fatalf("postgres url %s is not set", di.POSTGRES_URL)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	err = p.RunMigrations(url)

@@ -2,9 +2,44 @@ package deployments
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/notifique/internal/publisher"
 )
+
+type RabbitMQDeployer interface {
+	Deploy() error
+}
+
+type RabbitMQPriorityDeployer struct {
+	Client publisher.RabbitMQClient
+	Queues publisher.PriorityQueues
+}
+
+func (d *RabbitMQPriorityDeployer) Deploy() error {
+
+	makeQueueIfSupplied := func(name *string) error {
+		if name == nil {
+			return nil
+		}
+
+		return createQueue(d.Client, *name)
+	}
+
+	if err := makeQueueIfSupplied(d.Queues.Low); err != nil {
+		return err
+	}
+
+	if err := makeQueueIfSupplied(d.Queues.Medium); err != nil {
+		return err
+	}
+
+	if err := makeQueueIfSupplied(d.Queues.High); err != nil {
+		return err
+	}
+
+	return nil
+}
 
 func createQueue(client publisher.RabbitMQClient, name string) error {
 
@@ -24,27 +59,22 @@ func createQueue(client publisher.RabbitMQClient, name string) error {
 	return nil
 }
 
-func MakeRabbitMQPriorityQueues(client publisher.RabbitMQClient, queues publisher.PriorityQueues) error {
+func MakeRabbitMQPriorityDeployer(c publisher.RabbitMQPriorityConfigurator) (*RabbitMQPriorityDeployer, func(), error) {
 
-	makeQueueIfSupplied := func(name *string) error {
-		if name == nil {
-			return nil
-		}
+	client, err := publisher.MakeRabbitMQClient(c)
 
-		return createQueue(client, *name)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create rabbitmq client - %w", err)
 	}
 
-	if err := makeQueueIfSupplied(queues.Low); err != nil {
-		return err
+	cleanup := func() {
+		log.Fatal(client.Close())
 	}
 
-	if err := makeQueueIfSupplied(queues.Medium); err != nil {
-		return err
+	deployer := RabbitMQPriorityDeployer{
+		Client: *client,
+		Queues: c.GetPriorityQueues(),
 	}
 
-	if err := makeQueueIfSupplied(queues.High); err != nil {
-		return err
-	}
-
-	return nil
+	return &deployer, cleanup, nil
 }

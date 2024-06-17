@@ -29,6 +29,11 @@ type SQSConfigurator interface {
 	GetSQSClientConfig() SQSClientConfig
 }
 
+type SQSPriorityConfigurator interface {
+	SQSConfigurator
+	PriorityQueueConfigurator
+}
+
 func (p *SQSPublisher) Publish(ctx context.Context, n c.Notification, s c.NotificationStorage) error {
 	return publishByPriority(ctx, n, s, p, p.queues)
 }

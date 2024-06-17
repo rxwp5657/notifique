@@ -1,3 +1,6 @@
+//go:build wireinject
+// +build wireinject
+
 package dependencyinjection
 
 import (
@@ -11,6 +14,9 @@ import (
 	"github.com/notifique/controllers"
 	"github.com/notifique/routes"
 
+	rd "github.com/notifique/deployments/rabbitmq"
+	sd "github.com/notifique/deployments/sqs"
+	cfg "github.com/notifique/internal/config"
 	pub "github.com/notifique/internal/publisher"
 	ddb "github.com/notifique/internal/storage/dynamodb"
 	pg "github.com/notifique/internal/storage/postgres"
@@ -21,30 +27,6 @@ type Storage interface {
 	controllers.NotificationStorage
 	controllers.UserStorage
 	controllers.DistributionListStorage
-}
-
-type PgPrioritySQSConfigurator interface {
-	pg.PostgresConfigurator
-	pub.SQSConfigurator
-	pub.PriorityQueueConfigurator
-}
-
-type PgPriorityRabbitMQConfigurator interface {
-	pg.PostgresConfigurator
-	pub.RabbitMQConfigurator
-	pub.PriorityQueueConfigurator
-}
-
-type DynamoPrioritySQSConfigurator interface {
-	ddb.DynamoConfigurator
-	pub.SQSConfigurator
-	pub.PriorityQueueConfigurator
-}
-
-type DynamoPriorityRabbitMQConfigurator interface {
-	ddb.DynamoConfigurator
-	pub.RabbitMQConfigurator
-	pub.PriorityQueueConfigurator
 }
 
 type PostgresPrioritySQSIntegrationTest struct {
@@ -189,6 +171,17 @@ var DynamoContainerSet = wire.NewSet(
 	wire.Bind(new(ddb.DynamoConfigurator), new(*c.DynamoContainer)),
 )
 
+var EnvConfigSet = wire.NewSet(
+	cfg.MakeEnvConfig,
+	wire.Bind(new(pg.PostgresConfigurator), new(*cfg.EnvConfig)),
+	wire.Bind(new(ddb.DynamoConfigurator), new(*cfg.EnvConfig)),
+	wire.Bind(new(pub.PriorityQueueConfigurator), new(*cfg.EnvConfig)),
+	wire.Bind(new(pub.SQSConfigurator), new(*cfg.EnvConfig)),
+	wire.Bind(new(pub.RabbitMQConfigurator), new(*cfg.EnvConfig)),
+	wire.Bind(new(pub.RabbitMQPriorityConfigurator), new(*cfg.EnvConfig)),
+	wire.Bind(new(pub.SQSPriorityConfigurator), new(*cfg.EnvConfig)),
+)
+
 func MakeEngine(storage Storage, pub controllers.NotificationPublisher) *gin.Engine {
 
 	r := gin.Default()
@@ -200,9 +193,10 @@ func MakeEngine(storage Storage, pub controllers.NotificationPublisher) *gin.Eng
 	return r
 }
 
-func InjectPgPrioritySQS(pgc pg.PostgresConfigurator, sc pub.SQSConfigurator, qc pub.PriorityQueueConfigurator) (*gin.Engine, error) {
+func InjectPgPrioritySQS(envfile string) (*gin.Engine, error) {
 
 	wire.Build(
+		EnvConfigSet,
 		PostgresSet,
 		SQSPrioritySet,
 		MakeEngine,
@@ -211,9 +205,10 @@ func InjectPgPrioritySQS(pgc pg.PostgresConfigurator, sc pub.SQSConfigurator, qc
 	return nil, nil
 }
 
-func InjectPgPriorityRabbitMQ(pgc pg.PostgresConfigurator, rc pub.RabbitMQConfigurator, qc pub.PriorityQueueConfigurator) (*gin.Engine, error) {
+func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, error) {
 
 	wire.Build(
+		EnvConfigSet,
 		PostgresSet,
 		RabbitMQPrioritySet,
 		MakeEngine,
@@ -222,9 +217,10 @@ func InjectPgPriorityRabbitMQ(pgc pg.PostgresConfigurator, rc pub.RabbitMQConfig
 	return nil, nil
 }
 
-func InjectDynamoPrioritySQS(dc ddb.DynamoConfigurator, sc pub.SQSConfigurator, qc pub.PriorityQueueConfigurator) (*gin.Engine, error) {
+func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
 
 	wire.Build(
+		EnvConfigSet,
 		DynamoSet,
 		SQSPrioritySet,
 		MakeEngine,
@@ -233,9 +229,10 @@ func InjectDynamoPrioritySQS(dc ddb.DynamoConfigurator, sc pub.SQSConfigurator, 
 	return nil, nil
 }
 
-func InjectDynamoPriorityRabbitMQ(dc ddb.DynamoConfigurator, rc pub.RabbitMQConfigurator, qc pub.PriorityQueueConfigurator) (*gin.Engine, error) {
+func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, error) {
 
 	wire.Build(
+		EnvConfigSet,
 		DynamoSet,
 		RabbitMQPrioritySet,
 		MakeEngine,
@@ -298,4 +295,24 @@ func InjectDynamoPriorityRabbitMQIntegrationTest(ctx context.Context) (*DynamoPr
 	)
 
 	return nil, nil
+}
+
+func InjectRabbitMQPriorityDeployer(envfile string) (*rd.RabbitMQPriorityDeployer, func(), error) {
+
+	wire.Build(
+		EnvConfigSet,
+		rd.MakeRabbitMQPriorityDeployer,
+	)
+
+	return nil, nil, nil
+}
+
+func InjectSQSPriorityDeployer(envfile string) (*sd.SQSPriorityDeployer, func(), error) {
+
+	wire.Build(
+		EnvConfigSet,
+		sd.MakeSQSPriorityDeployer,
+	)
+
+	return nil, nil, nil
 }
