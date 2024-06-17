@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/docker/go-connections/nat"
-	deployments "github.com/notifique/deployments/sqs"
+	"github.com/notifique/internal/deployments"
 	"github.com/notifique/internal/publisher"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/localstack"

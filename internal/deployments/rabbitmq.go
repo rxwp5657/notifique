@@ -23,7 +23,7 @@ func (d *RabbitMQPriorityDeployer) Deploy() error {
 			return nil
 		}
 
-		return createQueue(d.Client, *name)
+		return createRabbitMQQueue(d.Client, *name)
 	}
 
 	if err := makeQueueIfSupplied(d.Queues.Low); err != nil {
@@ -41,7 +41,7 @@ func (d *RabbitMQPriorityDeployer) Deploy() error {
 	return nil
 }
 
-func createQueue(client publisher.RabbitMQClient, name string) error {
+func createRabbitMQQueue(client publisher.RabbitMQClient, name string) error {
 
 	_, err := client.QueueDeclare(
 		name,  // name

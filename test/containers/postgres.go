@@ -8,7 +8,7 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	p "github.com/notifique/deployments/postgres"
+	p "github.com/notifique/internal/deployments"
 )
 
 const (

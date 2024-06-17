@@ -42,7 +42,7 @@ func (d *SQSPriorityDeployer) Deploy() (urls publisher.PriorityQueues, err error
 		url, ok := availableQueuesMap[*name]
 
 		if !ok {
-			url, err := createQueue(d.Client, *name)
+			url, err := createSQSQueue(d.Client, *name)
 			return &url, err
 		}
 
@@ -91,7 +91,7 @@ func getQueues(c *sqs.Client) (queueUrls []string, err error) {
 	return
 }
 
-func createQueue(c *sqs.Client, queueName string) (queueUrl string, err error) {
+func createSQSQueue(c *sqs.Client, queueName string) (queueUrl string, err error) {
 
 	queue, err := c.CreateQueue(context.TODO(), &sqs.CreateQueueInput{
 		QueueName: &queueName,

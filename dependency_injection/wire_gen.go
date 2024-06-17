@@ -14,9 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 	"github.com/notifique/controllers"
-	"github.com/notifique/deployments/rabbitmq"
-	deployments2 "github.com/notifique/deployments/sqs"
 	"github.com/notifique/internal/config"
+	"github.com/notifique/internal/deployments"
 	"github.com/notifique/internal/publisher"
 	storage2 "github.com/notifique/internal/storage/dynamodb"
 	"github.com/notifique/internal/storage/postgres"
@@ -234,12 +233,12 @@ func InjectRabbitMQPriorityDeployer(envfile string) (*deployments.RabbitMQPriori
 	}, nil
 }
 
-func InjectSQSPriorityDeployer(envfile string) (*deployments2.SQSPriorityDeployer, func(), error) {
+func InjectSQSPriorityDeployer(envfile string) (*deployments.SQSPriorityDeployer, func(), error) {
 	envConfig, err := config.MakeEnvConfig(envfile)
 	if err != nil {
 		return nil, nil, err
 	}
-	sqsPriorityDeployer, cleanup, err := deployments2.MakeSQSPriorityDeployer(envConfig)
+	sqsPriorityDeployer, cleanup, err := deployments.MakeSQSPriorityDeployer(envConfig)
 	if err != nil {
 		return nil, nil, err
 	}

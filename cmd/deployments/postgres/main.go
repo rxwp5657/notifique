@@ -8,7 +8,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
-	p "github.com/notifique/deployments/postgres"
+	"github.com/notifique/internal/deployments"
 )
 
 func main() {
@@ -25,7 +25,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	err = p.RunMigrations(url)
+	err = deployments.RunMigrations(url)
 
 	if err != nil {
 		log.Fatalf("failed to execute migrations - %v", err)

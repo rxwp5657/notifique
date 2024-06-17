@@ -11,7 +11,7 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	ddb "github.com/notifique/deployments/dynamodb"
+	ddb "github.com/notifique/internal/deployments"
 	storage "github.com/notifique/internal/storage/dynamodb"
 )
 

@@ -14,9 +14,8 @@ import (
 	"github.com/notifique/controllers"
 	"github.com/notifique/routes"
 
-	rd "github.com/notifique/deployments/rabbitmq"
-	sd "github.com/notifique/deployments/sqs"
 	cfg "github.com/notifique/internal/config"
+	deployments "github.com/notifique/internal/deployments"
 	pub "github.com/notifique/internal/publisher"
 	ddb "github.com/notifique/internal/storage/dynamodb"
 	pg "github.com/notifique/internal/storage/postgres"
@@ -297,21 +296,21 @@ func InjectDynamoPriorityRabbitMQIntegrationTest(ctx context.Context) (*DynamoPr
 	return nil, nil
 }
 
-func InjectRabbitMQPriorityDeployer(envfile string) (*rd.RabbitMQPriorityDeployer, func(), error) {
+func InjectRabbitMQPriorityDeployer(envfile string) (*deployments.RabbitMQPriorityDeployer, func(), error) {
 
 	wire.Build(
 		EnvConfigSet,
-		rd.MakeRabbitMQPriorityDeployer,
+		deployments.MakeRabbitMQPriorityDeployer,
 	)
 
 	return nil, nil, nil
 }
 
-func InjectSQSPriorityDeployer(envfile string) (*sd.SQSPriorityDeployer, func(), error) {
+func InjectSQSPriorityDeployer(envfile string) (*deployments.SQSPriorityDeployer, func(), error) {
 
 	wire.Build(
 		EnvConfigSet,
-		sd.MakeSQSPriorityDeployer,
+		deployments.MakeSQSPriorityDeployer,
 	)
 
 	return nil, nil, nil

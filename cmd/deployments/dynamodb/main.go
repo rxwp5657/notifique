@@ -3,8 +3,8 @@ package main
 import (
 	"log"
 
-	ddb "github.com/notifique/deployments/dynamodb"
 	cfg "github.com/notifique/internal/config"
+	ddb "github.com/notifique/internal/deployments"
 	storage "github.com/notifique/internal/storage/dynamodb"
 )
 
