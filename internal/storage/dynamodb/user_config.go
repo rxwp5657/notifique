@@ -8,13 +8,13 @@ import (
 )
 
 const (
-	USER_CONFIG_TABLE        = "UserConfig"
-	USER_CONFIG_HASH_KEY     = "userId"
-	USER_CONFIG_EMAIL_KEY    = "emailConfig"
-	USER_CONFIG_SMS_KEY      = "smsConfig"
-	USER_CONFIG_INAPP_KEY    = "inAppConfig"
-	USER_CONFIG_SNOOZE_UNTIL = "snoozeUntil"
-	USER_CONFIG_OPT_IN       = "optIn"
+	UserConfigTable       = "UserConfig"
+	UserConfigHashKey     = "userId"
+	UserConfigEmailKey    = "emailConfig"
+	UserConfigSmsKey      = "smsConfig"
+	UserConfigInAppKey    = "inAppConfig"
+	UserConfigSnoozeUntil = "snoozeUntil"
+	UserConfigOptIn       = "optIn"
 )
 
 type channelConfig struct {

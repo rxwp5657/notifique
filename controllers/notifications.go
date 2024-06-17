@@ -13,9 +13,9 @@ import (
 type NotificationStatus string
 
 const (
-	CREATED        NotificationStatus = "CREATED"
-	PUBLISHED      NotificationStatus = "PUBLISHED"
-	PUBLISH_FAILED NotificationStatus = "FAILED"
+	Created       NotificationStatus = "CREATED"
+	Published     NotificationStatus = "PUBLISHED"
+	PublishFailed NotificationStatus = "PUBLISH_FAILED"
 )
 
 type Notification struct {
@@ -45,7 +45,7 @@ func (nc NotificationController) CreateNotification(c *gin.Context) {
 		return
 	}
 
-	userId := c.GetHeader(USER_ID_HEADER_KEY)
+	userId := c.GetHeader(UserIdHeaderKey)
 
 	notificationId, err := nc.Storage.SaveNotification(c, userId, notification)
 

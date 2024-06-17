@@ -43,7 +43,7 @@ func (n *userNotification) toDTO() dto.UserNotification {
 	return notification
 }
 
-const GET_USER_NOTIFICATIONS = `
+const GetUserNotifications = `
 SELECT
 	id,
 	title,
@@ -61,7 +61,7 @@ LIMIT
 	@limit;
 `
 
-const INSERT_USER_NOTIFICATION = `
+const InsertUserNotifications = `
 INSERT INTO user_notifications(
 	id,
 	user_id,
@@ -83,14 +83,14 @@ INSERT INTO user_notifications(
 );
 `
 
-const DELETE_USER_NOTIFICATION = `
+const DeleteUserNotification = `
 DELETE FROM 
 	ser_notifications
 WHERE
 	id = @id;
 `
 
-const UPDATE_READ_AT = `
+const UpdateReadAt = `
 UPDATE
 	user_notifications
 SET

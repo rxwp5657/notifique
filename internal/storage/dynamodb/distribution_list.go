@@ -8,11 +8,11 @@ import (
 )
 
 const (
-	DIST_LIST_RECIPIENTS_TABLE   = "DistributionListRecipients"
-	DIST_LIST_SUMMARY_TABLE      = "DistributionListSummary"
-	DIST_LIST_RECIPIENT_HASH_KEY = "listName"
-	DIST_LIST_RECIPIENT_SORT_KEY = "userId"
-	DIST_LIST_SUMMARY_HASH_KEY   = "name"
+	DistListRecipientsTable  = "DistributionListRecipients"
+	DistListSummaryTable     = "DistributionListSummary"
+	DistListRecipientHashKey = "listName"
+	DistListRecipientSortKey = "userId"
+	DistListSummaryHashKey   = "name"
 )
 
 type distListRecipient struct {
@@ -44,8 +44,8 @@ func (dl *distListRecipient) GetKey() (DynamoKey, error) {
 		return key, fmt.Errorf("failed to marshall dl userId - %w", err)
 	}
 
-	key[DIST_LIST_RECIPIENT_HASH_KEY] = name
-	key[DIST_LIST_RECIPIENT_SORT_KEY] = userId
+	key[DistListRecipientHashKey] = name
+	key[DistListRecipientSortKey] = userId
 
 	return key, nil
 }
@@ -59,7 +59,7 @@ func getSummaryKey(listName string) (DynamoKey, error) {
 		return key, fmt.Errorf("failed to marshall dl name - %w", err)
 	}
 
-	key[DIST_LIST_SUMMARY_HASH_KEY] = name
+	key[DistListSummaryHashKey] = name
 
 	return key, nil
 }

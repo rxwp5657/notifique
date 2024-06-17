@@ -34,7 +34,7 @@ func (ps *PostgresStorage) GetUserNotifications(ctx context.Context, filters dto
 
 	page := dto.Page[dto.UserNotification]{}
 
-	args := pgx.NamedArgs{"limit": internal.PAGE_SIZE}
+	args := pgx.NamedArgs{"limit": internal.PageSize}
 	whereFilters := make([]string, 0)
 
 	if filters.MaxResults != nil {
@@ -73,7 +73,7 @@ func (ps *PostgresStorage) GetUserNotifications(ctx context.Context, filters dto
 		whereStmt = fmt.Sprintf("WHERE %s", whereStmt)
 	}
 
-	query := fmt.Sprintf(GET_USER_NOTIFICATIONS, whereStmt)
+	query := fmt.Sprintf(GetUserNotifications, whereStmt)
 
 	rows, err := ps.conn.Query(ctx, query, args)
 
@@ -154,7 +154,7 @@ func addNotificationStatusLog(ctx context.Context, log notificationStatusLog, tx
 		"errorMessage":   log.Error,
 	}
 
-	_, err := tx.Exec(ctx, INSERT_NOTIFICATION_STATUS_LOG, args)
+	_, err := tx.Exec(ctx, InsertNotificationStatusLog, args)
 
 	if err != nil {
 		return fmt.Errorf("failed to insert notification status log - %w", err)
@@ -179,12 +179,12 @@ func (ps *PostgresStorage) SaveNotification(ctx context.Context, createdBy strin
 		"priority":         notification.Priority,
 		"distributionList": notification.DistributionList,
 		"createdAt":        time.Now().Format(time.RFC3339Nano),
-		"status":           string(c.CREATED),
+		"status":           string(c.Created),
 	}
 
 	var notificationId uuid.UUID
 
-	err = tx.QueryRow(ctx, INSERT_NOTIFICATION, notificationArgs).Scan(&notificationId)
+	err = tx.QueryRow(ctx, InsertNotification, notificationArgs).Scan(&notificationId)
 
 	if err != nil {
 		tx.Rollback(ctx)
@@ -200,7 +200,7 @@ func (ps *PostgresStorage) SaveNotification(ctx context.Context, createdBy strin
 
 	err = batchInsert(
 		ctx,
-		INSERT_NOTIFICATION_RECIPIENTS,
+		InsertNotificationRecipients,
 		notification.Recipients,
 		recipientsBuilder,
 		tx,
@@ -219,7 +219,7 @@ func (ps *PostgresStorage) SaveNotification(ctx context.Context, createdBy strin
 
 	err = batchInsert(
 		ctx,
-		INSERT_CHANNELS,
+		InsertChannels,
 		notification.Channels,
 		channelsBuilder,
 		tx,
@@ -232,7 +232,7 @@ func (ps *PostgresStorage) SaveNotification(ctx context.Context, createdBy strin
 
 	statusLog := notificationStatusLog{
 		NotificationId: notificationId.String(),
-		Status:         string(c.CREATED),
+		Status:         string(c.Created),
 		StatusDate:     time.Now(),
 		Error:          nil,
 	}
@@ -280,7 +280,7 @@ func (ps *PostgresStorage) makeUserConfig(ctx context.Context, userId string) (*
 		"pushSnoozeUntil":  cfg.PushSnoozeUntil,
 	}
 
-	_, err = tx.Exec(ctx, INSERT_USER_CONFIG, args)
+	_, err = tx.Exec(ctx, InsertUserConfig, args)
 
 	if err != nil {
 		tx.Rollback(ctx)
@@ -302,7 +302,7 @@ func (ps *PostgresStorage) GetUserConfig(ctx context.Context, userId string) (dt
 
 	var cfg userConfig
 
-	err := ps.conn.QueryRow(ctx, GET_USER_CONFIG, args).Scan(
+	err := ps.conn.QueryRow(ctx, GetUserConfig, args).Scan(
 		&cfg.EmailOptIn,
 		&cfg.EmailSnoozeUntil,
 		&cfg.SMSOptIn,
@@ -348,7 +348,7 @@ func (ps *PostgresStorage) UpdateUserConfig(ctx context.Context, userId string, 
 		"pushSnoozeUntil":  nil,
 	}
 
-	_, err = tx.Exec(ctx, UPSERT_USER_CONFIG, args)
+	_, err = tx.Exec(ctx, UpsertUserConfig, args)
 
 	if err != nil {
 		tx.Rollback(ctx)
@@ -379,7 +379,7 @@ func (ps *PostgresStorage) SetReadStatus(ctx context.Context, userId, notificati
 
 	var nId uuid.UUID
 
-	err = tx.QueryRow(ctx, UPDATE_READ_AT, args).Scan(&nId)
+	err = tx.QueryRow(ctx, UpdateReadAt, args).Scan(&nId)
 
 	if err != nil {
 		tx.Rollback(ctx)
@@ -407,7 +407,7 @@ func getDistributionListSummary(ctx context.Context, listName string, rQuerier R
 
 	var summary dto.DistributionListSummary
 
-	err := rQuerier.QueryRow(ctx, GET_DISTRIBUTION_LIST, args).Scan(
+	err := rQuerier.QueryRow(ctx, GetDistributionList, args).Scan(
 		&summary.Name,
 		&summary.NumberOfRecipients,
 	)
@@ -448,7 +448,7 @@ func (ps *PostgresStorage) CreateDistributionList(ctx context.Context, distribut
 		"numRecipients": len(distributionList.Recipients),
 	}
 
-	_, err = tx.Exec(ctx, INSERT_DISTRIBUTION_LIST, args)
+	_, err = tx.Exec(ctx, InsertDistributionList, args)
 
 	if err != nil {
 		tx.Rollback(ctx)
@@ -464,7 +464,7 @@ func (ps *PostgresStorage) CreateDistributionList(ctx context.Context, distribut
 
 	err = batchInsert(
 		ctx,
-		INSERT_DISTRIBUTION_LIST_RECIPIENT,
+		InsertDistributionListRecipient,
 		distributionList.Recipients,
 		recipientBuilder,
 		tx,
@@ -488,7 +488,7 @@ func (ps *PostgresStorage) GetDistributionLists(ctx context.Context, filters dto
 
 	page := dto.Page[dto.DistributionListSummary]{}
 
-	args := pgx.NamedArgs{"limit": internal.PAGE_SIZE}
+	args := pgx.NamedArgs{"limit": internal.PageSize}
 
 	nextTokenFilter := ""
 
@@ -510,7 +510,7 @@ func (ps *PostgresStorage) GetDistributionLists(ctx context.Context, filters dto
 		args["name"] = unmarsalledKey.Name
 	}
 
-	query := fmt.Sprintf(GET_DISTRIBUTION_LISTS, nextTokenFilter)
+	query := fmt.Sprintf(GetDistributionLists, nextTokenFilter)
 	rows, err := ps.conn.Query(ctx, query, args)
 
 	if err != nil {
@@ -572,7 +572,7 @@ func (ps *PostgresStorage) DeleteDistributionList(ctx context.Context, distlistN
 	args := pgx.NamedArgs{"name": distlistName}
 
 	// Should also delete its recipients
-	_, err = tx.Exec(ctx, DELETE_DISTRIBUTION_LIST, args)
+	_, err = tx.Exec(ctx, DeleteDistributionList, args)
 
 	if err != nil {
 		tx.Rollback(ctx)
@@ -604,7 +604,7 @@ func (ps *PostgresStorage) GetRecipients(ctx context.Context, distlistName strin
 		}
 	}
 
-	args := pgx.NamedArgs{"limit": internal.PAGE_SIZE}
+	args := pgx.NamedArgs{"limit": internal.PageSize}
 	whereFilters := make([]string, 0)
 
 	if filters.MaxResults != nil {
@@ -636,7 +636,7 @@ func (ps *PostgresStorage) GetRecipients(ctx context.Context, distlistName strin
 	}
 
 	whereStmt := strings.Join(whereFilters, "AND")
-	query := fmt.Sprintf(GET_DISTRIBUTION_LIST_RECIPIENTS, whereStmt)
+	query := fmt.Sprintf(GetDistributionListRecipients, whereStmt)
 
 	rows, err := ps.conn.Query(ctx, query, args)
 
@@ -713,7 +713,7 @@ func (ps *PostgresStorage) AddRecipients(ctx context.Context, distlistName strin
 
 	err = batchInsert(
 		ctx,
-		INSERT_DISTRIBUTION_LIST_RECIPIENT,
+		InsertDistributionListRecipient,
 		recipients,
 		recipientBuilder,
 		tx,
@@ -736,7 +736,7 @@ func (ps *PostgresStorage) AddRecipients(ctx context.Context, distlistName strin
 		"name":          distlistName,
 	}
 
-	_, err = tx.Exec(ctx, UPDATE_RECIPIENTS_COUNT, countArgs)
+	_, err = tx.Exec(ctx, UpdateRecipientsCount, countArgs)
 
 	if err != nil {
 		tx.Rollback(ctx)
@@ -777,7 +777,7 @@ func (ps *PostgresStorage) DeleteRecipients(ctx context.Context, distlistName st
 		"recipients": recipients,
 	}
 
-	_, err = tx.Exec(ctx, DELETE_DISTRIBUTION_LIST_RECIPIENTS, args)
+	_, err = tx.Exec(ctx, DeleteDistributionListRecipients, args)
 
 	if err != nil {
 		tx.Rollback(ctx)
@@ -796,7 +796,7 @@ func (ps *PostgresStorage) DeleteRecipients(ctx context.Context, distlistName st
 		"name":          distlistName,
 	}
 
-	_, err = tx.Exec(ctx, UPDATE_RECIPIENTS_COUNT, countArgs)
+	_, err = tx.Exec(ctx, UpdateRecipientsCount, countArgs)
 
 	if err != nil {
 		tx.Rollback(ctx)
@@ -827,7 +827,7 @@ func (ps *PostgresStorage) CreateNotificationStatusLog(ctx context.Context, noti
 		"errorMessage":   errMsg,
 	}
 
-	_, err = tx.Exec(ctx, INSERT_NOTIFICATION_STATUS_LOG, args)
+	_, err = tx.Exec(ctx, InsertNotificationStatusLog, args)
 
 	if err != nil {
 		tx.Rollback(ctx)
@@ -839,7 +839,7 @@ func (ps *PostgresStorage) CreateNotificationStatusLog(ctx context.Context, noti
 		"id":     notificationId,
 	}
 
-	_, err = tx.Exec(ctx, UPDATE_NOTIFICATION_STATUS, updateArgs)
+	_, err = tx.Exec(ctx, UpdateNotificationStatus, updateArgs)
 
 	if err != nil {
 		tx.Rollback(ctx)
@@ -874,7 +874,7 @@ func (ps *PostgresStorage) CreateUserNotification(ctx context.Context, userId st
 		"readAt":    un.ReadAt,
 	}
 
-	_, err = tx.Exec(ctx, INSERT_USER_NOTIFICATION, args)
+	_, err = tx.Exec(ctx, InsertUserNotifications, args)
 
 	if err != nil {
 		tx.Rollback(ctx)
@@ -901,7 +901,7 @@ func (ps *PostgresStorage) DeleteUserNotification(ctx context.Context, userId st
 		"id": un.Id,
 	}
 
-	_, err = tx.Exec(ctx, DELETE_USER_NOTIFICATION, args)
+	_, err = tx.Exec(ctx, DeleteUserNotification, args)
 
 	if err != nil {
 		tx.Rollback(ctx)

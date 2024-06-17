@@ -31,7 +31,7 @@ type notificationStatusLog struct {
 	Error          *string   `db:"error_message"`
 }
 
-const INSERT_NOTIFICATION = `
+const InsertNotification = `
 INSERT INTO notifications (
 	title,
 	contents,
@@ -54,7 +54,7 @@ INSERT INTO notifications (
 	id;
 `
 
-const INSERT_NOTIFICATION_RECIPIENTS = `
+const InsertNotificationRecipients = `
 INSERT INTO notification_recipients (
 	notification_id,
 	recipient
@@ -64,7 +64,7 @@ INSERT INTO notification_recipients (
 );
 `
 
-const INSERT_CHANNELS = `
+const InsertChannels = `
 INSERT INTO notification_channels (
 	notification_id,
 	channel
@@ -74,7 +74,7 @@ INSERT INTO notification_channels (
 );
 `
 
-const INSERT_NOTIFICATION_STATUS_LOG = `
+const InsertNotificationStatusLog = `
 INSERT INTO notification_status_log (
 	notification_id,
     status_date,
@@ -87,7 +87,7 @@ INSERT INTO notification_status_log (
 	@errorMessage
 );
 `
-const UPDATE_NOTIFICATION_STATUS = `
+const UpdateNotificationStatus = `
 UPDATE
 	notifications
 SET

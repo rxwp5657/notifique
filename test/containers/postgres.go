@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	POSTGRES_DB       = "notifique"
-	POSTGRES_USER     = "postgres"
-	POSTGRES_PASSWORD = "postgres"
+	PostgresDb       = "notifique"
+	PostgresUser     = "postgres"
+	PostgresPassword = "postgres"
 )
 
 type PostgresContainer struct {
@@ -35,9 +35,9 @@ func MakePostgresContainer(ctx context.Context) (*PostgresContainer, error) {
 		Image:      "postgres:16.3",
 		WaitingFor: wait.ForExposedPort(),
 		Env: map[string]string{
-			"POSTGRES_DB":       POSTGRES_DB,
-			"POSTGRES_PASSWORD": POSTGRES_PASSWORD,
-			"POSTGRES_USER":     POSTGRES_USER,
+			"PostgresDb":       PostgresDb,
+			"PostgresPassword": PostgresPassword,
+			"PostgresUser":     PostgresUser,
 		},
 	}
 
@@ -66,11 +66,11 @@ func MakePostgresContainer(ctx context.Context) (*PostgresContainer, error) {
 
 	uri := fmt.Sprintf(
 		uriTemplate,
-		POSTGRES_USER,
-		POSTGRES_PASSWORD,
+		PostgresUser,
+		PostgresPassword,
 		ip,
 		mappedPort.Port(),
-		POSTGRES_DB,
+		PostgresDb,
 	)
 
 	err = p.RunMigrations(uri)

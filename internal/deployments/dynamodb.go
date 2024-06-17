@@ -61,15 +61,15 @@ func createTable(client *dynamodb.Client, tableName string, input *dynamodb.Crea
 
 func createNotificationTable(client *dynamodb.Client) error {
 
-	tableName := sdb.NOTIFICATIONS_TABLE
+	tableName := sdb.NotificationsTable
 
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String(sdb.NOTIFICATION_HASH_KEY),
+			AttributeName: aws.String(sdb.NotificationHashKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String(sdb.NOTIFICATION_HASH_KEY),
+			AttributeName: aws.String(sdb.NotificationHashKey),
 			KeyType:       types.KeyTypeHash,
 		}},
 		TableName: aws.String(tableName),
@@ -84,15 +84,15 @@ func createNotificationTable(client *dynamodb.Client) error {
 
 func createUserConfigTable(client *dynamodb.Client) error {
 
-	tableName := sdb.USER_CONFIG_TABLE
+	tableName := sdb.UserConfigTable
 
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String(sdb.USER_CONFIG_HASH_KEY),
+			AttributeName: aws.String(sdb.UserConfigHashKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String(sdb.USER_CONFIG_HASH_KEY),
+			AttributeName: aws.String(sdb.UserConfigHashKey),
 			KeyType:       types.KeyTypeHash,
 		}},
 		TableName: aws.String(tableName),
@@ -107,33 +107,33 @@ func createUserConfigTable(client *dynamodb.Client) error {
 
 func createUserNotificationTable(client *dynamodb.Client) error {
 
-	tableName := sdb.USER_NOTIFICATIONS_TABLE
+	tableName := sdb.UserNotificationsTable
 
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String(sdb.USER_NOTIFICATIONS_HASH_KEY),
+			AttributeName: aws.String(sdb.UserNotificactionsHashKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}, {
-			AttributeName: aws.String(sdb.USER_NOTIFICATIONS_SORT_KEY),
+			AttributeName: aws.String(sdb.UserNotificationsSortKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}, {
-			AttributeName: aws.String(sdb.USER_NOTIFICATIONS_CREATEDAT_IDX_SORT_KEY),
+			AttributeName: aws.String(sdb.UserNotificationsCreatedAtIdxSortKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String(sdb.USER_NOTIFICATIONS_HASH_KEY),
+			AttributeName: aws.String(sdb.UserNotificactionsHashKey),
 			KeyType:       types.KeyTypeHash,
 		}, {
-			AttributeName: aws.String(sdb.USER_NOTIFICATIONS_SORT_KEY),
+			AttributeName: aws.String(sdb.UserNotificationsSortKey),
 			KeyType:       types.KeyTypeRange,
 		}},
 		LocalSecondaryIndexes: []types.LocalSecondaryIndex{{
-			IndexName: aws.String(sdb.USER_NOTIFICATIONS_CREATEDAT_IDX),
+			IndexName: aws.String(sdb.UserNotificationsCreatedAtIdx),
 			KeySchema: []types.KeySchemaElement{{
-				AttributeName: aws.String(sdb.USER_NOTIFICATIONS_HASH_KEY),
+				AttributeName: aws.String(sdb.UserNotificactionsHashKey),
 				KeyType:       types.KeyTypeHash,
 			}, {
-				AttributeName: aws.String(sdb.USER_NOTIFICATIONS_CREATEDAT_IDX_SORT_KEY),
+				AttributeName: aws.String(sdb.UserNotificationsCreatedAtIdxSortKey),
 				KeyType:       types.KeyTypeRange,
 			}},
 			Projection: &types.Projection{
@@ -152,21 +152,21 @@ func createUserNotificationTable(client *dynamodb.Client) error {
 
 func createDLRecipientsTable(client *dynamodb.Client) error {
 
-	tableName := sdb.DIST_LIST_RECIPIENTS_TABLE
+	tableName := sdb.DistListRecipientsTable
 
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String(sdb.DIST_LIST_RECIPIENT_HASH_KEY),
+			AttributeName: aws.String(sdb.DistListRecipientHashKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}, {
-			AttributeName: aws.String(sdb.DIST_LIST_RECIPIENT_SORT_KEY),
+			AttributeName: aws.String(sdb.DistListRecipientSortKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String(sdb.DIST_LIST_RECIPIENT_HASH_KEY),
+			AttributeName: aws.String(sdb.DistListRecipientHashKey),
 			KeyType:       types.KeyTypeHash,
 		}, {
-			AttributeName: aws.String(sdb.DIST_LIST_RECIPIENT_SORT_KEY),
+			AttributeName: aws.String(sdb.DistListRecipientSortKey),
 			KeyType:       types.KeyTypeRange,
 		}},
 		TableName: aws.String(tableName),
@@ -181,15 +181,15 @@ func createDLRecipientsTable(client *dynamodb.Client) error {
 
 func createDLSummaryTable(client *dynamodb.Client) error {
 
-	tableName := sdb.DIST_LIST_SUMMARY_TABLE
+	tableName := sdb.DistListSummaryTable
 
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String(sdb.DIST_LIST_SUMMARY_HASH_KEY),
+			AttributeName: aws.String(sdb.DistListSummaryHashKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String(sdb.DIST_LIST_SUMMARY_HASH_KEY),
+			AttributeName: aws.String(sdb.DistListSummaryHashKey),
 			KeyType:       types.KeyTypeHash,
 		}},
 		TableName: aws.String(tableName),
@@ -203,21 +203,21 @@ func createDLSummaryTable(client *dynamodb.Client) error {
 }
 
 func createNotificationStatusLogTable(client *dynamodb.Client) error {
-	tableName := sdb.NOTIFICATION_STATUS_LOG_TABLE
+	tableName := sdb.NotificationStatusLogTable
 
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String(sdb.NOTIFICATION_STATUS_LOG_HASH_KEY),
+			AttributeName: aws.String(sdb.NotificationStatusLogHashKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}, {
-			AttributeName: aws.String(sdb.NOTIFICATION_STATUS_LOG_SORT_KEY),
+			AttributeName: aws.String(sdb.NotificationStatusLogKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String(sdb.NOTIFICATION_STATUS_LOG_HASH_KEY),
+			AttributeName: aws.String(sdb.NotificationStatusLogHashKey),
 			KeyType:       types.KeyTypeHash,
 		}, {
-			AttributeName: aws.String(sdb.NOTIFICATION_STATUS_LOG_SORT_KEY),
+			AttributeName: aws.String(sdb.NotificationStatusLogKey),
 			KeyType:       types.KeyTypeRange,
 		}},
 		TableName: aws.String(tableName),

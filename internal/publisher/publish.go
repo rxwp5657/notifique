@@ -12,9 +12,9 @@ import (
 type Priority string
 
 const (
-	LOW    Priority = "LOW"
-	MEDIUM Priority = "MEDIUM"
-	HIGH   Priority = "HIGH"
+	low    Priority = "low"
+	medium Priority = "medium"
+	high   Priority = "high"
 )
 
 type PriorityQueues struct {
@@ -36,11 +36,11 @@ func publishByPriority(ctx context.Context, n c.Notification, s c.NotificationSt
 	var queueUri *string = nil
 
 	switch n.Priority {
-	case string(LOW):
+	case string(low):
 		queueUri = pq.Low
-	case string(MEDIUM):
+	case string(medium):
 		queueUri = pq.Medium
-	case string(HIGH):
+	case string(high):
 		queueUri = pq.High
 	default:
 		return fmt.Errorf("invalid priority")
@@ -60,7 +60,7 @@ func publishByPriority(ctx context.Context, n c.Notification, s c.NotificationSt
 
 	if err != nil {
 		errMsg := err.Error()
-		statuslogErr := s.CreateNotificationStatusLog(ctx, n.Id, c.PUBLISH_FAILED, &errMsg)
+		statuslogErr := s.CreateNotificationStatusLog(ctx, n.Id, c.PublishFailed, &errMsg)
 
 		if statuslogErr != nil {
 			errs := errors.Join(err, statuslogErr)
@@ -70,7 +70,7 @@ func publishByPriority(ctx context.Context, n c.Notification, s c.NotificationSt
 		return fmt.Errorf("failed to publish notification - %w", err)
 	}
 
-	err = s.CreateNotificationStatusLog(ctx, n.Id, c.PUBLISHED, nil)
+	err = s.CreateNotificationStatusLog(ctx, n.Id, c.Published, nil)
 
 	if err != nil {
 		return fmt.Errorf("failed to create notification status log - %w", err)

@@ -8,11 +8,11 @@ import (
 )
 
 const (
-	USER_NOTIFICATIONS_TABLE                  = "UserNotifications"
-	USER_NOTIFICATIONS_CREATEDAT_IDX          = "createdAtIdx"
-	USER_NOTIFICATIONS_HASH_KEY               = "userId"
-	USER_NOTIFICATIONS_SORT_KEY               = "id"
-	USER_NOTIFICATIONS_CREATEDAT_IDX_SORT_KEY = "createdAt"
+	UserNotificationsTable               = "UserNotifications"
+	UserNotificationsCreatedAtIdx        = "createdAtIdx"
+	UserNotificactionsHashKey            = "userId"
+	UserNotificationsSortKey             = "id"
+	UserNotificationsCreatedAtIdxSortKey = "createdAt"
 )
 
 type userNotification struct {

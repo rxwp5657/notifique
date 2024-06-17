@@ -101,7 +101,7 @@ func (s *DynamoDBStorage) getUserConfig(ctx context.Context, userId string) (*us
 
 	resp, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		Key:       key,
-		TableName: aws.String(USER_CONFIG_TABLE),
+		TableName: aws.String(UserConfigTable),
 	})
 
 	if err != nil {
@@ -138,7 +138,7 @@ func (s *DynamoDBStorage) createUserConfig(ctx context.Context, userId string) (
 	}
 
 	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(USER_CONFIG_TABLE),
+		TableName: aws.String(UserConfigTable),
 		Item:      item,
 	})
 
@@ -175,7 +175,7 @@ func (s *DynamoDBStorage) SaveNotification(ctx context.Context, createdBy string
 
 	statusLog := notificationStatusLog{
 		NotificationId: id,
-		Status:         string(c.CREATED),
+		Status:         string(c.Created),
 		StatusDate:     time.Now().Format(time.RFC3339Nano),
 		Error:          nil,
 	}
@@ -189,12 +189,12 @@ func (s *DynamoDBStorage) SaveNotification(ctx context.Context, createdBy string
 	_, err = s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
 		TransactItems: []types.TransactWriteItem{{
 			Put: &types.Put{
-				TableName: aws.String(NOTIFICATIONS_TABLE),
+				TableName: aws.String(NotificationsTable),
 				Item:      item,
 			},
 		}, {
 			Put: &types.Put{
-				TableName: aws.String(NOTIFICATION_STATUS_LOG_TABLE),
+				TableName: aws.String(NotificationStatusLogTable),
 				Item:      statusLogItem,
 			},
 		}},
@@ -204,7 +204,7 @@ func (s *DynamoDBStorage) SaveNotification(ctx context.Context, createdBy string
 		return "", fmt.Errorf("failed to store notification - %w", err)
 	}
 
-	err = s.CreateNotificationStatusLog(ctx, id, c.CREATED, nil)
+	err = s.CreateNotificationStatusLog(ctx, id, c.Created, nil)
 
 	if err != nil {
 		return "", err
@@ -240,7 +240,7 @@ func makePageFilters[T DynamodbPrimaryKey](key T, filters dto.PageFilter) (Dynam
 
 	params := DynamoDBPageParams{}
 
-	params.Limit = aws.Int32(internal.PAGE_SIZE)
+	params.Limit = aws.Int32(internal.PageSize)
 
 	if filters.MaxResults != nil {
 		limit := int32(*filters.MaxResults)
@@ -270,7 +270,7 @@ func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.
 
 	page := dto.Page[dto.UserNotification]{}
 
-	keyExp := expression.Key(USER_NOTIFICATIONS_HASH_KEY).Equal(expression.Value(filters.UserId))
+	keyExp := expression.Key(UserNotificactionsHashKey).Equal(expression.Value(filters.UserId))
 	builder := expression.NewBuilder().WithKeyCondition(keyExp)
 
 	topicsFilter := makeInFilter("topic", filters.Topics)
@@ -292,7 +292,7 @@ func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.
 	}
 
 	queryInput := dynamodb.QueryInput{
-		TableName:                 aws.String(USER_NOTIFICATIONS_TABLE),
+		TableName:                 aws.String(UserNotificationsTable),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
 		KeyConditionExpression:    expr.KeyCondition(),
@@ -300,7 +300,7 @@ func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.
 		ScanIndexForward:          aws.Bool(false),
 		Limit:                     pageParams.Limit,
 		ExclusiveStartKey:         pageParams.ExclusiveStartKey,
-		IndexName:                 aws.String(USER_NOTIFICATIONS_CREATEDAT_IDX),
+		IndexName:                 aws.String(UserNotificationsCreatedAtIdx),
 	}
 
 	response, err := s.client.Query(ctx, &queryInput)
@@ -391,7 +391,7 @@ func (s *DynamoDBStorage) SetReadStatus(ctx context.Context, userId, notificatio
 
 	reatAt := time.Now().Format(time.RFC3339Nano)
 	update := expression.Set(expression.Name("readAt"), expression.Value(reatAt))
-	condEx := expression.AttributeExists(expression.Name(USER_NOTIFICATIONS_HASH_KEY))
+	condEx := expression.AttributeExists(expression.Name(UserNotificactionsHashKey))
 	expr, err := expression.NewBuilder().WithUpdate(update).WithCondition(condEx).Build()
 
 	if err != nil {
@@ -406,7 +406,7 @@ func (s *DynamoDBStorage) SetReadStatus(ctx context.Context, userId, notificatio
 	}
 
 	_, err = s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName:                           aws.String(USER_NOTIFICATIONS_TABLE),
+		TableName:                           aws.String(UserNotificationsTable),
 		Key:                                 key,
 		ExpressionAttributeNames:            expr.Names(),
 		ExpressionAttributeValues:           expr.Values(),
@@ -449,16 +449,16 @@ func (s *DynamoDBStorage) UpdateUserConfig(ctx context.Context, userId string, c
 		}
 	}
 
-	emailFmt := makeKeyFormatter(USER_CONFIG_EMAIL_KEY)
-	smsFmt := makeKeyFormatter(USER_CONFIG_SMS_KEY)
-	inAppFmt := makeKeyFormatter(USER_CONFIG_INAPP_KEY)
+	emailFmt := makeKeyFormatter(UserConfigEmailKey)
+	smsFmt := makeKeyFormatter(UserConfigSmsKey)
+	inAppFmt := makeKeyFormatter(UserConfigInAppKey)
 
-	update := expression.Set(emailFmt(USER_CONFIG_OPT_IN), expression.Value(config.EmailConfig.OptIn))
-	update.Set(emailFmt(USER_CONFIG_SNOOZE_UNTIL), expression.Value(config.EmailConfig.SnoozeUntil))
-	update.Set(smsFmt(USER_CONFIG_OPT_IN), expression.Value(config.SMSConfig.OptIn))
-	update.Set(smsFmt(USER_CONFIG_SNOOZE_UNTIL), expression.Value(config.SMSConfig.SnoozeUntil))
-	update.Set(inAppFmt(USER_CONFIG_OPT_IN), expression.Value(config.InAppConfig.OptIn))
-	update.Set(inAppFmt(USER_CONFIG_SNOOZE_UNTIL), expression.Value(config.InAppConfig.SnoozeUntil))
+	update := expression.Set(emailFmt(UserConfigOptIn), expression.Value(config.EmailConfig.OptIn))
+	update.Set(emailFmt(UserConfigSnoozeUntil), expression.Value(config.EmailConfig.SnoozeUntil))
+	update.Set(smsFmt(UserConfigOptIn), expression.Value(config.SMSConfig.OptIn))
+	update.Set(smsFmt(UserConfigSnoozeUntil), expression.Value(config.SMSConfig.SnoozeUntil))
+	update.Set(inAppFmt(UserConfigOptIn), expression.Value(config.InAppConfig.OptIn))
+	update.Set(inAppFmt(UserConfigSnoozeUntil), expression.Value(config.InAppConfig.SnoozeUntil))
 
 	expr, err := expression.NewBuilder().WithUpdate(update).Build()
 
@@ -474,7 +474,7 @@ func (s *DynamoDBStorage) UpdateUserConfig(ctx context.Context, userId string, c
 	}
 
 	_, err = s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName:                 aws.String(USER_CONFIG_TABLE),
+		TableName:                 aws.String(UserConfigTable),
 		Key:                       key,
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
@@ -509,7 +509,7 @@ func (s *DynamoDBStorage) addRecipients(ctx context.Context, recipients []distLi
 	}
 
 	requestItems := map[string][]types.WriteRequest{
-		DIST_LIST_RECIPIENTS_TABLE: writeReq,
+		DistListRecipientsTable: writeReq,
 	}
 
 	_, err := s.client.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
@@ -533,7 +533,7 @@ func (s *DynamoDBStorage) queryDistListSummary(ctx context.Context, listName str
 
 	resp, err := s.client.GetItem(ctx, &dynamodb.GetItemInput{
 		Key:       key,
-		TableName: aws.String(DIST_LIST_SUMMARY_TABLE),
+		TableName: aws.String(DistListSummaryTable),
 	})
 
 	if err != nil {
@@ -581,7 +581,7 @@ func (s *DynamoDBStorage) deleteSummary(ctx context.Context, listName string) er
 	}
 
 	_, err = s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
-		TableName: aws.String(DIST_LIST_SUMMARY_TABLE),
+		TableName: aws.String(DistListSummaryTable),
 		Key:       key,
 	})
 
@@ -612,7 +612,7 @@ func (s *DynamoDBStorage) CreateDistributionList(ctx context.Context, dlReq dto.
 	}
 
 	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(DIST_LIST_SUMMARY_TABLE),
+		TableName: aws.String(DistListSummaryTable),
 		Item:      marshalled,
 	})
 
@@ -660,7 +660,7 @@ func (s *DynamoDBStorage) GetDistributionLists(ctx context.Context, filters dto.
 	}
 
 	scanInput := dynamodb.ScanInput{
-		TableName:         aws.String(DIST_LIST_SUMMARY_TABLE),
+		TableName:         aws.String(DistListSummaryTable),
 		Limit:             pageParams.Limit,
 		ExclusiveStartKey: pageParams.ExclusiveStartKey,
 	}
@@ -728,7 +728,7 @@ func (s *DynamoDBStorage) deleteRecipients(ctx context.Context, recipients []dis
 	}
 
 	requestItems := map[string][]types.WriteRequest{
-		DIST_LIST_RECIPIENTS_TABLE: deleteReq,
+		DistListRecipientsTable: deleteReq,
 	}
 
 	_, err := s.client.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
@@ -744,7 +744,7 @@ func (s *DynamoDBStorage) deleteRecipients(ctx context.Context, recipients []dis
 
 func (s *DynamoDBStorage) DeleteDistributionList(ctx context.Context, listName string) error {
 
-	keyEx := expression.Key(DIST_LIST_RECIPIENT_HASH_KEY).Equal(expression.Value(listName))
+	keyEx := expression.Key(DistListRecipientHashKey).Equal(expression.Value(listName))
 	expr, err := expression.NewBuilder().WithKeyCondition(keyEx).Build()
 
 	if err != nil {
@@ -752,7 +752,7 @@ func (s *DynamoDBStorage) DeleteDistributionList(ctx context.Context, listName s
 	}
 
 	queryPaginator := dynamodb.NewQueryPaginator(s.client, &dynamodb.QueryInput{
-		TableName:                 aws.String(DIST_LIST_RECIPIENTS_TABLE),
+		TableName:                 aws.String(DistListRecipientsTable),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
 		KeyConditionExpression:    expr.KeyCondition(),
@@ -802,8 +802,8 @@ func (s *DynamoDBStorage) GetRecipients(ctx context.Context, distlistName string
 		return page, internal.DistributionListNotFound{Name: distlistName}
 	}
 
-	keyExp := expression.Key(DIST_LIST_RECIPIENT_HASH_KEY).Equal(expression.Value(distlistName))
-	projExp := expression.NamesList(expression.Name(DIST_LIST_RECIPIENT_SORT_KEY))
+	keyExp := expression.Key(DistListRecipientHashKey).Equal(expression.Value(distlistName))
+	projExp := expression.NamesList(expression.Name(DistListRecipientSortKey))
 
 	builder := expression.NewBuilder()
 	expr, err := builder.WithKeyCondition(keyExp).WithProjection(projExp).Build()
@@ -819,7 +819,7 @@ func (s *DynamoDBStorage) GetRecipients(ctx context.Context, distlistName string
 	}
 
 	queryInput := dynamodb.QueryInput{
-		TableName:                 aws.String(DIST_LIST_RECIPIENTS_TABLE),
+		TableName:                 aws.String(DistListRecipientsTable),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
 		KeyConditionExpression:    expr.KeyCondition(),
@@ -888,7 +888,7 @@ func (s *DynamoDBStorage) getRecipientsInDL(ctx context.Context, listName string
 	}
 
 	scanPaginator := dynamodb.NewScanPaginator(s.client, &dynamodb.ScanInput{
-		TableName:                 aws.String(DIST_LIST_RECIPIENTS_TABLE),
+		TableName:                 aws.String(DistListRecipientsTable),
 		ConsistentRead:            aws.Bool(true),
 		ExpressionAttributeNames:  expr.Names(),
 		ExpressionAttributeValues: expr.Values(),
@@ -932,7 +932,7 @@ func (s *DynamoDBStorage) updateRecipientCount(ctx context.Context, listName str
 	}
 
 	resp, err := s.client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName:                 aws.String(DIST_LIST_SUMMARY_TABLE),
+		TableName:                 aws.String(DistListSummaryTable),
 		Key:                       key,
 		ExpressionAttributeNames:  exp.Names(),
 		ExpressionAttributeValues: exp.Values(),
@@ -1105,7 +1105,7 @@ func (s *DynamoDBStorage) CreateNotificationStatusLog(ctx context.Context, notif
 	}
 
 	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(NOTIFICATION_STATUS_LOG_TABLE),
+		TableName: aws.String(NotificationStatusLogTable),
 		Item:      item,
 	})
 
@@ -1136,7 +1136,7 @@ func (s *DynamoDBStorage) CreateUserNotification(ctx context.Context, userId str
 	}
 
 	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(USER_NOTIFICATIONS_TABLE),
+		TableName: aws.String(UserNotificationsTable),
 		Item:      item,
 	})
 
@@ -1161,7 +1161,7 @@ func (s *DynamoDBStorage) DeleteUserNotification(ctx context.Context, userId str
 	}
 
 	_, err = s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
-		TableName: aws.String(USER_NOTIFICATIONS_TABLE),
+		TableName: aws.String(UserNotificationsTable),
 		Key:       key,
 	})
 
