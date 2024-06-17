@@ -10,7 +10,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-const PROJECT_NAME = "notifique"
+const ProjectName = "notifique"
 
 func RunMigrations(url string) error {
 
@@ -20,12 +20,12 @@ func RunMigrations(url string) error {
 		return fmt.Errorf("failed to get current execution directory - %w", err)
 	}
 
-	for len(wd) != 1 && path.Base(wd) != PROJECT_NAME {
+	for len(wd) != 1 && path.Base(wd) != ProjectName {
 		wd = path.Dir(wd)
 	}
 
 	if len(wd) == 1 {
-		return fmt.Errorf("project root folder '%s' not found", PROJECT_NAME)
+		return fmt.Errorf("project root folder '%s' not found", ProjectName)
 	}
 
 	migrationsPath := fmt.Sprintf("file://%v/migrations", wd)

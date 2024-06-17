@@ -5,22 +5,34 @@ import (
 	"fmt"
 
 	"github.com/docker/go-connections/nat"
-	deployments "github.com/notifique/deployments/sqs"
+	"github.com/notifique/internal/deployments"
 	"github.com/notifique/internal/publisher"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/localstack"
 )
 
-type SQSContainerCleanupFn func() error
-
 type SQSContainer struct {
 	testcontainers.Container
-	URI       string
-	SQSQueues publisher.PriorityQueues
-	CleanupFn SQSContainerCleanupFn
+	URI     string
+	Cleanup func() error
 }
 
-func MakeSQSContainer(ctx context.Context) (*SQSContainer, error) {
+type SQSPriorityContainer struct {
+	Container SQSContainer
+	Queues    publisher.PriorityQueues
+}
+
+func (sc *SQSPriorityContainer) GetSQSClientConfig() publisher.SQSClientConfig {
+	return publisher.SQSClientConfig{
+		BaseEndpoint: &sc.Container.URI,
+	}
+}
+
+func (sc *SQSPriorityContainer) GetPriorityQueues() publisher.PriorityQueues {
+	return sc.Queues
+}
+
+func NewSQSContainer(ctx context.Context) (SQSContainer, error) {
 
 	port := "4566"
 
@@ -33,54 +45,62 @@ func MakeSQSContainer(ctx context.Context) (*SQSContainer, error) {
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create sqs container - %w", err)
+		return SQSContainer{}, fmt.Errorf("failed to create sqs container - %w", err)
 	}
 
 	ip, err := container.Host(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get the sqs host - %w", err)
+		return SQSContainer{}, fmt.Errorf("failed to get the sqs host - %w", err)
 	}
 
 	mappedPort, err := container.MappedPort(ctx, nat.Port(port))
 
 	if err != nil {
-		return nil, err
+		return SQSContainer{}, err
 	}
 
 	uri := fmt.Sprintf("http://%s:%s", ip, mappedPort.Port())
-
-	cfg := publisher.SQSClientConfig{BaseEndpoint: &uri}
-	client, err := publisher.MakeSQSClient(cfg)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create sqs client")
-	}
-
-	low := PRIORITY_QUEUE_LOW_NAME
-	medium := PRIORITY_QUEUE_MEDIUM_NAME
-	high := PRIORITY_QUEUE_HIGH_NAME
-
-	queues := publisher.PriorityQueues{
-		Low:    &low,
-		Medium: &medium,
-		High:   &high,
-	}
-
-	urls, err := deployments.MakePriorityQueues(client, queues)
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to create queues - %w", err)
-	}
 
 	cleanup := func() error { return container.Terminate(ctx) }
 
 	sqsContainer := SQSContainer{
 		Container: container,
 		URI:       uri,
-		SQSQueues: urls,
-		CleanupFn: cleanup,
+		Cleanup:   cleanup,
 	}
 
-	return &sqsContainer, nil
+	return sqsContainer, nil
+}
+
+func NewSQSPriorityContainer(ctx context.Context) (*SQSPriorityContainer, error) {
+	queues := NewPriorityQueueConfig()
+	container, err := NewSQSContainer(ctx)
+
+	if err != nil {
+		return nil, nil
+	}
+
+	pc := SQSPriorityContainer{
+		Container: container,
+		Queues:    queues,
+	}
+
+	deployer, cleanup, err := deployments.NewSQSPriorityDeployer(&pc)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer cleanup()
+
+	deployedQueues, err := deployer.Deploy()
+
+	if err != nil {
+		return nil, err
+	}
+
+	pc.Queues = deployedQueues
+
+	return &pc, nil
 }

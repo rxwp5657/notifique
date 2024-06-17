@@ -11,22 +11,21 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	ddb "github.com/notifique/deployments/dynamodb"
+	ddb "github.com/notifique/internal/deployments"
+	storage "github.com/notifique/internal/storage/dynamodb"
 )
-
-type DynamoCleanup func() error
 
 type DynamoContainer struct {
 	testcontainers.Container
-	URI       string
-	CleanupFn DynamoCleanup
+	URI     string
+	Cleanup func() error
 }
 
 func (ddbc *DynamoContainer) GetURI() string {
 	return ddbc.URI
 }
 
-func MakeDynamoContainer(ctx context.Context) (*DynamoContainer, error) {
+func NewDynamoContainer(ctx context.Context) (*DynamoContainer, error) {
 
 	port := "8000"
 
@@ -79,8 +78,14 @@ func MakeDynamoContainer(ctx context.Context) (*DynamoContainer, error) {
 	dc := DynamoContainer{
 		Container: container,
 		URI:       uri,
-		CleanupFn: cleanup,
+		Cleanup:   cleanup,
 	}
 
 	return &dc, nil
+}
+
+func (dc *DynamoContainer) GetDynamoClientConfig() storage.DynamoClientConfig {
+	return storage.DynamoClientConfig{
+		BaseEndpoint: &dc.URI,
+	}
 }

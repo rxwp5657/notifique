@@ -8,28 +8,26 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	p "github.com/notifique/deployments/postgres"
+	p "github.com/notifique/internal/deployments"
 )
 
 const (
-	POSTGRES_DB       = "notifique"
-	POSTGRES_USER     = "postgres"
-	POSTGRES_PASSWORD = "postgres"
+	PostgresDb       = "notifique"
+	PostgresUser     = "postgres"
+	PostgresPassword = "postgres"
 )
-
-type PostgresContainerCleanupFn func() error
 
 type PostgresContainer struct {
 	testcontainers.Container
-	URI       string
-	CleanupFn PostgresContainerCleanupFn
+	URI     string
+	Cleanup func() error
 }
 
-func (pc *PostgresContainer) GetURI() string {
-	return pc.URI
+func (pc *PostgresContainer) GetPostgresUrl() (string, error) {
+	return pc.URI, nil
 }
 
-func MakePostgresContainer(ctx context.Context) (*PostgresContainer, error) {
+func NewPostgresContainer(ctx context.Context) (*PostgresContainer, error) {
 
 	port := "5432"
 
@@ -37,9 +35,9 @@ func MakePostgresContainer(ctx context.Context) (*PostgresContainer, error) {
 		Image:      "postgres:16.3",
 		WaitingFor: wait.ForExposedPort(),
 		Env: map[string]string{
-			"POSTGRES_DB":       POSTGRES_DB,
-			"POSTGRES_PASSWORD": POSTGRES_PASSWORD,
-			"POSTGRES_USER":     POSTGRES_USER,
+			"PostgresDb":       PostgresDb,
+			"PostgresPassword": PostgresPassword,
+			"PostgresUser":     PostgresUser,
 		},
 	}
 
@@ -68,11 +66,11 @@ func MakePostgresContainer(ctx context.Context) (*PostgresContainer, error) {
 
 	uri := fmt.Sprintf(
 		uriTemplate,
-		POSTGRES_USER,
-		POSTGRES_PASSWORD,
+		PostgresUser,
+		PostgresPassword,
 		ip,
 		mappedPort.Port(),
-		POSTGRES_DB,
+		PostgresDb,
 	)
 
 	err = p.RunMigrations(uri)
@@ -82,5 +80,5 @@ func MakePostgresContainer(ctx context.Context) (*PostgresContainer, error) {
 	}
 
 	cleanup := func() error { return container.Terminate(ctx) }
-	return &PostgresContainer{URI: uri, CleanupFn: cleanup}, nil
+	return &PostgresContainer{URI: uri, Cleanup: cleanup}, nil
 }

@@ -1,5 +1,5 @@
 package internal
 
 const (
-	PAGE_SIZE = 25
+	PageSize = 25
 )

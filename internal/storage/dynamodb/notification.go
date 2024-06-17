@@ -1,11 +1,11 @@
 package storage
 
 const (
-	NOTIFICATIONS_TABLE              = "Notifications"
-	NOTIFICATION_HASH_KEY            = "id"
-	NOTIFICATION_STATUS_LOG_TABLE    = "NotificationStatusLogs"
-	NOTIFICATION_STATUS_LOG_HASH_KEY = "id"
-	NOTIFICATION_STATUS_LOG_SORT_KEY = "statusDate"
+	NotificationsTable           = "Notifications"
+	NotificationHashKey          = "id"
+	NotificationStatusLogTable   = "NotificationStatusLogs"
+	NotificationStatusLogHashKey = "id"
+	NotificationStatusLogKey     = "statusDate"
 )
 
 type notificationStatusLog struct {

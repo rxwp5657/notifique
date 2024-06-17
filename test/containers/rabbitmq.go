@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/docker/go-connections/nat"
-	deployments "github.com/notifique/deployments/rabbitmq"
+	"github.com/notifique/internal/deployments"
 	"github.com/notifique/internal/publisher"
 
 	"github.com/testcontainers/testcontainers-go"
@@ -14,36 +14,25 @@ import (
 
 type RabbitMQContainer struct {
 	testcontainers.Container
-	URI       string
-	Terminate func() error
+	URI     string
+	Cleanup func() error
 }
 
-type RabbitMQDeployer interface {
-	Deploy(container RabbitMQContainer) error
+type RabbitMQPriorityContainer struct {
+	Container RabbitMQContainer
+	Client    publisher.RabbitMQClient
+	Queues    publisher.PriorityQueues
 }
 
-type RabbitMQPriorityDeployer struct {
-	Queues publisher.PriorityQueues
+func (rc *RabbitMQPriorityContainer) GetRabbitMQUrl() (string, error) {
+	return rc.Container.URI, nil
 }
 
-func (d RabbitMQPriorityDeployer) Deploy(container RabbitMQContainer) error {
-
-	client, err := MakeRabbitMQClient(&container)
-
-	if err != nil {
-		return err
-	}
-
-	err = deployments.MakeRabbitMQPriorityQueues(*client, d.Queues)
-
-	if err != nil {
-		return fmt.Errorf("failed to deploy priority queues - %w", err)
-	}
-
-	return nil
+func (rc *RabbitMQPriorityContainer) GetPriorityQueues() publisher.PriorityQueues {
+	return rc.Queues
 }
 
-func MakeRabbitMQContainer(ctx context.Context, deployer RabbitMQDeployer) (*RabbitMQContainer, error) {
+func NewRabbitMQContainer(ctx context.Context) (RabbitMQContainer, error) {
 
 	port := "5672"
 	userName := "admin"
@@ -56,65 +45,57 @@ func MakeRabbitMQContainer(ctx context.Context, deployer RabbitMQDeployer) (*Rab
 	)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create rabbitmq container - %w", err)
+		return RabbitMQContainer{}, fmt.Errorf("failed to create rabbitmq container - %w", err)
 	}
 
 	ip, err := container.Host(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get the rabbitmq host - %w", err)
+		return RabbitMQContainer{}, fmt.Errorf("failed to get the rabbitmq host - %w", err)
 	}
 
 	mappedPort, err := container.MappedPort(ctx, nat.Port(port))
 
 	if err != nil {
-		return nil, err
+		return RabbitMQContainer{}, err
 	}
 
 	uri := fmt.Sprintf("amqp://%s:%s/", ip, mappedPort.Port())
 
-	terminate := func() error { return container.Terminate(ctx) }
+	cleanup := func() error { return container.Terminate(ctx) }
 
 	rabbitmqContainer := RabbitMQContainer{
 		Container: container,
 		URI:       uri,
-		Terminate: terminate,
+		Cleanup:   cleanup,
 	}
 
-	err = deployer.Deploy(rabbitmqContainer)
+	return rabbitmqContainer, nil
+}
+
+func NewRabbitMQPriorityContainer(ctx context.Context) (*RabbitMQPriorityContainer, error) {
+
+	queues := NewPriorityQueueConfig()
+	container, err := NewRabbitMQContainer(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to deploy queues - %w", err)
+		return nil, nil
 	}
 
-	return &rabbitmqContainer, nil
-}
+	pc := RabbitMQPriorityContainer{
+		Container: container,
+		Queues:    queues,
+	}
 
-func MakeRabbitMQPriorityDeployer() *RabbitMQPriorityDeployer {
-	deployer := RabbitMQPriorityDeployer{Queues: MakePriorityQueueConfig()}
-	return &deployer
-}
-
-func MakeRabbitMQClient(container *RabbitMQContainer) (*publisher.RabbitMQClient, error) {
-
-	url := publisher.RabbitMQURL(container.URI)
-	client, err := publisher.MakeRabbitMQClient(url)
+	deployer, cleanup, err := deployments.NewRabbitMQPriorityDeployer(&pc)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create rabbitmq client - %w", err)
+		return nil, fmt.Errorf("failed to make rabbitmq deployer - %w", err)
 	}
 
-	return client, err
-}
+	defer cleanup()
 
-func MakeRabbitMQPriorityPub(client *publisher.RabbitMQClient, deployer *RabbitMQPriorityDeployer) (*publisher.RabbitMQPriorityPublisher, error) {
+	deployer.Deploy()
 
-	cfg := publisher.RabbitMQPriorityPublisherConfig{
-		Publisher: client,
-		Queues:    deployer.Queues,
-	}
-
-	pub := publisher.MakeRabbitMQPriorityPub(cfg)
-
-	return pub, nil
+	return &pc, nil
 }

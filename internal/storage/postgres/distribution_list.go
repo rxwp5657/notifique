@@ -18,7 +18,7 @@ type distributionListKey struct {
 	Name string `json:"name"`
 }
 
-const INSERT_DISTRIBUTION_LIST = `
+const InsertDistributionList = `
 INSERT INTO distribution_lists (
 	"name",
 	num_recipients
@@ -28,7 +28,7 @@ INSERT INTO distribution_lists (
 );
 `
 
-const INSERT_DISTRIBUTION_LIST_RECIPIENT = `
+const InsertDistributionListRecipient = `
 INSERT INTO distribution_list_recipients(
 	"name",
 	recipient
@@ -40,7 +40,7 @@ INSERT INTO distribution_list_recipients(
   DO NOTHING;
 `
 
-const GET_DISTRIBUTION_LIST = `
+const GetDistributionList = `
 SELECT
 	"name",
 	COUNT(*) AS num_recipients
@@ -52,7 +52,7 @@ GROUP BY
 	"name";
 `
 
-const GET_DISTRIBUTION_LISTS = `
+const GetDistributionLists = `
 SELECT
 	*
 FROM
@@ -64,21 +64,21 @@ LIMIT
 	@limit;
 `
 
-const DELETE_DISTRIBUTION_LIST = `
+const DeleteDistributionList = `
 DELETE FROM
 	distribution_lists
 WHERE
 	"name" = @name;
 `
 
-const DELETE_ALL_RECIPIENTS_DISTRIBUTION_LIST = `
+const DeleteAllRecipientsOfDistributionList = `
 DELETE FROM
 	distribution_list_recipients
 WHERE
 	"name" = @name;
 `
 
-const DELETE_DISTRIBUTION_LIST_RECIPIENTS = `
+const DeleteDistributionListRecipients = `
 DELETE FROM
 	distribution_list_recipients
 WHERE
@@ -86,7 +86,7 @@ WHERE
 	recipient = ANY (@recipients);
 `
 
-const GET_DISTRIBUTION_LIST_RECIPIENTS = `
+const GetDistributionListRecipients = `
 SELECT
 	recipient
 FROM
@@ -99,7 +99,7 @@ LIMIT
 	@limit;
 `
 
-const UPDATE_RECIPIENTS_COUNT = `
+const UpdateRecipientsCount = `
 UPDATE
 	distribution_lists
 SET

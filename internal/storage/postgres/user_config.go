@@ -44,7 +44,7 @@ func (cf *userConfig) toDTO() dto.UserConfig {
 	}
 }
 
-const GET_USER_CONFIG = `
+const GetUserConfig = `
 SELECT
 	email_opt_in,
 	email_snooze_until,
@@ -60,7 +60,7 @@ WHERE
 	user_id = @userId;
 `
 
-const INSERT_USER_CONFIG = `
+const InsertUserConfig = `
 INSERT INTO user_config (
 	user_id,
 	email_opt_in,
@@ -84,7 +84,7 @@ INSERT INTO user_config (
 );
 `
 
-const UPSERT_USER_CONFIG = `
+const UpsertUserConfig = `
 INSERT INTO user_config (
 	user_id,
 	email_opt_in,

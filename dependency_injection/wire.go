@@ -11,34 +11,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
-
 	"github.com/notifique/controllers"
-	rabbitdeploy "github.com/notifique/deployments/rabbitmq"
-	sqsdeploy "github.com/notifique/deployments/sqs"
-	"github.com/notifique/internal/publisher"
+	"github.com/notifique/routes"
+
+	cfg "github.com/notifique/internal/config"
+	deployments "github.com/notifique/internal/deployments"
 	pub "github.com/notifique/internal/publisher"
 	ddb "github.com/notifique/internal/storage/dynamodb"
 	pg "github.com/notifique/internal/storage/postgres"
-	"github.com/notifique/routes"
 	c "github.com/notifique/test/containers"
-)
-
-const (
-	SQS_BASE_ENDPOINT              = "SQS_BASE_ENDPOINT"
-	SQS_REGION                     = "SQS_REGION"
-	DYNAMO_BASE_ENDPOINT           = "DYNAMO_BASE_ENDPOINT"
-	DYNAMO_REGION                  = "DYNAMO_REGION"
-	SQS_PRIORITY_LOW_NAME          = "SQS_PRIORITY_LOW_NAME"
-	SQS_PRIORITY_MEDIUM_NAME       = "SQS_PRIORITY_MEDIUM_NAME"
-	SQS_PRIORITY_HIGH_NAME         = "SQS_PRIORITY_HIGH_NAME"
-	SQS_PRIORITY_LOW_URL           = "SQS_LOW_URL"
-	SQS_PRIORITY_MEDIUM_URL        = "SQS_MEDIUM_URL"
-	SQS_PRIORITY_HIGH_URL          = "SQS_HIGH_URL"
-	RABBITMQ_URL                   = "RABBITMQ_URL"
-	RABBITMQ_PRIORITY_LOW_QUEUE    = "RABBITMQ_PRIORITY_LOW_QUEUE"
-	RABBITMQ_PRIORITY_MEDIUM_QUEUE = "RABBITMQ_PRIORITY_MEDIUM_QUEUE"
-	RABBITMQ_PRIORITY_HIGH_QUEUE   = "RABBITMQ_PRIORITY_HIGH_QUEUE"
-	POSTGRES_URL                   = "POSTGRES_URL"
 )
 
 type Storage interface {
@@ -47,214 +28,160 @@ type Storage interface {
 	controllers.DistributionListStorage
 }
 
-type ConfigLoader interface {
-	GetConfigValue(key string) (string, bool)
-}
-
-var DynamoSet = wire.NewSet(
-	ddb.MakeDynamoDBClient,
-	ddb.MakeDynamoDBStorage,
-	wire.Bind(new(ddb.DynamoDBAPI), new(*dynamodb.Client)),
-	wire.Bind(new(Storage), new(*ddb.DynamoDBStorage)),
-)
-
-var PostgresSet = wire.NewSet(
-	pg.MakePostgresStorage,
-	wire.Bind(new(Storage), new(*pg.PostgresStorage)),
-)
-
-var SQSSet = wire.NewSet(
-	pub.MakeSQSClient,
-	pub.MakeSQSPublisher,
-	wire.Bind(new(pub.SQSAPI), new(*sqs.Client)),
-	wire.Bind(new(controllers.NotificationPublisher), new(*pub.SQSPublisher)),
-)
-
-var PostgresContainerSet = wire.NewSet(
-	c.MakePostgresContainer,
-	MakePostgresUrlFromContainer,
-)
-
-var SQSContainerSet = wire.NewSet(
-	c.MakeSQSContainer,
-	MakeSQSConfigFromContainer,
-)
-
-var RabbitMQPrioritySet = wire.NewSet(
-	GetRabbitMQUrl,
-	GetRabbitMQQueues,
-	pub.MakeRabbitMQClient,
-	MakeRabbitMKPriorityConfig,
-	pub.MakeRabbitMQPriorityPub,
-	wire.Bind(new(controllers.NotificationPublisher), new(*pub.RabbitMQPriorityPublisher)),
-)
-
-var DynamoContainerSet = wire.NewSet(
-	c.MakeDynamoContainer,
-	MakeDynamoConfigFromContainer,
-)
-
-var RabbitMQPriorityContainerSet = wire.NewSet(
-	c.MakeRabbitMQPriorityDeployer,
-	c.MakeRabbitMQContainer,
-	c.MakeRabbitMQClient,
-	c.MakeRabbitMQPriorityPub,
-	wire.Bind(new(c.RabbitMQDeployer), new(*c.RabbitMQPriorityDeployer)),
-	wire.Bind(new(controllers.NotificationPublisher), new(*pub.RabbitMQPriorityPublisher)),
-)
-
-type PostgresSQSIntegrationTest struct {
+type PostgresPrioritySQSIntegrationTest struct {
 	PostgresContainer *c.PostgresContainer
-	SQSContainer      *c.SQSContainer
+	SQSContainer      *c.SQSPriorityContainer
 	Storage           *pg.PostgresStorage
 	Publisher         *pub.SQSPublisher
 	Engine            *gin.Engine
 }
 
-func (app *PostgresSQSIntegrationTest) Cleanup() error {
-	if err := app.PostgresContainer.CleanupFn(); err != nil {
-		return fmt.Errorf("failed to cleanup postgres container - %w", err)
-	}
-
-	if err := app.SQSContainer.CleanupFn(); err != nil {
-		return fmt.Errorf("failed to terminate sqs container - %w", err)
-	}
-
-	return nil
-}
-
-type DynamoSQSIntegrationTest struct {
+type DynamoPrioritySQSIntegrationTest struct {
 	DynamoContainer *c.DynamoContainer
-	SQSContainer    *c.SQSContainer
+	SQSContainer    *c.SQSPriorityContainer
 	Storage         *ddb.DynamoDBStorage
 	Publisher       *pub.SQSPublisher
 	Engine          *gin.Engine
 }
 
-func (app *DynamoSQSIntegrationTest) Cleanup() error {
-	if err := app.DynamoContainer.CleanupFn(); err != nil {
-		return fmt.Errorf("failed to cleanup dynamo container - %w", err)
-	}
-
-	if err := app.SQSContainer.CleanupFn(); err != nil {
-		return fmt.Errorf("failed to terminate sqs container - %w", err)
-	}
-
-	return nil
-}
-
-type PostgresRabbitMQPriorityIntegrationTest struct {
+type PostgresPriorityRabbitMQIntegrationTest struct {
 	PostgresContainer *c.PostgresContainer
-	RabbitMQContainer *c.RabbitMQContainer
+	RabbitMQContainer *c.RabbitMQPriorityContainer
 	RabbitMQClient    *pub.RabbitMQClient
-	RabbitMQPubliser  *pub.RabbitMQPriorityPublisher
 	Storage           *pg.PostgresStorage
+	Publisher         *pub.RabbitMQPriorityPublisher
 	Engine            *gin.Engine
 }
 
-func (app *PostgresRabbitMQPriorityIntegrationTest) Cleanup() error {
-	if err := app.PostgresContainer.CleanupFn(); err != nil {
-		return fmt.Errorf("failed to terminate postgres container - %w", err)
+type DynamoPriorityRabbitMQIntegrationTest struct {
+	DynamoContainer   *c.DynamoContainer
+	RabbitMQContainer *c.RabbitMQPriorityContainer
+	RabbitMQClient    *pub.RabbitMQClient
+	Storage           *ddb.DynamoDBStorage
+	Publisher         *pub.RabbitMQPriorityPublisher
+	Engine            *gin.Engine
+}
+
+func (it *PostgresPrioritySQSIntegrationTest) Cleanup() error {
+
+	if err := it.PostgresContainer.Cleanup(); err != nil {
+		return fmt.Errorf("failed to cleanup postgres container - %w", err)
 	}
 
-	if err := app.RabbitMQClient.Close(); err != nil {
-		return fmt.Errorf("failed to terminate rabbitmq client - %w", err)
-	}
-
-	if err := app.RabbitMQContainer.Terminate(); err != nil {
-		return fmt.Errorf("failed to terminate rabbitmq container - %w", err)
+	if err := it.SQSContainer.Container.Cleanup(); err != nil {
+		return fmt.Errorf("failed to cleanup sqs container - %w", err)
 	}
 
 	return nil
 }
 
-type SQSPriorityDeployment struct {
-	Client *sqs.Client
-	Deploy func() (publisher.PriorityQueues, error)
-}
+func (it *DynamoPrioritySQSIntegrationTest) Cleanup() error {
 
-type RabbitMQPriorityDeployment struct {
-	Client *pub.RabbitMQClient
-	Deploy func() error
-}
-
-func MakePostgresUrlFromContainer(container *c.PostgresContainer) (pg.PostgresURL, error) {
-
-	if container == nil {
-		return "", fmt.Errorf("postgres container is null")
+	if err := it.DynamoContainer.Cleanup(); err != nil {
+		return fmt.Errorf("failed to cleanup dynamo container - %w", err)
 	}
 
-	return (pg.PostgresURL)(container.URI), nil
+	if err := it.SQSContainer.Container.Cleanup(); err != nil {
+		return fmt.Errorf("failed to cleanup sqs container - %w", err)
+	}
+
+	return nil
 }
 
-func MakeSQSConfigFromContainer(container *c.SQSContainer) (cfg pub.SQSConfig, err error) {
+func (it *PostgresPriorityRabbitMQIntegrationTest) Cleanup() error {
 
-	if container == nil {
-		return cfg, fmt.Errorf("sqs container is null")
+	if err := it.PostgresContainer.Cleanup(); err != nil {
+		return fmt.Errorf("failed to cleanup postgres container - %w", err)
 	}
 
-	clientCfg := pub.SQSClientConfig{BaseEndpoint: &container.URI}
-	client, err := pub.MakeSQSClient(clientCfg)
-
-	if err != nil {
-		return cfg, fmt.Errorf("failed to create client - %w", err)
+	if err := it.RabbitMQClient.Close(); err != nil {
+		return fmt.Errorf("failed to close rabbitmq connection - %w", err)
 	}
 
-	cfg.Client = client
-	cfg.Queues = container.SQSQueues
+	if err := it.RabbitMQContainer.Container.Cleanup(); err != nil {
+		return fmt.Errorf("failed to cleanup rabbitmq container - %w", err)
+	}
 
-	return
+	return nil
 }
 
-func MakeDynamoConfigFromContainer(container *c.DynamoContainer) (cfg ddb.DynamoClientConfig, err error) {
+func (it *DynamoPriorityRabbitMQIntegrationTest) Cleanup() error {
 
-	if container == nil {
-		return cfg, fmt.Errorf("sqs container is null")
+	if err := it.DynamoContainer.Cleanup(); err != nil {
+		return fmt.Errorf("failed to cleanup dynamo container - %w", err)
 	}
 
-	cfg.BaseEndpoint = &container.URI
+	if err := it.RabbitMQClient.Close(); err != nil {
+		return fmt.Errorf("failed to close rabbitmq connection - %w", err)
+	}
 
-	return
+	if err := it.RabbitMQContainer.Container.Cleanup(); err != nil {
+		return fmt.Errorf("failed to cleanup rabbitmq container - %w", err)
+	}
+
+	return nil
 }
 
-func MakeSQSClient(cfg ConfigLoader) (*sqs.Client, error) {
-	clientCfg := pub.SQSClientConfig{}
+var DynamoSet = wire.NewSet(
+	ddb.NewDynamoDBClient,
+	ddb.NewDynamoDBStorage,
+	wire.Bind(new(ddb.DynamoDBAPI), new(*dynamodb.Client)),
+	wire.Bind(new(Storage), new(*ddb.DynamoDBStorage)),
+)
 
-	if baseEndpoint, ok := cfg.GetConfigValue(SQS_BASE_ENDPOINT); ok {
-		clientCfg.BaseEndpoint = &baseEndpoint
-	}
+var PostgresSet = wire.NewSet(
+	pg.NewPostgresStorage,
+	wire.Bind(new(Storage), new(*pg.PostgresStorage)),
+)
 
-	if region, ok := cfg.GetConfigValue(SQS_REGION); ok {
-		clientCfg.Region = &region
-	}
+var SQSPrioritySet = wire.NewSet(
+	pub.NewSQSClient,
+	pub.NewSQSPublisher,
+	wire.Bind(new(pub.SQSAPI), new(*sqs.Client)),
+	wire.Bind(new(controllers.NotificationPublisher), new(*pub.SQSPublisher)),
+)
 
-	return pub.MakeSQSClient(clientCfg)
-}
+var RabbitMQPrioritySet = wire.NewSet(
+	pub.NewRabbitMQClient,
+	pub.NewRabbitMQPriorityPub,
+	wire.Bind(new(pub.RabbitMQAPI), new(*pub.RabbitMQClient)),
+	wire.Bind(new(controllers.NotificationPublisher), new(*pub.RabbitMQPriorityPublisher)),
+)
 
-func MakeSQSConfig(cfg ConfigLoader) (sqsCfg pub.SQSConfig, err error) {
+var PostgresContainerSet = wire.NewSet(
+	c.NewPostgresContainer,
+	wire.Bind(new(pg.PostgresConfigurator), new(*c.PostgresContainer)),
+)
 
-	client, err := MakeSQSClient(cfg)
+var SQSPriorityContainerSet = wire.NewSet(
+	c.NewSQSPriorityContainer,
+	wire.Bind(new(pub.SQSConfigurator), new(*c.SQSPriorityContainer)),
+	wire.Bind(new(pub.PriorityQueueConfigurator), new(*c.SQSPriorityContainer)),
+)
 
-	if err != nil {
-		return sqsCfg, err
-	}
+var RabbitMQPriorityContainerSet = wire.NewSet(
+	c.NewRabbitMQPriorityContainer,
+	wire.Bind(new(pub.RabbitMQConfigurator), new(*c.RabbitMQPriorityContainer)),
+	wire.Bind(new(pub.PriorityQueueConfigurator), new(*c.RabbitMQPriorityContainer)),
+)
 
-	queues := GetSQSPriorityQueueUrls(cfg)
+var DynamoContainerSet = wire.NewSet(
+	c.NewDynamoContainer,
+	wire.Bind(new(ddb.DynamoConfigurator), new(*c.DynamoContainer)),
+)
 
-	sqsCfg.Client = client
-	sqsCfg.Queues = queues
+var EnvConfigSet = wire.NewSet(
+	cfg.NewEnvConfig,
+	wire.Bind(new(pg.PostgresConfigurator), new(*cfg.EnvConfig)),
+	wire.Bind(new(ddb.DynamoConfigurator), new(*cfg.EnvConfig)),
+	wire.Bind(new(pub.PriorityQueueConfigurator), new(*cfg.EnvConfig)),
+	wire.Bind(new(pub.SQSConfigurator), new(*cfg.EnvConfig)),
+	wire.Bind(new(pub.RabbitMQConfigurator), new(*cfg.EnvConfig)),
+	wire.Bind(new(pub.RabbitMQPriorityConfigurator), new(*cfg.EnvConfig)),
+	wire.Bind(new(pub.SQSPriorityConfigurator), new(*cfg.EnvConfig)),
+)
 
-	return
-}
-
-func MakeRabbitMKPriorityConfig(client *pub.RabbitMQClient, queues pub.PriorityQueues) pub.RabbitMQPriorityPublisherConfig {
-	return pub.RabbitMQPriorityPublisherConfig{
-		Publisher: client,
-		Queues:    queues,
-	}
-}
-
-func MakeEngine(storage Storage, pub controllers.NotificationPublisher) *gin.Engine {
+func NewEngine(storage Storage, pub controllers.NotificationPublisher) *gin.Engine {
 
 	r := gin.Default()
 
@@ -265,225 +192,126 @@ func MakeEngine(storage Storage, pub controllers.NotificationPublisher) *gin.Eng
 	return r
 }
 
-func GetSQSPriorityQueueNames(cfg ConfigLoader) (queues pub.PriorityQueues) {
-
-	if low, ok := cfg.GetConfigValue(SQS_PRIORITY_LOW_NAME); ok {
-		queues.Low = &low
-	}
-
-	if medium, ok := cfg.GetConfigValue(SQS_PRIORITY_MEDIUM_NAME); ok {
-		queues.Medium = &medium
-	}
-
-	if high, ok := cfg.GetConfigValue(SQS_PRIORITY_HIGH_NAME); ok {
-		queues.High = &high
-	}
-
-	return
-}
-
-func GetSQSPriorityQueueUrls(cfg ConfigLoader) (queues pub.PriorityQueues) {
-
-	if low, ok := cfg.GetConfigValue(SQS_PRIORITY_LOW_URL); ok {
-		queues.Low = &low
-	}
-
-	if medium, ok := cfg.GetConfigValue(SQS_PRIORITY_MEDIUM_URL); ok {
-		queues.Medium = &medium
-	}
-
-	if high, ok := cfg.GetConfigValue(SQS_PRIORITY_HIGH_URL); ok {
-		queues.High = &high
-	}
-
-	return
-}
-
-func GetRabbitMQUrl(cfg ConfigLoader) (pub.RabbitMQURL, error) {
-
-	url, ok := cfg.GetConfigValue(RABBITMQ_URL)
-
-	if !ok {
-		return "", fmt.Errorf("rabbitmq url %s not found", RABBITMQ_URL)
-	}
-
-	return pub.RabbitMQURL(url), nil
-}
-
-func GetRabbitMQQueues(cfg ConfigLoader) (queues pub.PriorityQueues) {
-
-	if low, ok := cfg.GetConfigValue(RABBITMQ_PRIORITY_LOW_QUEUE); ok {
-		queues.Low = &low
-	}
-
-	if medium, ok := cfg.GetConfigValue(RABBITMQ_PRIORITY_MEDIUM_QUEUE); ok {
-		queues.Medium = &medium
-	}
-
-	if high, ok := cfg.GetConfigValue(RABBITMQ_PRIORITY_HIGH_QUEUE); ok {
-		queues.High = &high
-	}
-
-	return
-}
-
-func MakeSQSPriorityQueueDeployment(client *sqs.Client, queues pub.PriorityQueues) *SQSPriorityDeployment {
-
-	deploy := func() (publisher.PriorityQueues, error) {
-		return sqsdeploy.MakePriorityQueues(client, queues)
-	}
-
-	return &SQSPriorityDeployment{
-		Client: client,
-		Deploy: deploy,
-	}
-}
-
-func MakeRabbitMQDeployment(client *pub.RabbitMQClient, queues pub.PriorityQueues) *RabbitMQPriorityDeployment {
-
-	deploy := func() error {
-		return rabbitdeploy.MakeRabbitMQPriorityQueues(*client, queues)
-	}
-
-	return &RabbitMQPriorityDeployment{
-		Client: client,
-		Deploy: deploy,
-	}
-}
-
-func GetPostgresUrl(cfg ConfigLoader) (pg.PostgresURL, error) {
-	url, ok := cfg.GetConfigValue(POSTGRES_URL)
-
-	if !ok {
-		return "", fmt.Errorf("%s is not set", POSTGRES_URL)
-	}
-
-	return pg.PostgresURL(url), nil
-}
-
-func MakeDynamoClientConfig(cfg ConfigLoader) (dynamoCfg ddb.DynamoClientConfig) {
-
-	if baseEndpoint, ok := cfg.GetConfigValue(DYNAMO_BASE_ENDPOINT); ok {
-		dynamoCfg.BaseEndpoint = &baseEndpoint
-	}
-
-	if region, ok := cfg.GetConfigValue(DYNAMO_REGION); ok {
-		dynamoCfg.Region = &region
-	}
-
-	return
-}
-
-func InjectDynamoSQSEngine(cfg ConfigLoader) (*gin.Engine, error) {
+func InjectPgPrioritySQS(envfile string) (*gin.Engine, error) {
 
 	wire.Build(
-		MakeSQSConfig,
-		MakeDynamoClientConfig,
-		DynamoSet,
-		SQSSet,
-		MakeEngine,
-	)
-
-	return nil, nil
-}
-
-func InjectPostgresSQSEngine(cfg ConfigLoader) (*gin.Engine, error) {
-
-	wire.Build(
-		MakeSQSConfig,
-		GetPostgresUrl,
+		EnvConfigSet,
 		PostgresSet,
-		SQSSet,
-		MakeEngine,
+		SQSPrioritySet,
+		NewEngine,
 	)
 
 	return nil, nil
 }
 
-func InjectDynamoRabbitMQPriorityQueueEngine(cfg ConfigLoader) (*gin.Engine, error) {
+func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, error) {
 
 	wire.Build(
-		MakeDynamoClientConfig,
-		DynamoSet,
-		RabbitMQPrioritySet,
-		MakeEngine,
-	)
-
-	return nil, nil
-}
-
-func InjectPostgresRabbitMQPriorityQueueEngine(cfg ConfigLoader) (*gin.Engine, error) {
-
-	wire.Build(
-		GetPostgresUrl,
+		EnvConfigSet,
 		PostgresSet,
 		RabbitMQPrioritySet,
-		MakeEngine,
+		NewEngine,
 	)
 
 	return nil, nil
 }
 
-func InjectPostgresSQSContainerTesting(ctx context.Context) (*PostgresSQSIntegrationTest, error) {
+func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
+
+	wire.Build(
+		EnvConfigSet,
+		DynamoSet,
+		SQSPrioritySet,
+		NewEngine,
+	)
+
+	return nil, nil
+}
+
+func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, error) {
+
+	wire.Build(
+		EnvConfigSet,
+		DynamoSet,
+		RabbitMQPrioritySet,
+		NewEngine,
+	)
+
+	return nil, nil
+}
+
+func InjectPgPrioritySQSIntegrationTest(ctx context.Context) (*PostgresPrioritySQSIntegrationTest, error) {
 
 	wire.Build(
 		PostgresContainerSet,
-		SQSContainerSet,
+		SQSPriorityContainerSet,
 		PostgresSet,
-		SQSSet,
-		MakeEngine,
-		wire.Struct(new(PostgresSQSIntegrationTest), "*"),
+		SQSPrioritySet,
+		NewEngine,
+		wire.Struct(new(PostgresPrioritySQSIntegrationTest), "*"),
 	)
 
 	return nil, nil
 }
 
-func InjectDynamoSQSContainerTesting(ctx context.Context) (*DynamoSQSIntegrationTest, error) {
-
-	wire.Build(
-		DynamoContainerSet,
-		SQSContainerSet,
-		DynamoSet,
-		SQSSet,
-		MakeEngine,
-		wire.Struct(new(DynamoSQSIntegrationTest), "*"),
-	)
-
-	return nil, nil
-}
-
-func InjectPostgresRabbitMQPriorityContainerTesting(ctx context.Context) (*PostgresRabbitMQPriorityIntegrationTest, error) {
+func InjectPgPriorityRabbitMQIntegrationTest(ctx context.Context) (*PostgresPriorityRabbitMQIntegrationTest, error) {
 
 	wire.Build(
 		PostgresContainerSet,
 		RabbitMQPriorityContainerSet,
 		PostgresSet,
-		MakeEngine,
-		wire.Struct(new(PostgresRabbitMQPriorityIntegrationTest), "*"),
+		RabbitMQPrioritySet,
+		NewEngine,
+		wire.Struct(new(PostgresPriorityRabbitMQIntegrationTest), "*"),
 	)
 
 	return nil, nil
 }
 
-func InjectSQSPriorityQueueDeployment(cfg ConfigLoader) (*SQSPriorityDeployment, error) {
+func InjectDynamoPrioritySQSIntegrationTest(ctx context.Context) (*DynamoPrioritySQSIntegrationTest, error) {
 
 	wire.Build(
-		MakeSQSClient,
-		GetSQSPriorityQueueNames,
-		MakeSQSPriorityQueueDeployment,
+		DynamoContainerSet,
+		SQSPriorityContainerSet,
+		DynamoSet,
+		SQSPrioritySet,
+		NewEngine,
+		wire.Struct(new(DynamoPrioritySQSIntegrationTest), "*"),
 	)
 
 	return nil, nil
 }
 
-func InjectRabbitMQPriorityQueueDeployment(cfg ConfigLoader) (*RabbitMQPriorityDeployment, error) {
+func InjectDynamoPriorityRabbitMQIntegrationTest(ctx context.Context) (*DynamoPriorityRabbitMQIntegrationTest, error) {
 
 	wire.Build(
-		GetRabbitMQUrl,
-		GetRabbitMQQueues,
-		pub.MakeRabbitMQClient,
-		MakeRabbitMQDeployment,
+		DynamoContainerSet,
+		RabbitMQPriorityContainerSet,
+		DynamoSet,
+		RabbitMQPrioritySet,
+		NewEngine,
+		wire.Struct(new(DynamoPriorityRabbitMQIntegrationTest), "*"),
 	)
 
 	return nil, nil
+}
+
+func InjectRabbitMQPriorityDeployer(envfile string) (*deployments.RabbitMQPriorityDeployer, func(), error) {
+
+	wire.Build(
+		EnvConfigSet,
+		deployments.NewRabbitMQPriorityDeployer,
+	)
+
+	return nil, nil, nil
+}
+
+func InjectSQSPriorityDeployer(envfile string) (*deployments.SQSPriorityDeployer, func(), error) {
+
+	wire.Build(
+		EnvConfigSet,
+		deployments.NewSQSPriorityDeployer,
+	)
+
+	return nil, nil, nil
 }

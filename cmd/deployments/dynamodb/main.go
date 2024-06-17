@@ -3,29 +3,20 @@ package main
 import (
 	"log"
 
-	di "github.com/notifique/dependency_injection"
-	ddb "github.com/notifique/deployments/dynamodb"
 	cfg "github.com/notifique/internal/config"
+	ddb "github.com/notifique/internal/deployments"
 	storage "github.com/notifique/internal/storage/dynamodb"
 )
 
 func main() {
 
-	loader, err := cfg.MakeEnvConfig(".env")
+	configurator, err := cfg.NewEnvConfig(".env")
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	var url *string = nil
-
-	if be, ok := loader.GetConfigValue(di.DYNAMO_BASE_ENDPOINT); ok {
-		url = &be
-	}
-
-	cfg := storage.DynamoClientConfig{BaseEndpoint: url}
-
-	client, err := storage.MakeDynamoDBClient(cfg)
+	client, err := storage.NewDynamoDBClient(configurator)
 
 	if err != nil {
 		log.Fatalf("failed to create dynamo client - %v", err)

@@ -30,20 +30,24 @@ type RabbitMQPriorityPublisher struct {
 	queues    PriorityQueues
 }
 
-type RabbitMQPriorityPublisherConfig struct {
-	Publisher RabbitMQAPI
-	Queues    PriorityQueues
+type RabbitMQConfigurator interface {
+	GetRabbitMQUrl() (string, error)
 }
 
-func (p *RabbitMQPriorityPublisher) Publish(ctx context.Context, notification c.Notification, storage c.NotificationStorage) error {
-	return publishByPriority(ctx, notification, storage, &p.publisher, p.queues)
+type RabbitMQPriorityConfigurator interface {
+	RabbitMQConfigurator
+	PriorityQueueConfigurator
 }
 
-func (p *RabbitMQPublisher) PublishMsg(ctx context.Context, queue string, message []byte) error {
+func (p *RabbitMQPriorityPublisher) Publish(ctx context.Context, n c.Notification, s c.NotificationStorage) error {
+	return publishByPriority(ctx, n, s, &p.publisher, p.queues)
+}
+
+func (p *RabbitMQPublisher) PublishMsg(ctx context.Context, queueName string, message []byte) error {
 	return p.ch.PublishWithContext(
 		ctx,
 		"",
-		queue,
+		queueName,
 		false,
 		false,
 		amqp.Publishing{
@@ -54,7 +58,13 @@ func (p *RabbitMQPublisher) PublishMsg(ctx context.Context, queue string, messag
 	)
 }
 
-func MakeRabbitMQClient(url RabbitMQURL) (*RabbitMQClient, error) {
+func NewRabbitMQClient(c RabbitMQConfigurator) (*RabbitMQClient, error) {
+
+	url, err := c.GetRabbitMQUrl()
+
+	if err != nil {
+		return nil, err
+	}
 
 	conn, err := amqp.Dial(string(url))
 
@@ -86,9 +96,14 @@ func MakeRabbitMQClient(url RabbitMQURL) (*RabbitMQClient, error) {
 	return &client, nil
 }
 
-func MakeRabbitMQPriorityPub(cfg RabbitMQPriorityPublisherConfig) *RabbitMQPriorityPublisher {
-	pub := RabbitMQPublisher{ch: cfg.Publisher}
-	ppub := RabbitMQPriorityPublisher{publisher: pub, queues: cfg.Queues}
+func NewRabbitMQPriorityPub(p RabbitMQAPI, c PriorityQueueConfigurator) *RabbitMQPriorityPublisher {
+
+	pub := RabbitMQPublisher{ch: p}
+
+	ppub := RabbitMQPriorityPublisher{
+		publisher: pub,
+		queues:    c.GetPriorityQueues(),
+	}
 
 	return &ppub
 }

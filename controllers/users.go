@@ -31,7 +31,7 @@ func (nc UserController) GetUserNotifications(c *gin.Context) {
 		return
 	}
 
-	filters.UserId = c.GetHeader(USER_ID_HEADER_KEY)
+	filters.UserId = c.GetHeader(UserIdHeaderKey)
 	notifications, err := nc.Storage.GetUserNotifications(c, filters)
 
 	if err != nil {
@@ -44,7 +44,7 @@ func (nc UserController) GetUserNotifications(c *gin.Context) {
 }
 
 func (nc UserController) GetUserConfig(c *gin.Context) {
-	userId := c.GetHeader(USER_ID_HEADER_KEY)
+	userId := c.GetHeader(UserIdHeaderKey)
 	cfg, err := nc.Storage.GetUserConfig(c, userId)
 
 	if err != nil {
@@ -64,7 +64,7 @@ func (nc UserController) SetReadStatus(c *gin.Context) {
 		return
 	}
 
-	userId := c.GetHeader(USER_ID_HEADER_KEY)
+	userId := c.GetHeader(UserIdHeaderKey)
 	err := nc.Storage.SetReadStatus(c, userId, n.NotificationId)
 
 	if err != nil {
@@ -90,7 +90,7 @@ func (nc UserController) UpdateUserConfig(c *gin.Context) {
 		return
 	}
 
-	userId := c.GetHeader(USER_ID_HEADER_KEY)
+	userId := c.GetHeader(UserIdHeaderKey)
 
 	if err := nc.Storage.UpdateUserConfig(c, userId, userConfig); err != nil {
 		slog.Error(err.Error())

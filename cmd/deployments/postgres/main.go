@@ -3,30 +3,29 @@ package main
 import (
 	"log"
 
-	di "github.com/notifique/dependency_injection"
 	cfg "github.com/notifique/internal/config"
 
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
-	p "github.com/notifique/deployments/postgres"
+	"github.com/notifique/internal/deployments"
 )
 
 func main() {
 
-	loader, err := cfg.MakeEnvConfig(".env")
+	loader, err := cfg.NewEnvConfig(".env")
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	url, ok := loader.GetConfigValue(di.POSTGRES_URL)
+	url, err := loader.GetPostgresUrl()
 
-	if !ok {
-		log.Fatalf("postgres url %s is not set", di.POSTGRES_URL)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	err = p.RunMigrations(url)
+	err = deployments.RunMigrations(url)
 
 	if err != nil {
 		log.Fatalf("failed to execute migrations - %v", err)
