@@ -59,9 +59,9 @@ func createRabbitMQQueue(client publisher.RabbitMQClient, name string) error {
 	return nil
 }
 
-func MakeRabbitMQPriorityDeployer(c publisher.RabbitMQPriorityConfigurator) (*RabbitMQPriorityDeployer, func(), error) {
+func NewRabbitMQPriorityDeployer(c publisher.RabbitMQPriorityConfigurator) (*RabbitMQPriorityDeployer, func(), error) {
 
-	client, err := publisher.MakeRabbitMQClient(c)
+	client, err := publisher.NewRabbitMQClient(c)
 
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create rabbitmq client - %w", err)

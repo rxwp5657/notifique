@@ -8,7 +8,7 @@ const (
 	HighPriorityQueue   = "notifique-high"
 )
 
-func MakePriorityQueueConfig() (queues publisher.PriorityQueues) {
+func NewPriorityQueueConfig() (queues publisher.PriorityQueues) {
 
 	low := LowPriorityQueue
 	medium := MediumPriorityQueue

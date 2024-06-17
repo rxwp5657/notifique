@@ -48,7 +48,7 @@ func (p *SQSPublisher) PublishMsg(ctx context.Context, q string, m []byte) error
 	return err
 }
 
-func MakeSQSClient(c SQSConfigurator) (client *sqs.Client, err error) {
+func NewSQSClient(c SQSConfigurator) (client *sqs.Client, err error) {
 
 	clientCfg := c.GetSQSClientConfig()
 
@@ -71,7 +71,7 @@ func MakeSQSClient(c SQSConfigurator) (client *sqs.Client, err error) {
 	return
 }
 
-func MakeSQSPublisher(a SQSAPI, c PriorityQueueConfigurator) *SQSPublisher {
+func NewSQSPublisher(a SQSAPI, c PriorityQueueConfigurator) *SQSPublisher {
 	return &SQSPublisher{
 		client: a,
 		queues: c.GetPriorityQueues(),

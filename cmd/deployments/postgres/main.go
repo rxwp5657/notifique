@@ -13,7 +13,7 @@ import (
 
 func main() {
 
-	loader, err := cfg.MakeEnvConfig(".env")
+	loader, err := cfg.NewEnvConfig(".env")
 
 	if err != nil {
 		log.Fatal(err)

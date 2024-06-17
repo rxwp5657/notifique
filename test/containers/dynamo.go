@@ -25,7 +25,7 @@ func (ddbc *DynamoContainer) GetURI() string {
 	return ddbc.URI
 }
 
-func MakeDynamoContainer(ctx context.Context) (*DynamoContainer, error) {
+func NewDynamoContainer(ctx context.Context) (*DynamoContainer, error) {
 
 	port := "8000"
 

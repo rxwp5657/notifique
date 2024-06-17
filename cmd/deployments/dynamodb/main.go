@@ -10,13 +10,13 @@ import (
 
 func main() {
 
-	configurator, err := cfg.MakeEnvConfig(".env")
+	configurator, err := cfg.NewEnvConfig(".env")
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	client, err := storage.MakeDynamoDBClient(configurator)
+	client, err := storage.NewDynamoDBClient(configurator)
 
 	if err != nil {
 		log.Fatalf("failed to create dynamo client - %v", err)

@@ -58,7 +58,7 @@ func (p *RabbitMQPublisher) PublishMsg(ctx context.Context, queueName string, me
 	)
 }
 
-func MakeRabbitMQClient(c RabbitMQConfigurator) (*RabbitMQClient, error) {
+func NewRabbitMQClient(c RabbitMQConfigurator) (*RabbitMQClient, error) {
 
 	url, err := c.GetRabbitMQUrl()
 
@@ -96,7 +96,7 @@ func MakeRabbitMQClient(c RabbitMQConfigurator) (*RabbitMQClient, error) {
 	return &client, nil
 }
 
-func MakeRabbitMQPriorityPub(p RabbitMQAPI, c PriorityQueueConfigurator) *RabbitMQPriorityPublisher {
+func NewRabbitMQPriorityPub(p RabbitMQAPI, c PriorityQueueConfigurator) *RabbitMQPriorityPublisher {
 
 	pub := RabbitMQPublisher{ch: p}
 

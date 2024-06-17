@@ -27,7 +27,7 @@ func (pc *PostgresContainer) GetPostgresUrl() (string, error) {
 	return pc.URI, nil
 }
 
-func MakePostgresContainer(ctx context.Context) (*PostgresContainer, error) {
+func NewPostgresContainer(ctx context.Context) (*PostgresContainer, error) {
 
 	port := "5432"
 

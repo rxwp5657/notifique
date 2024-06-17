@@ -917,7 +917,7 @@ func (ps *PostgresStorage) DeleteUserNotification(ctx context.Context, userId st
 	return nil
 }
 
-func MakePostgresStorage(configurator PostgresConfigurator) (*PostgresStorage, error) {
+func NewPostgresStorage(configurator PostgresConfigurator) (*PostgresStorage, error) {
 
 	url, err := configurator.GetPostgresUrl()
 

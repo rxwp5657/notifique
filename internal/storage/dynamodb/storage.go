@@ -1168,7 +1168,7 @@ func (s *DynamoDBStorage) DeleteUserNotification(ctx context.Context, userId str
 	return err
 }
 
-func MakeDynamoDBClient(c DynamoConfigurator) (client *dynamodb.Client, err error) {
+func NewDynamoDBClient(c DynamoConfigurator) (client *dynamodb.Client, err error) {
 
 	clientCfg := c.GetDynamoClientConfig()
 
@@ -1191,6 +1191,6 @@ func MakeDynamoDBClient(c DynamoConfigurator) (client *dynamodb.Client, err erro
 	return
 }
 
-func MakeDynamoDBStorage(a DynamoDBAPI) *DynamoDBStorage {
+func NewDynamoDBStorage(a DynamoDBAPI) *DynamoDBStorage {
 	return &DynamoDBStorage{client: a}
 }

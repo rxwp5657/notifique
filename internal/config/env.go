@@ -17,7 +17,7 @@ const (
 	lowPriorityQueue    = "LOW_PRIORITY_QUEUE"
 	mediumPriorityQueue = "MEDIUM_PRIORITY_QUEUE"
 	highPriorityQueue   = "HIGH_PRIORITY_QUEUE"
-	rabbitMqUrl         = "RABBIT_MQ_URL"
+	rabbitMqUrl         = "RABBITMQ_URL"
 	sqsBaseEndpoint     = "SQS_BASE_ENDPOINT"
 	sqsRegion           = "SQS_REGION"
 )
@@ -88,7 +88,7 @@ func (cfg EnvConfig) GetSQSClientConfig() (sqsCfg publisher.SQSClientConfig) {
 	return
 }
 
-func MakeEnvConfig(envFile string) (*EnvConfig, error) {
+func NewEnvConfig(envFile string) (*EnvConfig, error) {
 	err := godotenv.Load(envFile)
 
 	if err != nil {

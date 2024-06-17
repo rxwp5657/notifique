@@ -32,7 +32,7 @@ func (sc *SQSPriorityContainer) GetPriorityQueues() publisher.PriorityQueues {
 	return sc.Queues
 }
 
-func MakeSQSContainer(ctx context.Context) (SQSContainer, error) {
+func NewSQSContainer(ctx context.Context) (SQSContainer, error) {
 
 	port := "4566"
 
@@ -73,9 +73,9 @@ func MakeSQSContainer(ctx context.Context) (SQSContainer, error) {
 	return sqsContainer, nil
 }
 
-func MakeSQSPriorityContainer(ctx context.Context) (*SQSPriorityContainer, error) {
-	queues := MakePriorityQueueConfig()
-	container, err := MakeSQSContainer(ctx)
+func NewSQSPriorityContainer(ctx context.Context) (*SQSPriorityContainer, error) {
+	queues := NewPriorityQueueConfig()
+	container, err := NewSQSContainer(ctx)
 
 	if err != nil {
 		return nil, nil
@@ -86,7 +86,7 @@ func MakeSQSPriorityContainer(ctx context.Context) (*SQSPriorityContainer, error
 		Queues:    queues,
 	}
 
-	deployer, cleanup, err := deployments.MakeSQSPriorityDeployer(&pc)
+	deployer, cleanup, err := deployments.NewSQSPriorityDeployer(&pc)
 
 	if err != nil {
 		return nil, err

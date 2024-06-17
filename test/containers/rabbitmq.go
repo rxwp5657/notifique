@@ -32,7 +32,7 @@ func (rc *RabbitMQPriorityContainer) GetPriorityQueues() publisher.PriorityQueue
 	return rc.Queues
 }
 
-func MakeRabbitMQContainer(ctx context.Context) (RabbitMQContainer, error) {
+func NewRabbitMQContainer(ctx context.Context) (RabbitMQContainer, error) {
 
 	port := "5672"
 	userName := "admin"
@@ -73,10 +73,10 @@ func MakeRabbitMQContainer(ctx context.Context) (RabbitMQContainer, error) {
 	return rabbitmqContainer, nil
 }
 
-func MakeRabbitMQPriorityContainer(ctx context.Context) (*RabbitMQPriorityContainer, error) {
+func NewRabbitMQPriorityContainer(ctx context.Context) (*RabbitMQPriorityContainer, error) {
 
-	queues := MakePriorityQueueConfig()
-	container, err := MakeRabbitMQContainer(ctx)
+	queues := NewPriorityQueueConfig()
+	container, err := NewRabbitMQContainer(ctx)
 
 	if err != nil {
 		return nil, nil
@@ -87,7 +87,7 @@ func MakeRabbitMQPriorityContainer(ctx context.Context) (*RabbitMQPriorityContai
 		Queues:    queues,
 	}
 
-	deployer, cleanup, err := deployments.MakeRabbitMQPriorityDeployer(&pc)
+	deployer, cleanup, err := deployments.NewRabbitMQPriorityDeployer(&pc)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to make rabbitmq deployer - %w", err)
