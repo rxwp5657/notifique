@@ -12,9 +12,9 @@ import (
 type Priority string
 
 const (
-	low    Priority = "low"
-	medium Priority = "medium"
-	high   Priority = "high"
+	low    Priority = "LOW"
+	medium Priority = "MEDIUM"
+	high   Priority = "HIGH"
 )
 
 type PriorityQueues struct {

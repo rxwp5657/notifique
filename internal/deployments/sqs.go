@@ -82,7 +82,7 @@ func getQueues(c *sqs.Client) (queueUrls []string, err error) {
 		output, err := paginator.NextPage(context.TODO())
 
 		if err != nil {
-			return nil, fmt.Errorf("failed to get queue urls")
+			return nil, fmt.Errorf("failed to get queue urls - %w", err)
 		}
 
 		queueUrls = append(queueUrls, output.QueueUrls...)
