@@ -28,11 +28,12 @@ func createTestUserNotifications(numNotifications int, userId string, tester Use
 
 	for i := range numNotifications {
 		notification := dto.UserNotification{
-			Id:        uuid.NewString(),
-			Title:     fmt.Sprintf("Test title %d", i),
-			Contents:  fmt.Sprintf("Test contents %d", i),
-			Topic:     "Testing",
-			CreatedAt: time.Now().Format(time.RFC3339Nano),
+			Id:       uuid.NewString(),
+			Title:    fmt.Sprintf("Test title %d", i),
+			Contents: fmt.Sprintf("Test contents %d", i),
+			Topic:    "Testing",
+			// Reduce milisec resolution to match postgre's resolution.
+			CreatedAt: time.Now().Format("2006-01-02T15:04:05.999Z07:00"),
 		}
 
 		err := tester.CreateUserNotification(context.TODO(), userId, notification)

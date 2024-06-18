@@ -35,9 +35,9 @@ func NewPostgresContainer(ctx context.Context) (*PostgresContainer, error) {
 		Image:      "postgres:16.3",
 		WaitingFor: wait.ForExposedPort(),
 		Env: map[string]string{
-			"PostgresDb":       PostgresDb,
-			"PostgresPassword": PostgresPassword,
-			"PostgresUser":     PostgresUser,
+			"POSTGRES_DB":       PostgresDb,
+			"POSTGRES_PASSWORD": PostgresPassword,
+			"POSTGRES_USER":     PostgresUser,
 		},
 	}
 
