@@ -7,8 +7,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
-
-	c "github.com/notifique/controllers"
 )
 
 type SQSAPI interface {
@@ -17,7 +15,6 @@ type SQSAPI interface {
 
 type SQSPublisher struct {
 	client SQSAPI
-	queues PriorityQueues
 }
 
 type SQSClientConfig struct {
@@ -34,15 +31,11 @@ type SQSPriorityConfigurator interface {
 	PriorityQueueConfigurator
 }
 
-func (p *SQSPublisher) Publish(ctx context.Context, n c.Notification, s c.NotificationStorage) error {
-	return publishByPriority(ctx, n, s, p, p.queues)
-}
-
-func (p *SQSPublisher) PublishMsg(ctx context.Context, q string, m []byte) error {
+func (p *SQSPublisher) Publish(ctx context.Context, queueUrl string, message []byte) error {
 
 	_, err := p.client.SendMessage(ctx, &sqs.SendMessageInput{
-		MessageBody: aws.String(string(m)),
-		QueueUrl:    &q,
+		MessageBody: aws.String(string(message)),
+		QueueUrl:    &queueUrl,
 	})
 
 	return err
@@ -71,9 +64,8 @@ func NewSQSClient(c SQSConfigurator) (client *sqs.Client, err error) {
 	return
 }
 
-func NewSQSPublisher(a SQSAPI, c PriorityQueueConfigurator) *SQSPublisher {
+func NewSQSPublisher(a SQSAPI) *SQSPublisher {
 	return &SQSPublisher{
 		client: a,
-		queues: c.GetPriorityQueues(),
 	}
 }

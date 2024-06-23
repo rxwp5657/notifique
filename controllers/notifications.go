@@ -29,7 +29,7 @@ type NotificationStorage interface {
 }
 
 type NotificationPublisher interface {
-	Publish(ctx context.Context, notification Notification, storage NotificationStorage) error
+	Publish(ctx context.Context, notification Notification) error
 }
 
 type NotificationController struct {
@@ -60,7 +60,7 @@ func (nc NotificationController) CreateNotification(c *gin.Context) {
 		Id:              notificationId,
 	}
 
-	err = nc.Publisher.Publish(c, notificationWithId, nc.Storage)
+	err = nc.Publisher.Publish(c, notificationWithId)
 
 	if err != nil {
 		slog.Error(err.Error())
