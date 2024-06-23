@@ -15,7 +15,7 @@ import (
 	"github.com/notifique/routes"
 
 	cfg "github.com/notifique/internal/config"
-	deployments "github.com/notifique/internal/deployments"
+	"github.com/notifique/internal/deployments"
 	pub "github.com/notifique/internal/publisher"
 	ddb "github.com/notifique/internal/storage/dynamodb"
 	pg "github.com/notifique/internal/storage/postgres"
@@ -49,7 +49,7 @@ type PostgresPriorityRabbitMQIntegrationTest struct {
 	RabbitMQContainer *c.RabbitMQPriorityContainer
 	RabbitMQClient    *pub.RabbitMQClient
 	Storage           *pg.PostgresStorage
-	Publisher         *pub.RabbitMQPriorityPublisher
+	Publisher         *pub.PriorityPublisher
 	Engine            *gin.Engine
 }
 
@@ -58,7 +58,7 @@ type DynamoPriorityRabbitMQIntegrationTest struct {
 	RabbitMQContainer *c.RabbitMQPriorityContainer
 	RabbitMQClient    *pub.RabbitMQClient
 	Storage           *ddb.DynamoDBStorage
-	Publisher         *pub.RabbitMQPriorityPublisher
+	Publisher         *pub.PriorityPublisher
 	Engine            *gin.Engine
 }
 
@@ -127,25 +127,55 @@ var DynamoSet = wire.NewSet(
 	ddb.NewDynamoDBStorage,
 	wire.Bind(new(ddb.DynamoDBAPI), new(*dynamodb.Client)),
 	wire.Bind(new(Storage), new(*ddb.DynamoDBStorage)),
+	wire.Bind(new(controllers.NotificationStorage), new(*ddb.DynamoDBStorage)),
 )
 
 var PostgresSet = wire.NewSet(
 	pg.NewPostgresStorage,
 	wire.Bind(new(Storage), new(*pg.PostgresStorage)),
+	wire.Bind(new(controllers.NotificationStorage), new(*pg.PostgresStorage)),
 )
 
-var SQSPrioritySet = wire.NewSet(
+var SQSPublisherSet = wire.NewSet(
 	pub.NewSQSClient,
 	pub.NewSQSPublisher,
 	wire.Bind(new(pub.SQSAPI), new(*sqs.Client)),
-	wire.Bind(new(controllers.NotificationPublisher), new(*pub.SQSPublisher)),
+	wire.Bind(new(pub.Publisher), new(*pub.SQSPublisher)),
 )
 
-var RabbitMQPrioritySet = wire.NewSet(
+var RabbitMQPublisherSet = wire.NewSet(
 	pub.NewRabbitMQClient,
-	pub.NewRabbitMQPriorityPub,
+	pub.NewRabbitMQPublisher,
 	wire.Bind(new(pub.RabbitMQAPI), new(*pub.RabbitMQClient)),
-	wire.Bind(new(controllers.NotificationPublisher), new(*pub.RabbitMQPriorityPublisher)),
+	wire.Bind(new(pub.Publisher), new(*pub.RabbitMQPublisher)),
+)
+
+var PostgresSQSPriroritySet = wire.NewSet(
+	PostgresSet,
+	SQSPublisherSet,
+	pub.NewPriorityPublisher,
+	wire.Bind(new(controllers.NotificationPublisher), new(*pub.PriorityPublisher)),
+)
+
+var PostgresRabbitMQPriroritySet = wire.NewSet(
+	PostgresSet,
+	RabbitMQPublisherSet,
+	pub.NewPriorityPublisher,
+	wire.Bind(new(controllers.NotificationPublisher), new(*pub.PriorityPublisher)),
+)
+
+var DynamoSQSPriroritySet = wire.NewSet(
+	DynamoSet,
+	SQSPublisherSet,
+	pub.NewPriorityPublisher,
+	wire.Bind(new(controllers.NotificationPublisher), new(*pub.PriorityPublisher)),
+)
+
+var DynamoRabbitMQPriroritySet = wire.NewSet(
+	DynamoSet,
+	RabbitMQPublisherSet,
+	pub.NewPriorityPublisher,
+	wire.Bind(new(controllers.NotificationPublisher), new(*pub.PriorityPublisher)),
 )
 
 var PostgresContainerSet = wire.NewSet(
@@ -196,8 +226,7 @@ func InjectPgPrioritySQS(envfile string) (*gin.Engine, error) {
 
 	wire.Build(
 		EnvConfigSet,
-		PostgresSet,
-		SQSPrioritySet,
+		PostgresSQSPriroritySet,
 		NewEngine,
 	)
 
@@ -208,8 +237,7 @@ func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, error) {
 
 	wire.Build(
 		EnvConfigSet,
-		PostgresSet,
-		RabbitMQPrioritySet,
+		PostgresRabbitMQPriroritySet,
 		NewEngine,
 	)
 
@@ -220,8 +248,7 @@ func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
 
 	wire.Build(
 		EnvConfigSet,
-		DynamoSet,
-		SQSPrioritySet,
+		DynamoSQSPriroritySet,
 		NewEngine,
 	)
 
@@ -232,8 +259,7 @@ func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, error) {
 
 	wire.Build(
 		EnvConfigSet,
-		DynamoSet,
-		RabbitMQPrioritySet,
+		PostgresRabbitMQPriroritySet,
 		NewEngine,
 	)
 
@@ -245,8 +271,7 @@ func InjectPgPrioritySQSIntegrationTest(ctx context.Context) (*PostgresPriorityS
 	wire.Build(
 		PostgresContainerSet,
 		SQSPriorityContainerSet,
-		PostgresSet,
-		SQSPrioritySet,
+		PostgresSQSPriroritySet,
 		NewEngine,
 		wire.Struct(new(PostgresPrioritySQSIntegrationTest), "*"),
 	)
@@ -259,8 +284,7 @@ func InjectPgPriorityRabbitMQIntegrationTest(ctx context.Context) (*PostgresPrio
 	wire.Build(
 		PostgresContainerSet,
 		RabbitMQPriorityContainerSet,
-		PostgresSet,
-		RabbitMQPrioritySet,
+		PostgresRabbitMQPriroritySet,
 		NewEngine,
 		wire.Struct(new(PostgresPriorityRabbitMQIntegrationTest), "*"),
 	)
@@ -273,8 +297,7 @@ func InjectDynamoPrioritySQSIntegrationTest(ctx context.Context) (*DynamoPriorit
 	wire.Build(
 		DynamoContainerSet,
 		SQSPriorityContainerSet,
-		DynamoSet,
-		SQSPrioritySet,
+		DynamoSQSPriroritySet,
 		NewEngine,
 		wire.Struct(new(DynamoPrioritySQSIntegrationTest), "*"),
 	)
@@ -287,8 +310,7 @@ func InjectDynamoPriorityRabbitMQIntegrationTest(ctx context.Context) (*DynamoPr
 	wire.Build(
 		DynamoContainerSet,
 		RabbitMQPriorityContainerSet,
-		DynamoSet,
-		RabbitMQPrioritySet,
+		DynamoRabbitMQPriroritySet,
 		NewEngine,
 		wire.Struct(new(DynamoPriorityRabbitMQIntegrationTest), "*"),
 	)

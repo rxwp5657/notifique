@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	amqp "github.com/rabbitmq/amqp091-go"
-
-	c "github.com/notifique/controllers"
 )
 
 type RabbitMQURL string
@@ -25,11 +23,6 @@ type RabbitMQPublisher struct {
 	ch RabbitMQAPI
 }
 
-type RabbitMQPriorityPublisher struct {
-	publisher RabbitMQPublisher
-	queues    PriorityQueues
-}
-
 type RabbitMQConfigurator interface {
 	GetRabbitMQUrl() (string, error)
 }
@@ -39,11 +32,7 @@ type RabbitMQPriorityConfigurator interface {
 	PriorityQueueConfigurator
 }
 
-func (p *RabbitMQPriorityPublisher) Publish(ctx context.Context, n c.Notification, s c.NotificationStorage) error {
-	return publishByPriority(ctx, n, s, &p.publisher, p.queues)
-}
-
-func (p *RabbitMQPublisher) PublishMsg(ctx context.Context, queueName string, message []byte) error {
+func (p *RabbitMQPublisher) Publish(ctx context.Context, queueName string, message []byte) error {
 	return p.ch.PublishWithContext(
 		ctx,
 		"",
@@ -96,14 +85,6 @@ func NewRabbitMQClient(c RabbitMQConfigurator) (*RabbitMQClient, error) {
 	return &client, nil
 }
 
-func NewRabbitMQPriorityPub(p RabbitMQAPI, c PriorityQueueConfigurator) *RabbitMQPriorityPublisher {
-
-	pub := RabbitMQPublisher{ch: p}
-
-	ppub := RabbitMQPriorityPublisher{
-		publisher: pub,
-		queues:    c.GetPriorityQueues(),
-	}
-
-	return &ppub
+func NewRabbitMQPublisher(p RabbitMQAPI) *RabbitMQPublisher {
+	return &RabbitMQPublisher{ch: p}
 }

@@ -17,31 +17,37 @@ const (
 	high   Priority = "HIGH"
 )
 
-type PriorityQueues struct {
-	Low    *string
-	Medium *string
-	High   *string
-}
-
 type Publisher interface {
-	PublishMsg(ctx context.Context, queueName string, message []byte) error
+	Publish(ctx context.Context, queueName string, message []byte) error
 }
 
 type PriorityQueueConfigurator interface {
 	GetPriorityQueues() PriorityQueues
 }
 
-func publishByPriority(ctx context.Context, n c.Notification, s c.NotificationStorage, p Publisher, pq PriorityQueues) error {
+type PriorityQueues struct {
+	Low    *string
+	Medium *string
+	High   *string
+}
+
+type PriorityPublisher struct {
+	publisher Publisher
+	storage   c.NotificationStorage
+	queues    PriorityQueues
+}
+
+func (p PriorityPublisher) Publish(ctx context.Context, n c.Notification) error {
 
 	var queueUri *string = nil
 
 	switch n.Priority {
 	case string(low):
-		queueUri = pq.Low
+		queueUri = p.queues.Low
 	case string(medium):
-		queueUri = pq.Medium
+		queueUri = p.queues.Medium
 	case string(high):
-		queueUri = pq.High
+		queueUri = p.queues.High
 	default:
 		return fmt.Errorf("invalid priority")
 	}
@@ -56,11 +62,11 @@ func publishByPriority(ctx context.Context, n c.Notification, s c.NotificationSt
 		return fmt.Errorf("failed to marshall message body - %w", err)
 	}
 
-	err = p.PublishMsg(ctx, *queueUri, message)
+	err = p.publisher.Publish(ctx, *queueUri, message)
 
 	if err != nil {
 		errMsg := err.Error()
-		statuslogErr := s.CreateNotificationStatusLog(ctx, n.Id, c.PublishFailed, &errMsg)
+		statuslogErr := p.storage.CreateNotificationStatusLog(ctx, n.Id, c.PublishFailed, &errMsg)
 
 		if statuslogErr != nil {
 			errs := errors.Join(err, statuslogErr)
@@ -70,11 +76,20 @@ func publishByPriority(ctx context.Context, n c.Notification, s c.NotificationSt
 		return fmt.Errorf("failed to publish notification - %w", err)
 	}
 
-	err = s.CreateNotificationStatusLog(ctx, n.Id, c.Published, nil)
+	err = p.storage.CreateNotificationStatusLog(ctx, n.Id, c.Published, nil)
 
 	if err != nil {
 		return fmt.Errorf("failed to create notification status log - %w", err)
 	}
 
 	return nil
+}
+
+func NewPriorityPublisher(p Publisher, c PriorityQueueConfigurator, s c.NotificationStorage) *PriorityPublisher {
+
+	return &PriorityPublisher{
+		publisher: p,
+		storage:   s,
+		queues:    c.GetPriorityQueues(),
+	}
 }

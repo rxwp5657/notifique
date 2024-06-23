@@ -38,8 +38,9 @@ func InjectPgPrioritySQS(envfile string) (*gin.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	sqsPublisher := publisher.NewSQSPublisher(client, envConfig)
-	engine := NewEngine(postgresStorage, sqsPublisher)
+	sqsPublisher := publisher.NewSQSPublisher(client)
+	priorityPublisher := publisher.NewPriorityPublisher(sqsPublisher, envConfig, postgresStorage)
+	engine := NewEngine(postgresStorage, priorityPublisher)
 	return engine, nil
 }
 
@@ -56,8 +57,9 @@ func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	rabbitMQPriorityPublisher := publisher.NewRabbitMQPriorityPub(rabbitMQClient, envConfig)
-	engine := NewEngine(postgresStorage, rabbitMQPriorityPublisher)
+	rabbitMQPublisher := publisher.NewRabbitMQPublisher(rabbitMQClient)
+	priorityPublisher := publisher.NewPriorityPublisher(rabbitMQPublisher, envConfig, postgresStorage)
+	engine := NewEngine(postgresStorage, priorityPublisher)
 	return engine, nil
 }
 
@@ -75,8 +77,9 @@ func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	sqsPublisher := publisher.NewSQSPublisher(sqsClient, envConfig)
-	engine := NewEngine(dynamoDBStorage, sqsPublisher)
+	sqsPublisher := publisher.NewSQSPublisher(sqsClient)
+	priorityPublisher := publisher.NewPriorityPublisher(sqsPublisher, envConfig, dynamoDBStorage)
+	engine := NewEngine(dynamoDBStorage, priorityPublisher)
 	return engine, nil
 }
 
@@ -85,17 +88,17 @@ func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	client, err := storage2.NewDynamoDBClient(envConfig)
+	postgresStorage, err := storage.NewPostgresStorage(envConfig)
 	if err != nil {
 		return nil, err
 	}
-	dynamoDBStorage := storage2.NewDynamoDBStorage(client)
 	rabbitMQClient, err := publisher.NewRabbitMQClient(envConfig)
 	if err != nil {
 		return nil, err
 	}
-	rabbitMQPriorityPublisher := publisher.NewRabbitMQPriorityPub(rabbitMQClient, envConfig)
-	engine := NewEngine(dynamoDBStorage, rabbitMQPriorityPublisher)
+	rabbitMQPublisher := publisher.NewRabbitMQPublisher(rabbitMQClient)
+	priorityPublisher := publisher.NewPriorityPublisher(rabbitMQPublisher, envConfig, postgresStorage)
+	engine := NewEngine(postgresStorage, priorityPublisher)
 	return engine, nil
 }
 
@@ -116,8 +119,9 @@ func InjectPgPrioritySQSIntegrationTest(ctx context.Context) (*PostgresPriorityS
 	if err != nil {
 		return nil, err
 	}
-	sqsPublisher := publisher.NewSQSPublisher(client, sqsPriorityContainer)
-	engine := NewEngine(postgresStorage, sqsPublisher)
+	sqsPublisher := publisher.NewSQSPublisher(client)
+	priorityPublisher := publisher.NewPriorityPublisher(sqsPublisher, sqsPriorityContainer, postgresStorage)
+	engine := NewEngine(postgresStorage, priorityPublisher)
 	postgresPrioritySQSIntegrationTest := &PostgresPrioritySQSIntegrationTest{
 		PostgresContainer: postgresContainer,
 		SQSContainer:      sqsPriorityContainer,
@@ -145,14 +149,15 @@ func InjectPgPriorityRabbitMQIntegrationTest(ctx context.Context) (*PostgresPrio
 	if err != nil {
 		return nil, err
 	}
-	rabbitMQPriorityPublisher := publisher.NewRabbitMQPriorityPub(rabbitMQClient, rabbitMQPriorityContainer)
-	engine := NewEngine(postgresStorage, rabbitMQPriorityPublisher)
+	rabbitMQPublisher := publisher.NewRabbitMQPublisher(rabbitMQClient)
+	priorityPublisher := publisher.NewPriorityPublisher(rabbitMQPublisher, rabbitMQPriorityContainer, postgresStorage)
+	engine := NewEngine(postgresStorage, priorityPublisher)
 	postgresPriorityRabbitMQIntegrationTest := &PostgresPriorityRabbitMQIntegrationTest{
 		PostgresContainer: postgresContainer,
 		RabbitMQContainer: rabbitMQPriorityContainer,
 		RabbitMQClient:    rabbitMQClient,
 		Storage:           postgresStorage,
-		Publisher:         rabbitMQPriorityPublisher,
+		Publisher:         priorityPublisher,
 		Engine:            engine,
 	}
 	return postgresPriorityRabbitMQIntegrationTest, nil
@@ -176,8 +181,9 @@ func InjectDynamoPrioritySQSIntegrationTest(ctx context.Context) (*DynamoPriorit
 	if err != nil {
 		return nil, err
 	}
-	sqsPublisher := publisher.NewSQSPublisher(sqsClient, sqsPriorityContainer)
-	engine := NewEngine(dynamoDBStorage, sqsPublisher)
+	sqsPublisher := publisher.NewSQSPublisher(sqsClient)
+	priorityPublisher := publisher.NewPriorityPublisher(sqsPublisher, sqsPriorityContainer, dynamoDBStorage)
+	engine := NewEngine(dynamoDBStorage, priorityPublisher)
 	dynamoPrioritySQSIntegrationTest := &DynamoPrioritySQSIntegrationTest{
 		DynamoContainer: dynamoContainer,
 		SQSContainer:    sqsPriorityContainer,
@@ -206,14 +212,15 @@ func InjectDynamoPriorityRabbitMQIntegrationTest(ctx context.Context) (*DynamoPr
 		return nil, err
 	}
 	dynamoDBStorage := storage2.NewDynamoDBStorage(client)
-	rabbitMQPriorityPublisher := publisher.NewRabbitMQPriorityPub(rabbitMQClient, rabbitMQPriorityContainer)
-	engine := NewEngine(dynamoDBStorage, rabbitMQPriorityPublisher)
+	rabbitMQPublisher := publisher.NewRabbitMQPublisher(rabbitMQClient)
+	priorityPublisher := publisher.NewPriorityPublisher(rabbitMQPublisher, rabbitMQPriorityContainer, dynamoDBStorage)
+	engine := NewEngine(dynamoDBStorage, priorityPublisher)
 	dynamoPriorityRabbitMQIntegrationTest := &DynamoPriorityRabbitMQIntegrationTest{
 		DynamoContainer:   dynamoContainer,
 		RabbitMQContainer: rabbitMQPriorityContainer,
 		RabbitMQClient:    rabbitMQClient,
 		Storage:           dynamoDBStorage,
-		Publisher:         rabbitMQPriorityPublisher,
+		Publisher:         priorityPublisher,
 		Engine:            engine,
 	}
 	return dynamoPriorityRabbitMQIntegrationTest, nil
@@ -276,7 +283,7 @@ type PostgresPriorityRabbitMQIntegrationTest struct {
 	RabbitMQContainer *containers.RabbitMQPriorityContainer
 	RabbitMQClient    *publisher.RabbitMQClient
 	Storage           *storage.PostgresStorage
-	Publisher         *publisher.RabbitMQPriorityPublisher
+	Publisher         *publisher.PriorityPublisher
 	Engine            *gin.Engine
 }
 
@@ -285,7 +292,7 @@ type DynamoPriorityRabbitMQIntegrationTest struct {
 	RabbitMQContainer *containers.RabbitMQPriorityContainer
 	RabbitMQClient    *publisher.RabbitMQClient
 	Storage           *storage2.DynamoDBStorage
-	Publisher         *publisher.RabbitMQPriorityPublisher
+	Publisher         *publisher.PriorityPublisher
 	Engine            *gin.Engine
 }
 
@@ -349,13 +356,33 @@ func (it *DynamoPriorityRabbitMQIntegrationTest) Cleanup() error {
 	return nil
 }
 
-var DynamoSet = wire.NewSet(storage2.NewDynamoDBClient, storage2.NewDynamoDBStorage, wire.Bind(new(storage2.DynamoDBAPI), new(*dynamodb.Client)), wire.Bind(new(Storage), new(*storage2.DynamoDBStorage)))
+var DynamoSet = wire.NewSet(storage2.NewDynamoDBClient, storage2.NewDynamoDBStorage, wire.Bind(new(storage2.DynamoDBAPI), new(*dynamodb.Client)), wire.Bind(new(Storage), new(*storage2.DynamoDBStorage)), wire.Bind(new(controllers.NotificationStorage), new(*storage2.DynamoDBStorage)))
 
-var PostgresSet = wire.NewSet(storage.NewPostgresStorage, wire.Bind(new(Storage), new(*storage.PostgresStorage)))
+var PostgresSet = wire.NewSet(storage.NewPostgresStorage, wire.Bind(new(Storage), new(*storage.PostgresStorage)), wire.Bind(new(controllers.NotificationStorage), new(*storage.PostgresStorage)))
 
-var SQSPrioritySet = wire.NewSet(publisher.NewSQSClient, publisher.NewSQSPublisher, wire.Bind(new(publisher.SQSAPI), new(*sqs.Client)), wire.Bind(new(controllers.NotificationPublisher), new(*publisher.SQSPublisher)))
+var SQSPublisherSet = wire.NewSet(publisher.NewSQSClient, publisher.NewSQSPublisher, wire.Bind(new(publisher.SQSAPI), new(*sqs.Client)), wire.Bind(new(publisher.Publisher), new(*publisher.SQSPublisher)))
 
-var RabbitMQPrioritySet = wire.NewSet(publisher.NewRabbitMQClient, publisher.NewRabbitMQPriorityPub, wire.Bind(new(publisher.RabbitMQAPI), new(*publisher.RabbitMQClient)), wire.Bind(new(controllers.NotificationPublisher), new(*publisher.RabbitMQPriorityPublisher)))
+var RabbitMQPublisherSet = wire.NewSet(publisher.NewRabbitMQClient, publisher.NewRabbitMQPublisher, wire.Bind(new(publisher.RabbitMQAPI), new(*publisher.RabbitMQClient)), wire.Bind(new(publisher.Publisher), new(*publisher.RabbitMQPublisher)))
+
+var PostgresSQSPriroritySet = wire.NewSet(
+	PostgresSet,
+	SQSPublisherSet, publisher.NewPriorityPublisher, wire.Bind(new(controllers.NotificationPublisher), new(*publisher.PriorityPublisher)),
+)
+
+var PostgresRabbitMQPriroritySet = wire.NewSet(
+	PostgresSet,
+	RabbitMQPublisherSet, publisher.NewPriorityPublisher, wire.Bind(new(controllers.NotificationPublisher), new(*publisher.PriorityPublisher)),
+)
+
+var DynamoSQSPriroritySet = wire.NewSet(
+	DynamoSet,
+	SQSPublisherSet, publisher.NewPriorityPublisher, wire.Bind(new(controllers.NotificationPublisher), new(*publisher.PriorityPublisher)),
+)
+
+var DynamoRabbitMQPriroritySet = wire.NewSet(
+	DynamoSet,
+	RabbitMQPublisherSet, publisher.NewPriorityPublisher, wire.Bind(new(controllers.NotificationPublisher), new(*publisher.PriorityPublisher)),
+)
 
 var PostgresContainerSet = wire.NewSet(containers.NewPostgresContainer, wire.Bind(new(storage.PostgresConfigurator), new(*containers.PostgresContainer)))
 
