@@ -19,8 +19,15 @@ type UserStorage interface {
 	UpdateUserConfig(ctx context.Context, userId string, config dto.UserConfig) error
 }
 
+type UserNotificationBroker interface {
+	Suscribe(ctx context.Context, userId string) (<-chan dto.UserNotification, error)
+	Unsubscribe(ctx context.Context, userId string) error
+	Publish(ctx context.Context, userId string, un dto.UserNotification) error
+}
+
 type UserController struct {
 	Storage UserStorage
+	Broker  UserNotificationBroker
 }
 
 func (nc UserController) GetUserNotifications(c *gin.Context) {

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 
@@ -20,6 +21,7 @@ const (
 	rabbitMqUrl         = "RABBITMQ_URL"
 	sqsBaseEndpoint     = "SQS_BASE_ENDPOINT"
 	sqsRegion           = "SQS_REGION"
+	brokerCapacity      = "BROKER_CAPACITY"
 )
 
 type EnvConfig struct{}
@@ -86,6 +88,23 @@ func (cfg EnvConfig) GetSQSClientConfig() (sqsCfg publisher.SQSClientConfig) {
 	}
 
 	return
+}
+
+func (cfg EnvConfig) GetBrokerChannelSize() (int, error) {
+
+	chSizeStr, ok := os.LookupEnv(brokerCapacity)
+
+	if !ok {
+		return 0, fmt.Errorf("broker capacity %s not set", brokerCapacity)
+	}
+
+	chSize, err := strconv.Atoi(chSizeStr)
+
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse capacity to int - %w", err)
+	}
+
+	return chSize, nil
 }
 
 func NewEnvConfig(envFile string) (*EnvConfig, error) {
