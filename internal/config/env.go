@@ -22,6 +22,7 @@ const (
 	sqsBaseEndpoint     = "SQS_BASE_ENDPOINT"
 	sqsRegion           = "SQS_REGION"
 	brokerCapacity      = "BROKER_CAPACITY"
+	redisUrl            = "REDIS_URL"
 )
 
 type EnvConfig struct{}
@@ -105,6 +106,17 @@ func (cfg EnvConfig) GetBrokerChannelSize() (int, error) {
 	}
 
 	return chSize, nil
+}
+
+func (cfg EnvConfig) GetRedisUrl() (string, error) {
+
+	url, ok := os.LookupEnv(redisUrl)
+
+	if !ok {
+		return "", fmt.Errorf("redis url %s not set", redisUrl)
+	}
+
+	return url, nil
 }
 
 func NewEnvConfig(envFile string) (*EnvConfig, error) {

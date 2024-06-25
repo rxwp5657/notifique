@@ -6,7 +6,7 @@ import (
 
 	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/redis"
+	"github.com/testcontainers/testcontainers-go/wait"
 )
 
 const TestBrokerChannelSize = 10
@@ -18,39 +18,54 @@ type RedisContainer struct {
 }
 
 func (rc *RedisContainer) GetRedisUrl() (string, error) {
+
+	if rc == nil {
+		return "", fmt.Errorf("redis container is null")
+	}
+
 	return rc.URI, nil
 }
 
 func (rc *RedisContainer) GetBrokerChannelSize() (int, error) {
+
+	if rc == nil {
+		return 0, fmt.Errorf("redis container is null")
+	}
+
 	return TestBrokerChannelSize, nil
 }
 
-func NewRedisContainer(ctx context.Context) (RedisContainer, error) {
+func NewRedisContainer(ctx context.Context) (*RedisContainer, error) {
 
-	port := "4566"
+	port := "6379"
 
-	container, err := redis.RunContainer(
-		ctx,
-		testcontainers.WithImage("redis:7.4-rc1-alpine"),
-	)
+	req := testcontainers.ContainerRequest{
+		Image:      "redis:7.4-rc1-alpine",
+		WaitingFor: wait.ForExposedPort(),
+	}
+
+	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
 
 	if err != nil {
-		return RedisContainer{}, fmt.Errorf("failed to create redis container - %w", err)
+		return nil, fmt.Errorf("failed to create redis container - %w", err)
 	}
 
 	ip, err := container.Host(ctx)
 
 	if err != nil {
-		return RedisContainer{}, fmt.Errorf("failed to get the redis host - %w", err)
+		return nil, fmt.Errorf("failed to get the redis host - %w", err)
 	}
 
 	mappedPort, err := container.MappedPort(ctx, nat.Port(port))
 
 	if err != nil {
-		return RedisContainer{}, err
+		return nil, err
 	}
 
-	uri := fmt.Sprintf("http://%s:%s", ip, mappedPort.Port())
+	uri := fmt.Sprintf("redis://%s:%s", ip, mappedPort.Port())
 
 	cleanup := func() error { return container.Terminate(ctx) }
 
@@ -60,5 +75,5 @@ func NewRedisContainer(ctx context.Context) (RedisContainer, error) {
 		Cleanup:   cleanup,
 	}
 
-	return redisContainer, nil
+	return &redisContainer, nil
 }

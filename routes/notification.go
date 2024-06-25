@@ -10,8 +10,8 @@ func SetupNotificationRoutes(r *gin.Engine, ns c.NotificationStorage, p c.Notifi
 
 	controller := c.NotificationController{Storage: ns, Publisher: p}
 
-	v0 := r.Group("/v0")
+	g := r.Group("/v0")
 	{
-		v0.POST("/notifications", controller.CreateNotification)
+		g.POST("/notifications", controller.CreateNotification)
 	}
 }

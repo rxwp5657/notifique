@@ -9,17 +9,21 @@ import (
 	"github.com/notifique/internal"
 )
 
-func SetupUsersRoutes(r *gin.Engine, us c.UserStorage) {
+func SetupUsersRoutes(r *gin.Engine, us c.UserStorage, bk c.UserNotificationBroker) {
 
-	controller := c.UserController{Storage: us}
+	controller := c.UserController{
+		Storage: us,
+		Broker:  bk,
+	}
 
-	v0 := r.Group("/v0")
+	g := r.Group("/v0")
 	{
-		v0.GET("/users/me/notifications", controller.GetUserNotifications)
-		v0.PATCH("/users/me/notifications/:id", controller.SetReadStatus)
+		g.GET("/users/me/notifications", controller.GetUserNotifications)
+		g.GET("/users/me/notifications/live", controller.GetLiveUserNotifications)
+		g.PATCH("/users/me/notifications/:id", controller.SetReadStatus)
 
-		v0.GET("/users/me/notifications/config", controller.GetUserConfig)
-		v0.PUT("/users/me/notifications/config", controller.UpdateUserConfig)
+		g.GET("/users/me/notifications/config", controller.GetUserConfig)
+		g.PUT("/users/me/notifications/config", controller.UpdateUserConfig)
 	}
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {

@@ -1,5 +1,6 @@
 package controllers
 
 const (
-	UserIdHeaderKey = "userId"
+	UserIdHeaderKey       = "userId"
+	userNotificationEvent = "userNotification"
 )

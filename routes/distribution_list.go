@@ -14,15 +14,15 @@ func SetupDistributionListRoutes(r *gin.Engine, dls c.DistributionListStorage) {
 
 	controller := c.DistributionListController{Storage: dls}
 
-	v0 := r.Group("/v0")
+	g := r.Group("/v0")
 	{
-		v0.GET("/distribution-lists", controller.GetDistributionLists)
-		v0.POST("/distribution-lists", controller.CreateDistributionList)
-		v0.DELETE("/distribution-lists/:name", controller.DeleteDistributionList)
+		g.GET("/distribution-lists", controller.GetDistributionLists)
+		g.POST("/distribution-lists", controller.CreateDistributionList)
+		g.DELETE("/distribution-lists/:name", controller.DeleteDistributionList)
 
-		v0.GET("/distribution-lists/:name/recipients", controller.GetRecipients)
-		v0.PATCH("/distribution-lists/:name/recipients", controller.AddRecipients)
-		v0.DELETE("/distribution-lists/:name/recipients", controller.DeleteRecipients)
+		g.GET("/distribution-lists/:name/recipients", controller.GetRecipients)
+		g.PATCH("/distribution-lists/:name/recipients", controller.AddRecipients)
+		g.DELETE("/distribution-lists/:name/recipients", controller.DeleteRecipients)
 	}
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {

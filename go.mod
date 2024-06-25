@@ -26,7 +26,6 @@ require (
 	github.com/rabbitmq/amqp091-go v1.10.0 // indirect
 	github.com/redis/go-redis/v9 v9.5.3 // indirect
 	github.com/testcontainers/testcontainers-go/modules/rabbitmq v0.31.0 // indirect
-	github.com/testcontainers/testcontainers-go/modules/redis v0.31.0 // indirect
 )
 
 require (
