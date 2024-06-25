@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -55,18 +56,19 @@ func (nc NotificationController) CreateNotification(c *gin.Context) {
 		return
 	}
 
-	notificationWithId := Notification{
-		NotificationReq: notification,
-		Id:              notificationId,
-	}
-
-	err = nc.Publisher.Publish(c, notificationWithId)
-
-	if err != nil {
-		slog.Error(err.Error())
-		c.Status(http.StatusInternalServerError)
-		return
-	}
-
 	c.Status(http.StatusNoContent)
+
+	go func() {
+		notificationWithId := Notification{
+			NotificationReq: notification,
+			Id:              notificationId,
+		}
+
+		err = nc.Publisher.Publish(c, notificationWithId)
+
+		if err != nil {
+			errMsg := fmt.Errorf("failed to publish notification - %w", err).Error()
+			slog.Error(errMsg)
+		}
+	}()
 }
