@@ -10,9 +10,9 @@ type UserNotification struct {
 	Id        string  `json:"id"`
 	Title     string  `json:"title"`
 	Contents  string  `json:"contents"`
-	CreatedAt string  `json:"created_at"`
+	CreatedAt string  `json:"createdAt"`
 	Image     *string `json:"image"`
-	ReadAt    *string `json:"read_at,omitempty"`
+	ReadAt    *string `json:"readAt,omitempty"`
 	Topic     string  `json:"topic"`
 }
 

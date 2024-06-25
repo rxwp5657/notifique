@@ -13,7 +13,10 @@ import (
 	"github.com/google/wire"
 	"github.com/notifique/controllers"
 	"github.com/notifique/routes"
+	"github.com/redis/go-redis/v9"
 
+	"github.com/notifique/internal"
+	bk "github.com/notifique/internal/broker"
 	cfg "github.com/notifique/internal/config"
 	"github.com/notifique/internal/deployments"
 	pub "github.com/notifique/internal/publisher"
@@ -31,16 +34,20 @@ type Storage interface {
 type PostgresPrioritySQSIntegrationTest struct {
 	PostgresContainer *c.PostgresContainer
 	SQSContainer      *c.SQSPriorityContainer
+	RedisContainer    *c.RedisContainer
 	Storage           *pg.PostgresStorage
 	Publisher         *pub.SQSPublisher
+	Broker            *bk.RedisBroker
 	Engine            *gin.Engine
 }
 
 type DynamoPrioritySQSIntegrationTest struct {
 	DynamoContainer *c.DynamoContainer
 	SQSContainer    *c.SQSPriorityContainer
+	RedisContainer  *c.RedisContainer
 	Storage         *ddb.DynamoDBStorage
 	Publisher       *pub.SQSPublisher
+	Broker          *bk.RedisBroker
 	Engine          *gin.Engine
 }
 
@@ -48,8 +55,10 @@ type PostgresPriorityRabbitMQIntegrationTest struct {
 	PostgresContainer *c.PostgresContainer
 	RabbitMQContainer *c.RabbitMQPriorityContainer
 	RabbitMQClient    *pub.RabbitMQClient
+	RedisContainer    *c.RedisContainer
 	Storage           *pg.PostgresStorage
 	Publisher         *pub.PriorityPublisher
+	Broker            *bk.RedisBroker
 	Engine            *gin.Engine
 }
 
@@ -57,8 +66,10 @@ type DynamoPriorityRabbitMQIntegrationTest struct {
 	DynamoContainer   *c.DynamoContainer
 	RabbitMQContainer *c.RabbitMQPriorityContainer
 	RabbitMQClient    *pub.RabbitMQClient
+	RedisContainer    *c.RedisContainer
 	Storage           *ddb.DynamoDBStorage
 	Publisher         *pub.PriorityPublisher
+	Broker            *bk.RedisBroker
 	Engine            *gin.Engine
 }
 
@@ -72,6 +83,10 @@ func (it *PostgresPrioritySQSIntegrationTest) Cleanup() error {
 		return fmt.Errorf("failed to cleanup sqs container - %w", err)
 	}
 
+	if err := it.RedisContainer.Cleanup(); err != nil {
+		return fmt.Errorf("failed to cleanup redis container - %w", err)
+	}
+
 	return nil
 }
 
@@ -83,6 +98,10 @@ func (it *DynamoPrioritySQSIntegrationTest) Cleanup() error {
 
 	if err := it.SQSContainer.Container.Cleanup(); err != nil {
 		return fmt.Errorf("failed to cleanup sqs container - %w", err)
+	}
+
+	if err := it.RedisContainer.Cleanup(); err != nil {
+		return fmt.Errorf("failed to cleanup redis container - %w", err)
 	}
 
 	return nil
@@ -102,6 +121,10 @@ func (it *PostgresPriorityRabbitMQIntegrationTest) Cleanup() error {
 		return fmt.Errorf("failed to cleanup rabbitmq container - %w", err)
 	}
 
+	if err := it.RedisContainer.Cleanup(); err != nil {
+		return fmt.Errorf("failed to cleanup redis container - %w", err)
+	}
+
 	return nil
 }
 
@@ -117,6 +140,10 @@ func (it *DynamoPriorityRabbitMQIntegrationTest) Cleanup() error {
 
 	if err := it.RabbitMQContainer.Container.Cleanup(); err != nil {
 		return fmt.Errorf("failed to cleanup rabbitmq container - %w", err)
+	}
+
+	if err := it.RedisContainer.Cleanup(); err != nil {
+		return fmt.Errorf("failed to cleanup redis container - %w", err)
 	}
 
 	return nil
@@ -178,6 +205,13 @@ var DynamoRabbitMQPriroritySet = wire.NewSet(
 	wire.Bind(new(controllers.NotificationPublisher), new(*pub.PriorityPublisher)),
 )
 
+var RedisUserNotificationBrokerSet = wire.NewSet(
+	internal.NewRedisClient,
+	bk.NewRedisBroker,
+	wire.Bind(new(bk.RedisApi), new(*redis.Client)),
+	wire.Bind(new(controllers.UserNotificationBroker), new(*bk.RedisBroker)),
+)
+
 var PostgresContainerSet = wire.NewSet(
 	c.NewPostgresContainer,
 	wire.Bind(new(pg.PostgresConfigurator), new(*c.PostgresContainer)),
@@ -200,6 +234,12 @@ var DynamoContainerSet = wire.NewSet(
 	wire.Bind(new(ddb.DynamoConfigurator), new(*c.DynamoContainer)),
 )
 
+var RedisContainerSet = wire.NewSet(
+	c.NewRedisContainer,
+	wire.Bind(new(internal.RedisConfigurator), new(*c.RedisContainer)),
+	wire.Bind(new(bk.BrokerConfigurator), new(*c.RedisContainer)),
+)
+
 var EnvConfigSet = wire.NewSet(
 	cfg.NewEnvConfig,
 	wire.Bind(new(pg.PostgresConfigurator), new(*cfg.EnvConfig)),
@@ -209,15 +249,17 @@ var EnvConfigSet = wire.NewSet(
 	wire.Bind(new(pub.RabbitMQConfigurator), new(*cfg.EnvConfig)),
 	wire.Bind(new(pub.RabbitMQPriorityConfigurator), new(*cfg.EnvConfig)),
 	wire.Bind(new(pub.SQSPriorityConfigurator), new(*cfg.EnvConfig)),
+	wire.Bind(new(internal.RedisConfigurator), new(*cfg.EnvConfig)),
+	wire.Bind(new(bk.BrokerConfigurator), new(*cfg.EnvConfig)),
 )
 
-func NewEngine(storage Storage, pub controllers.NotificationPublisher) *gin.Engine {
+func NewEngine(storage Storage, pub controllers.NotificationPublisher, bk controllers.UserNotificationBroker) *gin.Engine {
 
 	r := gin.Default()
 
 	routes.SetupNotificationRoutes(r, storage, pub)
 	routes.SetupDistributionListRoutes(r, storage)
-	routes.SetupUsersRoutes(r, storage)
+	routes.SetupUsersRoutes(r, storage, bk)
 
 	return r
 }
@@ -227,6 +269,7 @@ func InjectPgPrioritySQS(envfile string) (*gin.Engine, error) {
 	wire.Build(
 		EnvConfigSet,
 		PostgresSQSPriroritySet,
+		RedisUserNotificationBrokerSet,
 		NewEngine,
 	)
 
@@ -238,6 +281,7 @@ func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, error) {
 	wire.Build(
 		EnvConfigSet,
 		PostgresRabbitMQPriroritySet,
+		RedisUserNotificationBrokerSet,
 		NewEngine,
 	)
 
@@ -249,6 +293,7 @@ func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
 	wire.Build(
 		EnvConfigSet,
 		DynamoSQSPriroritySet,
+		RedisUserNotificationBrokerSet,
 		NewEngine,
 	)
 
@@ -259,7 +304,8 @@ func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, error) {
 
 	wire.Build(
 		EnvConfigSet,
-		PostgresRabbitMQPriroritySet,
+		DynamoRabbitMQPriroritySet,
+		RedisUserNotificationBrokerSet,
 		NewEngine,
 	)
 
@@ -271,7 +317,9 @@ func InjectPgPrioritySQSIntegrationTest(ctx context.Context) (*PostgresPriorityS
 	wire.Build(
 		PostgresContainerSet,
 		SQSPriorityContainerSet,
+		RedisContainerSet,
 		PostgresSQSPriroritySet,
+		RedisUserNotificationBrokerSet,
 		NewEngine,
 		wire.Struct(new(PostgresPrioritySQSIntegrationTest), "*"),
 	)
@@ -284,7 +332,9 @@ func InjectPgPriorityRabbitMQIntegrationTest(ctx context.Context) (*PostgresPrio
 	wire.Build(
 		PostgresContainerSet,
 		RabbitMQPriorityContainerSet,
+		RedisContainerSet,
 		PostgresRabbitMQPriroritySet,
+		RedisUserNotificationBrokerSet,
 		NewEngine,
 		wire.Struct(new(PostgresPriorityRabbitMQIntegrationTest), "*"),
 	)
@@ -297,7 +347,9 @@ func InjectDynamoPrioritySQSIntegrationTest(ctx context.Context) (*DynamoPriorit
 	wire.Build(
 		DynamoContainerSet,
 		SQSPriorityContainerSet,
+		RedisContainerSet,
 		DynamoSQSPriroritySet,
+		RedisUserNotificationBrokerSet,
 		NewEngine,
 		wire.Struct(new(DynamoPrioritySQSIntegrationTest), "*"),
 	)
@@ -310,7 +362,9 @@ func InjectDynamoPriorityRabbitMQIntegrationTest(ctx context.Context) (*DynamoPr
 	wire.Build(
 		DynamoContainerSet,
 		RabbitMQPriorityContainerSet,
+		RedisContainerSet,
 		DynamoRabbitMQPriroritySet,
+		RedisUserNotificationBrokerSet,
 		NewEngine,
 		wire.Struct(new(DynamoPriorityRabbitMQIntegrationTest), "*"),
 	)

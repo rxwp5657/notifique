@@ -14,6 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
 	"github.com/notifique/controllers"
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/broker"
 	"github.com/notifique/internal/config"
 	"github.com/notifique/internal/deployments"
 	"github.com/notifique/internal/publisher"
@@ -21,6 +23,7 @@ import (
 	"github.com/notifique/internal/storage/postgres"
 	"github.com/notifique/routes"
 	"github.com/notifique/test/containers"
+	"github.com/redis/go-redis/v9"
 )
 
 // Injectors from wire.go:
@@ -40,7 +43,15 @@ func InjectPgPrioritySQS(envfile string) (*gin.Engine, error) {
 	}
 	sqsPublisher := publisher.NewSQSPublisher(client)
 	priorityPublisher := publisher.NewPriorityPublisher(sqsPublisher, envConfig, postgresStorage)
-	engine := NewEngine(postgresStorage, priorityPublisher)
+	redisClient, err := internal.NewRedisClient(envConfig)
+	if err != nil {
+		return nil, err
+	}
+	redisBroker, err := broker.NewRedisBroker(redisClient, envConfig)
+	if err != nil {
+		return nil, err
+	}
+	engine := NewEngine(postgresStorage, priorityPublisher, redisBroker)
 	return engine, nil
 }
 
@@ -59,7 +70,15 @@ func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, error) {
 	}
 	rabbitMQPublisher := publisher.NewRabbitMQPublisher(rabbitMQClient)
 	priorityPublisher := publisher.NewPriorityPublisher(rabbitMQPublisher, envConfig, postgresStorage)
-	engine := NewEngine(postgresStorage, priorityPublisher)
+	client, err := internal.NewRedisClient(envConfig)
+	if err != nil {
+		return nil, err
+	}
+	redisBroker, err := broker.NewRedisBroker(client, envConfig)
+	if err != nil {
+		return nil, err
+	}
+	engine := NewEngine(postgresStorage, priorityPublisher, redisBroker)
 	return engine, nil
 }
 
@@ -79,7 +98,15 @@ func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
 	}
 	sqsPublisher := publisher.NewSQSPublisher(sqsClient)
 	priorityPublisher := publisher.NewPriorityPublisher(sqsPublisher, envConfig, dynamoDBStorage)
-	engine := NewEngine(dynamoDBStorage, priorityPublisher)
+	redisClient, err := internal.NewRedisClient(envConfig)
+	if err != nil {
+		return nil, err
+	}
+	redisBroker, err := broker.NewRedisBroker(redisClient, envConfig)
+	if err != nil {
+		return nil, err
+	}
+	engine := NewEngine(dynamoDBStorage, priorityPublisher, redisBroker)
 	return engine, nil
 }
 
@@ -88,17 +115,26 @@ func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	postgresStorage, err := storage.NewPostgresStorage(envConfig)
+	client, err := storage2.NewDynamoDBClient(envConfig)
 	if err != nil {
 		return nil, err
 	}
+	dynamoDBStorage := storage2.NewDynamoDBStorage(client)
 	rabbitMQClient, err := publisher.NewRabbitMQClient(envConfig)
 	if err != nil {
 		return nil, err
 	}
 	rabbitMQPublisher := publisher.NewRabbitMQPublisher(rabbitMQClient)
-	priorityPublisher := publisher.NewPriorityPublisher(rabbitMQPublisher, envConfig, postgresStorage)
-	engine := NewEngine(postgresStorage, priorityPublisher)
+	priorityPublisher := publisher.NewPriorityPublisher(rabbitMQPublisher, envConfig, dynamoDBStorage)
+	redisClient, err := internal.NewRedisClient(envConfig)
+	if err != nil {
+		return nil, err
+	}
+	redisBroker, err := broker.NewRedisBroker(redisClient, envConfig)
+	if err != nil {
+		return nil, err
+	}
+	engine := NewEngine(dynamoDBStorage, priorityPublisher, redisBroker)
 	return engine, nil
 }
 
@@ -111,6 +147,10 @@ func InjectPgPrioritySQSIntegrationTest(ctx context.Context) (*PostgresPriorityS
 	if err != nil {
 		return nil, err
 	}
+	redisContainer, err := containers.NewRedisContainer(ctx)
+	if err != nil {
+		return nil, err
+	}
 	postgresStorage, err := storage.NewPostgresStorage(postgresContainer)
 	if err != nil {
 		return nil, err
@@ -120,13 +160,23 @@ func InjectPgPrioritySQSIntegrationTest(ctx context.Context) (*PostgresPriorityS
 		return nil, err
 	}
 	sqsPublisher := publisher.NewSQSPublisher(client)
+	redisClient, err := internal.NewRedisClient(redisContainer)
+	if err != nil {
+		return nil, err
+	}
+	redisBroker, err := broker.NewRedisBroker(redisClient, redisContainer)
+	if err != nil {
+		return nil, err
+	}
 	priorityPublisher := publisher.NewPriorityPublisher(sqsPublisher, sqsPriorityContainer, postgresStorage)
-	engine := NewEngine(postgresStorage, priorityPublisher)
+	engine := NewEngine(postgresStorage, priorityPublisher, redisBroker)
 	postgresPrioritySQSIntegrationTest := &PostgresPrioritySQSIntegrationTest{
 		PostgresContainer: postgresContainer,
 		SQSContainer:      sqsPriorityContainer,
+		RedisContainer:    redisContainer,
 		Storage:           postgresStorage,
 		Publisher:         sqsPublisher,
+		Broker:            redisBroker,
 		Engine:            engine,
 	}
 	return postgresPrioritySQSIntegrationTest, nil
@@ -145,19 +195,33 @@ func InjectPgPriorityRabbitMQIntegrationTest(ctx context.Context) (*PostgresPrio
 	if err != nil {
 		return nil, err
 	}
+	redisContainer, err := containers.NewRedisContainer(ctx)
+	if err != nil {
+		return nil, err
+	}
 	postgresStorage, err := storage.NewPostgresStorage(postgresContainer)
 	if err != nil {
 		return nil, err
 	}
 	rabbitMQPublisher := publisher.NewRabbitMQPublisher(rabbitMQClient)
 	priorityPublisher := publisher.NewPriorityPublisher(rabbitMQPublisher, rabbitMQPriorityContainer, postgresStorage)
-	engine := NewEngine(postgresStorage, priorityPublisher)
+	client, err := internal.NewRedisClient(redisContainer)
+	if err != nil {
+		return nil, err
+	}
+	redisBroker, err := broker.NewRedisBroker(client, redisContainer)
+	if err != nil {
+		return nil, err
+	}
+	engine := NewEngine(postgresStorage, priorityPublisher, redisBroker)
 	postgresPriorityRabbitMQIntegrationTest := &PostgresPriorityRabbitMQIntegrationTest{
 		PostgresContainer: postgresContainer,
 		RabbitMQContainer: rabbitMQPriorityContainer,
 		RabbitMQClient:    rabbitMQClient,
+		RedisContainer:    redisContainer,
 		Storage:           postgresStorage,
 		Publisher:         priorityPublisher,
+		Broker:            redisBroker,
 		Engine:            engine,
 	}
 	return postgresPriorityRabbitMQIntegrationTest, nil
@@ -172,6 +236,10 @@ func InjectDynamoPrioritySQSIntegrationTest(ctx context.Context) (*DynamoPriorit
 	if err != nil {
 		return nil, err
 	}
+	redisContainer, err := containers.NewRedisContainer(ctx)
+	if err != nil {
+		return nil, err
+	}
 	client, err := storage2.NewDynamoDBClient(dynamoContainer)
 	if err != nil {
 		return nil, err
@@ -182,13 +250,23 @@ func InjectDynamoPrioritySQSIntegrationTest(ctx context.Context) (*DynamoPriorit
 		return nil, err
 	}
 	sqsPublisher := publisher.NewSQSPublisher(sqsClient)
+	redisClient, err := internal.NewRedisClient(redisContainer)
+	if err != nil {
+		return nil, err
+	}
+	redisBroker, err := broker.NewRedisBroker(redisClient, redisContainer)
+	if err != nil {
+		return nil, err
+	}
 	priorityPublisher := publisher.NewPriorityPublisher(sqsPublisher, sqsPriorityContainer, dynamoDBStorage)
-	engine := NewEngine(dynamoDBStorage, priorityPublisher)
+	engine := NewEngine(dynamoDBStorage, priorityPublisher, redisBroker)
 	dynamoPrioritySQSIntegrationTest := &DynamoPrioritySQSIntegrationTest{
 		DynamoContainer: dynamoContainer,
 		SQSContainer:    sqsPriorityContainer,
+		RedisContainer:  redisContainer,
 		Storage:         dynamoDBStorage,
 		Publisher:       sqsPublisher,
+		Broker:          redisBroker,
 		Engine:          engine,
 	}
 	return dynamoPrioritySQSIntegrationTest, nil
@@ -207,6 +285,10 @@ func InjectDynamoPriorityRabbitMQIntegrationTest(ctx context.Context) (*DynamoPr
 	if err != nil {
 		return nil, err
 	}
+	redisContainer, err := containers.NewRedisContainer(ctx)
+	if err != nil {
+		return nil, err
+	}
 	client, err := storage2.NewDynamoDBClient(dynamoContainer)
 	if err != nil {
 		return nil, err
@@ -214,13 +296,23 @@ func InjectDynamoPriorityRabbitMQIntegrationTest(ctx context.Context) (*DynamoPr
 	dynamoDBStorage := storage2.NewDynamoDBStorage(client)
 	rabbitMQPublisher := publisher.NewRabbitMQPublisher(rabbitMQClient)
 	priorityPublisher := publisher.NewPriorityPublisher(rabbitMQPublisher, rabbitMQPriorityContainer, dynamoDBStorage)
-	engine := NewEngine(dynamoDBStorage, priorityPublisher)
+	redisClient, err := internal.NewRedisClient(redisContainer)
+	if err != nil {
+		return nil, err
+	}
+	redisBroker, err := broker.NewRedisBroker(redisClient, redisContainer)
+	if err != nil {
+		return nil, err
+	}
+	engine := NewEngine(dynamoDBStorage, priorityPublisher, redisBroker)
 	dynamoPriorityRabbitMQIntegrationTest := &DynamoPriorityRabbitMQIntegrationTest{
 		DynamoContainer:   dynamoContainer,
 		RabbitMQContainer: rabbitMQPriorityContainer,
 		RabbitMQClient:    rabbitMQClient,
+		RedisContainer:    redisContainer,
 		Storage:           dynamoDBStorage,
 		Publisher:         priorityPublisher,
+		Broker:            redisBroker,
 		Engine:            engine,
 	}
 	return dynamoPriorityRabbitMQIntegrationTest, nil
@@ -265,16 +357,20 @@ type Storage interface {
 type PostgresPrioritySQSIntegrationTest struct {
 	PostgresContainer *containers.PostgresContainer
 	SQSContainer      *containers.SQSPriorityContainer
+	RedisContainer    *containers.RedisContainer
 	Storage           *storage.PostgresStorage
 	Publisher         *publisher.SQSPublisher
+	Broker            *broker.RedisBroker
 	Engine            *gin.Engine
 }
 
 type DynamoPrioritySQSIntegrationTest struct {
 	DynamoContainer *containers.DynamoContainer
 	SQSContainer    *containers.SQSPriorityContainer
+	RedisContainer  *containers.RedisContainer
 	Storage         *storage2.DynamoDBStorage
 	Publisher       *publisher.SQSPublisher
+	Broker          *broker.RedisBroker
 	Engine          *gin.Engine
 }
 
@@ -282,8 +378,10 @@ type PostgresPriorityRabbitMQIntegrationTest struct {
 	PostgresContainer *containers.PostgresContainer
 	RabbitMQContainer *containers.RabbitMQPriorityContainer
 	RabbitMQClient    *publisher.RabbitMQClient
+	RedisContainer    *containers.RedisContainer
 	Storage           *storage.PostgresStorage
 	Publisher         *publisher.PriorityPublisher
+	Broker            *broker.RedisBroker
 	Engine            *gin.Engine
 }
 
@@ -291,8 +389,10 @@ type DynamoPriorityRabbitMQIntegrationTest struct {
 	DynamoContainer   *containers.DynamoContainer
 	RabbitMQContainer *containers.RabbitMQPriorityContainer
 	RabbitMQClient    *publisher.RabbitMQClient
+	RedisContainer    *containers.RedisContainer
 	Storage           *storage2.DynamoDBStorage
 	Publisher         *publisher.PriorityPublisher
+	Broker            *broker.RedisBroker
 	Engine            *gin.Engine
 }
 
@@ -306,6 +406,10 @@ func (it *PostgresPrioritySQSIntegrationTest) Cleanup() error {
 		return fmt.Errorf("failed to cleanup sqs container - %w", err)
 	}
 
+	if err := it.RedisContainer.Cleanup(); err != nil {
+		return fmt.Errorf("failed to cleanup redis container - %w", err)
+	}
+
 	return nil
 }
 
@@ -317,6 +421,10 @@ func (it *DynamoPrioritySQSIntegrationTest) Cleanup() error {
 
 	if err := it.SQSContainer.Container.Cleanup(); err != nil {
 		return fmt.Errorf("failed to cleanup sqs container - %w", err)
+	}
+
+	if err := it.RedisContainer.Cleanup(); err != nil {
+		return fmt.Errorf("failed to cleanup redis container - %w", err)
 	}
 
 	return nil
@@ -336,6 +444,10 @@ func (it *PostgresPriorityRabbitMQIntegrationTest) Cleanup() error {
 		return fmt.Errorf("failed to cleanup rabbitmq container - %w", err)
 	}
 
+	if err := it.RedisContainer.Cleanup(); err != nil {
+		return fmt.Errorf("failed to cleanup redis container - %w", err)
+	}
+
 	return nil
 }
 
@@ -351,6 +463,10 @@ func (it *DynamoPriorityRabbitMQIntegrationTest) Cleanup() error {
 
 	if err := it.RabbitMQContainer.Container.Cleanup(); err != nil {
 		return fmt.Errorf("failed to cleanup rabbitmq container - %w", err)
+	}
+
+	if err := it.RedisContainer.Cleanup(); err != nil {
+		return fmt.Errorf("failed to cleanup redis container - %w", err)
 	}
 
 	return nil
@@ -384,6 +500,8 @@ var DynamoRabbitMQPriroritySet = wire.NewSet(
 	RabbitMQPublisherSet, publisher.NewPriorityPublisher, wire.Bind(new(controllers.NotificationPublisher), new(*publisher.PriorityPublisher)),
 )
 
+var RedisUserNotificationBrokerSet = wire.NewSet(internal.NewRedisClient, broker.NewRedisBroker, wire.Bind(new(broker.RedisApi), new(*redis.Client)), wire.Bind(new(controllers.UserNotificationBroker), new(*broker.RedisBroker)))
+
 var PostgresContainerSet = wire.NewSet(containers.NewPostgresContainer, wire.Bind(new(storage.PostgresConfigurator), new(*containers.PostgresContainer)))
 
 var SQSPriorityContainerSet = wire.NewSet(containers.NewSQSPriorityContainer, wire.Bind(new(publisher.SQSConfigurator), new(*containers.SQSPriorityContainer)), wire.Bind(new(publisher.PriorityQueueConfigurator), new(*containers.SQSPriorityContainer)))
@@ -392,14 +510,16 @@ var RabbitMQPriorityContainerSet = wire.NewSet(containers.NewRabbitMQPriorityCon
 
 var DynamoContainerSet = wire.NewSet(containers.NewDynamoContainer, wire.Bind(new(storage2.DynamoConfigurator), new(*containers.DynamoContainer)))
 
-var EnvConfigSet = wire.NewSet(config.NewEnvConfig, wire.Bind(new(storage.PostgresConfigurator), new(*config.EnvConfig)), wire.Bind(new(storage2.DynamoConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.PriorityQueueConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.SQSConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.RabbitMQConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.RabbitMQPriorityConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.SQSPriorityConfigurator), new(*config.EnvConfig)))
+var RedisContainerSet = wire.NewSet(containers.NewRedisContainer, wire.Bind(new(internal.RedisConfigurator), new(*containers.RedisContainer)), wire.Bind(new(broker.BrokerConfigurator), new(*containers.RedisContainer)))
 
-func NewEngine(storage3 Storage, pub controllers.NotificationPublisher) *gin.Engine {
+var EnvConfigSet = wire.NewSet(config.NewEnvConfig, wire.Bind(new(storage.PostgresConfigurator), new(*config.EnvConfig)), wire.Bind(new(storage2.DynamoConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.PriorityQueueConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.SQSConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.RabbitMQConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.RabbitMQPriorityConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.SQSPriorityConfigurator), new(*config.EnvConfig)), wire.Bind(new(internal.RedisConfigurator), new(*config.EnvConfig)), wire.Bind(new(broker.BrokerConfigurator), new(*config.EnvConfig)))
+
+func NewEngine(storage3 Storage, pub controllers.NotificationPublisher, bk controllers.UserNotificationBroker) *gin.Engine {
 
 	r := gin.Default()
 	routes.SetupNotificationRoutes(r, storage3, pub)
 	routes.SetupDistributionListRoutes(r, storage3)
-	routes.SetupUsersRoutes(r, storage3)
+	routes.SetupUsersRoutes(r, storage3, bk)
 
 	return r
 }

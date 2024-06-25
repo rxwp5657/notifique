@@ -68,7 +68,11 @@ func NewRabbitMQPriorityDeployer(c publisher.RabbitMQPriorityConfigurator) (*Rab
 	}
 
 	cleanup := func() {
-		log.Fatal(client.Close())
+		err := client.Close()
+
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	deployer := RabbitMQPriorityDeployer{

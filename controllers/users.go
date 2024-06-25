@@ -1,7 +1,10 @@
 package controllers
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 
@@ -19,8 +22,15 @@ type UserStorage interface {
 	UpdateUserConfig(ctx context.Context, userId string, config dto.UserConfig) error
 }
 
+type UserNotificationBroker interface {
+	Suscribe(ctx context.Context, userId string) (<-chan dto.UserNotification, error)
+	Unsubscribe(ctx context.Context, userId string) error
+	Publish(ctx context.Context, userId string, un dto.UserNotification) error
+}
+
 type UserController struct {
 	Storage UserStorage
+	Broker  UserNotificationBroker
 }
 
 func (nc UserController) GetUserNotifications(c *gin.Context) {
@@ -99,4 +109,42 @@ func (nc UserController) UpdateUserConfig(c *gin.Context) {
 	}
 
 	c.Status(http.StatusOK)
+}
+
+func (nc UserController) GetLiveUserNotifications(c *gin.Context) {
+
+	userId := c.GetHeader(UserIdHeaderKey)
+	ch, err := nc.Broker.Suscribe(c, userId)
+
+	if err != nil {
+		slog.Error(err.Error())
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	slog.Info(fmt.Sprintf("user %s connected", userId))
+	defer nc.Broker.Unsubscribe(c, userId)
+
+	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("Transfer-Encoding", "chunked")
+
+	c.Stream(func(w io.Writer) bool {
+		for {
+			select {
+			case <-c.Request.Context().Done():
+				slog.Info(fmt.Sprintf("user %s disconnected", userId))
+				return false
+			case un := <-ch:
+				marshalled, err := json.Marshal(un)
+				if err != nil {
+					slog.Error(err.Error())
+					continue
+				}
+				c.SSEvent(userNotificationEvent, string(marshalled))
+				return true
+			}
+		}
+	})
 }

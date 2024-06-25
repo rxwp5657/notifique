@@ -49,6 +49,20 @@ paths:
                       data:
                         $ref: '#/components/schemas/UserNotification'
 
+  /users/me/notifications/live:
+    get:
+      summary: |
+        Retrieves live user notification data through server sent events (SSE).
+      tags:
+        - users
+      produces: ["text/event-stream"]
+      responses:
+        schema:
+          type: object
+          x-events:
+            data:
+              $ref: '#/components/schemas/UserNotification'
+
   /users/me/notifications/{id}:
     patch:
       summary: Updates the notification's read status.
