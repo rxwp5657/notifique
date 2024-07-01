@@ -8,11 +8,13 @@ import (
 
 func main() {
 
-	r, err := di.InjectDynamoPriorityRabbitMQ(".env")
+	r, close, err := di.InjectDynamoPriorityRabbitMQ(".env")
 
 	if err != nil {
 		log.Fatalf("failed to create engine - %v", err)
 	}
+
+	defer close()
 
 	r.Run() // listen and serve on 0.0.0.0:8080
 }

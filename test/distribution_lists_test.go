@@ -16,7 +16,7 @@ import (
 
 func TestDistributionListController(t *testing.T) {
 
-	testApp, err := di.InjectPgPrioritySQSIntegrationTest(context.TODO())
+	testApp, close, err := di.InjectPgPrioritySQSIntegrationTest(context.TODO())
 
 	if err != nil {
 		t.Fatalf("failed to create container app - %v", err)
@@ -24,11 +24,7 @@ func TestDistributionListController(t *testing.T) {
 
 	userId := "1234"
 
-	defer func() {
-		if err := testApp.Cleanup(); err != nil {
-			t.Fatal(err)
-		}
-	}()
+	defer close()
 
 	dl := dto.DistributionList{
 		Name:       "TestDL",

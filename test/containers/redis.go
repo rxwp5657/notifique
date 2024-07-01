@@ -3,6 +3,7 @@ package containers
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
@@ -13,8 +14,7 @@ const TestBrokerChannelSize = 10
 
 type RedisContainer struct {
 	testcontainers.Container
-	URI     string
-	Cleanup func() error
+	URI string
 }
 
 func (rc *RedisContainer) GetRedisUrl() (string, error) {
@@ -35,7 +35,7 @@ func (rc *RedisContainer) GetBrokerChannelSize() (int, error) {
 	return TestBrokerChannelSize, nil
 }
 
-func NewRedisContainer(ctx context.Context) (*RedisContainer, error) {
+func NewRedisContainer(ctx context.Context) (*RedisContainer, func(), error) {
 
 	port := "6379"
 
@@ -50,30 +50,35 @@ func NewRedisContainer(ctx context.Context) (*RedisContainer, error) {
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create redis container - %w", err)
+		return nil, nil, fmt.Errorf("failed to create redis container - %w", err)
 	}
 
 	ip, err := container.Host(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get the redis host - %w", err)
+		return nil, nil, fmt.Errorf("failed to get the redis host - %w", err)
 	}
 
 	mappedPort, err := container.MappedPort(ctx, nat.Port(port))
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	uri := fmt.Sprintf("redis://%s:%s", ip, mappedPort.Port())
 
-	cleanup := func() error { return container.Terminate(ctx) }
+	close := func() {
+		err := container.Terminate(ctx)
+
+		if err != nil {
+			slog.Error("failed to terminate redis container", "reason", err)
+		}
+	}
 
 	redisContainer := RedisContainer{
 		Container: container,
 		URI:       uri,
-		Cleanup:   cleanup,
 	}
 
-	return &redisContainer, nil
+	return &redisContainer, close, nil
 }

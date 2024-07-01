@@ -5,7 +5,6 @@ package dependencyinjection
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -71,82 +70,6 @@ type DynamoPriorityRabbitMQIntegrationTest struct {
 	Publisher         *pub.PriorityPublisher
 	Broker            *bk.RedisBroker
 	Engine            *gin.Engine
-}
-
-func (it *PostgresPrioritySQSIntegrationTest) Cleanup() error {
-
-	if err := it.PostgresContainer.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup postgres container - %w", err)
-	}
-
-	if err := it.SQSContainer.Container.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup sqs container - %w", err)
-	}
-
-	if err := it.RedisContainer.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup redis container - %w", err)
-	}
-
-	return nil
-}
-
-func (it *DynamoPrioritySQSIntegrationTest) Cleanup() error {
-
-	if err := it.DynamoContainer.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup dynamo container - %w", err)
-	}
-
-	if err := it.SQSContainer.Container.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup sqs container - %w", err)
-	}
-
-	if err := it.RedisContainer.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup redis container - %w", err)
-	}
-
-	return nil
-}
-
-func (it *PostgresPriorityRabbitMQIntegrationTest) Cleanup() error {
-
-	if err := it.PostgresContainer.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup postgres container - %w", err)
-	}
-
-	if err := it.RabbitMQClient.Close(); err != nil {
-		return fmt.Errorf("failed to close rabbitmq connection - %w", err)
-	}
-
-	if err := it.RabbitMQContainer.Container.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup rabbitmq container - %w", err)
-	}
-
-	if err := it.RedisContainer.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup redis container - %w", err)
-	}
-
-	return nil
-}
-
-func (it *DynamoPriorityRabbitMQIntegrationTest) Cleanup() error {
-
-	if err := it.DynamoContainer.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup dynamo container - %w", err)
-	}
-
-	if err := it.RabbitMQClient.Close(); err != nil {
-		return fmt.Errorf("failed to close rabbitmq connection - %w", err)
-	}
-
-	if err := it.RabbitMQContainer.Container.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup rabbitmq container - %w", err)
-	}
-
-	if err := it.RedisContainer.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup redis container - %w", err)
-	}
-
-	return nil
 }
 
 var DynamoSet = wire.NewSet(
@@ -276,7 +199,7 @@ func InjectPgPrioritySQS(envfile string) (*gin.Engine, error) {
 	return nil, nil
 }
 
-func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, error) {
+func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
 
 	wire.Build(
 		EnvConfigSet,
@@ -285,7 +208,7 @@ func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, error) {
 		NewEngine,
 	)
 
-	return nil, nil
+	return nil, nil, nil
 }
 
 func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
@@ -300,7 +223,7 @@ func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
 	return nil, nil
 }
 
-func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, error) {
+func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
 
 	wire.Build(
 		EnvConfigSet,
@@ -309,10 +232,10 @@ func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, error) {
 		NewEngine,
 	)
 
-	return nil, nil
+	return nil, nil, nil
 }
 
-func InjectPgPrioritySQSIntegrationTest(ctx context.Context) (*PostgresPrioritySQSIntegrationTest, error) {
+func InjectPgPrioritySQSIntegrationTest(ctx context.Context) (*PostgresPrioritySQSIntegrationTest, func(), error) {
 
 	wire.Build(
 		PostgresContainerSet,
@@ -324,10 +247,10 @@ func InjectPgPrioritySQSIntegrationTest(ctx context.Context) (*PostgresPriorityS
 		wire.Struct(new(PostgresPrioritySQSIntegrationTest), "*"),
 	)
 
-	return nil, nil
+	return nil, nil, nil
 }
 
-func InjectPgPriorityRabbitMQIntegrationTest(ctx context.Context) (*PostgresPriorityRabbitMQIntegrationTest, error) {
+func InjectPgPriorityRabbitMQIntegrationTest(ctx context.Context) (*PostgresPriorityRabbitMQIntegrationTest, func(), error) {
 
 	wire.Build(
 		PostgresContainerSet,
@@ -339,10 +262,10 @@ func InjectPgPriorityRabbitMQIntegrationTest(ctx context.Context) (*PostgresPrio
 		wire.Struct(new(PostgresPriorityRabbitMQIntegrationTest), "*"),
 	)
 
-	return nil, nil
+	return nil, nil, nil
 }
 
-func InjectDynamoPrioritySQSIntegrationTest(ctx context.Context) (*DynamoPrioritySQSIntegrationTest, error) {
+func InjectDynamoPrioritySQSIntegrationTest(ctx context.Context) (*DynamoPrioritySQSIntegrationTest, func(), error) {
 
 	wire.Build(
 		DynamoContainerSet,
@@ -354,10 +277,10 @@ func InjectDynamoPrioritySQSIntegrationTest(ctx context.Context) (*DynamoPriorit
 		wire.Struct(new(DynamoPrioritySQSIntegrationTest), "*"),
 	)
 
-	return nil, nil
+	return nil, nil, nil
 }
 
-func InjectDynamoPriorityRabbitMQIntegrationTest(ctx context.Context) (*DynamoPriorityRabbitMQIntegrationTest, error) {
+func InjectDynamoPriorityRabbitMQIntegrationTest(ctx context.Context) (*DynamoPriorityRabbitMQIntegrationTest, func(), error) {
 
 	wire.Build(
 		DynamoContainerSet,
@@ -369,7 +292,7 @@ func InjectDynamoPriorityRabbitMQIntegrationTest(ctx context.Context) (*DynamoPr
 		wire.Struct(new(DynamoPriorityRabbitMQIntegrationTest), "*"),
 	)
 
-	return nil, nil
+	return nil, nil, nil
 }
 
 func InjectRabbitMQPriorityDeployer(envfile string) (*deployments.RabbitMQPriorityDeployer, func(), error) {

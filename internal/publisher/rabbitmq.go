@@ -3,6 +3,7 @@ package publisher
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 )
@@ -15,8 +16,7 @@ type RabbitMQAPI interface {
 
 type RabbitMQClient struct {
 	*amqp.Channel
-	conn  *amqp.Connection
-	Close func() error
+	conn *amqp.Connection
 }
 
 type RabbitMQPublisher struct {
@@ -47,42 +47,40 @@ func (p *RabbitMQPublisher) Publish(ctx context.Context, queueName string, messa
 	)
 }
 
-func NewRabbitMQClient(c RabbitMQConfigurator) (*RabbitMQClient, error) {
+func NewRabbitMQClient(c RabbitMQConfigurator) (*RabbitMQClient, func(), error) {
 
 	url, err := c.GetRabbitMQUrl()
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	conn, err := amqp.Dial(string(url))
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to rabbitmq - %w", err)
+		return nil, nil, fmt.Errorf("failed to connect to rabbitmq - %w", err)
 	}
 
 	ch, err := conn.Channel()
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create channel - %w", err)
+		return nil, nil, fmt.Errorf("failed to create channel - %w", err)
 	}
 
-	close := func() error {
+	close := func() {
 
 		if err := ch.Close(); err != nil {
-			return fmt.Errorf("failed to close rabbitmq channel - %w", err)
+			slog.Error("failed to close rabbitmq channel", "reason", err)
 		}
 
 		if err := conn.Close(); err != nil {
-			return fmt.Errorf("failed to close rabbitmq connection - %w", err)
+			slog.Error("failed to close rabbitmq connection", "reason", err)
 		}
-
-		return nil
 	}
 
-	client := RabbitMQClient{Channel: ch, conn: conn, Close: close}
+	client := RabbitMQClient{Channel: ch, conn: conn}
 
-	return &client, nil
+	return &client, close, nil
 }
 
 func NewRabbitMQPublisher(p RabbitMQAPI) *RabbitMQPublisher {
