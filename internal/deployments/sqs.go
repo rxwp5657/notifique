@@ -106,19 +106,17 @@ func createSQSQueue(c *sqs.Client, queueName string) (queueUrl string, err error
 	return
 }
 
-func NewSQSPriorityDeployer(c publisher.SQSPriorityConfigurator) (*SQSPriorityDeployer, func(), error) {
+func NewSQSPriorityDeployer(c publisher.SQSPriorityConfigurator) (*SQSPriorityDeployer, error) {
 	client, err := publisher.NewSQSClient(c)
 
 	if err != nil {
-		return nil, nil, nil
+		return nil, nil
 	}
-
-	cleanup := func() {}
 
 	deployer := SQSPriorityDeployer{
 		Client: client,
 		Queues: c.GetPriorityQueues(),
 	}
 
-	return &deployer, cleanup, nil
+	return &deployer, nil
 }

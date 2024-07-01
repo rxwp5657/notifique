@@ -3,6 +3,7 @@ package containers
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/docker/go-connections/nat"
 	"github.com/testcontainers/testcontainers-go"
@@ -19,15 +20,14 @@ const (
 
 type PostgresContainer struct {
 	testcontainers.Container
-	URI     string
-	Cleanup func() error
+	URI string
 }
 
 func (pc *PostgresContainer) GetPostgresUrl() (string, error) {
 	return pc.URI, nil
 }
 
-func NewPostgresContainer(ctx context.Context) (*PostgresContainer, error) {
+func NewPostgresContainer(ctx context.Context) (*PostgresContainer, func(), error) {
 
 	port := "5432"
 
@@ -47,19 +47,19 @@ func NewPostgresContainer(ctx context.Context) (*PostgresContainer, error) {
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to init the postgres container - %w", err)
+		return nil, nil, fmt.Errorf("failed to init the postgres container - %w", err)
 	}
 
 	ip, err := container.Host(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get the dynamodb's host - %w", err)
+		return nil, nil, fmt.Errorf("failed to get the dynamodb's host - %w", err)
 	}
 
 	mappedPort, err := container.MappedPort(ctx, nat.Port(port))
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to acquire mapped port - %w", err)
+		return nil, nil, fmt.Errorf("failed to acquire mapped port - %w", err)
 	}
 
 	uriTemplate := "postgres://%s:%s@%s:%s/%s?sslmode=disable"
@@ -76,9 +76,16 @@ func NewPostgresContainer(ctx context.Context) (*PostgresContainer, error) {
 	err = p.RunMigrations(uri)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to run migrations - %w", err)
+		return nil, nil, fmt.Errorf("failed to run migrations - %w", err)
 	}
 
-	cleanup := func() error { return container.Terminate(ctx) }
-	return &PostgresContainer{URI: uri, Cleanup: cleanup}, nil
+	close := func() {
+		err := container.Terminate(ctx)
+
+		if err != nil {
+			slog.Error("failed to terminate postgres container", "reason", err)
+		}
+	}
+
+	return &PostgresContainer{URI: uri}, close, nil
 }

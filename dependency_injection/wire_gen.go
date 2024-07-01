@@ -8,7 +8,6 @@ package dependencyinjection
 
 import (
 	"context"
-	"fmt"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/gin-gonic/gin"
@@ -55,31 +54,35 @@ func InjectPgPrioritySQS(envfile string) (*gin.Engine, error) {
 	return engine, nil
 }
 
-func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, error) {
+func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
 	envConfig, err := config.NewEnvConfig(envfile)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	postgresStorage, err := storage.NewPostgresStorage(envConfig)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	rabbitMQClient, err := publisher.NewRabbitMQClient(envConfig)
+	rabbitMQClient, cleanup, err := publisher.NewRabbitMQClient(envConfig)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	rabbitMQPublisher := publisher.NewRabbitMQPublisher(rabbitMQClient)
 	priorityPublisher := publisher.NewPriorityPublisher(rabbitMQPublisher, envConfig, postgresStorage)
 	client, err := internal.NewRedisClient(envConfig)
 	if err != nil {
-		return nil, err
+		cleanup()
+		return nil, nil, err
 	}
 	redisBroker, err := broker.NewRedisBroker(client, envConfig)
 	if err != nil {
-		return nil, err
+		cleanup()
+		return nil, nil, err
 	}
 	engine := NewEngine(postgresStorage, priorityPublisher, redisBroker)
-	return engine, nil
+	return engine, func() {
+		cleanup()
+	}, nil
 }
 
 func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
@@ -110,63 +113,82 @@ func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
 	return engine, nil
 }
 
-func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, error) {
+func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
 	envConfig, err := config.NewEnvConfig(envfile)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	client, err := storage2.NewDynamoDBClient(envConfig)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	dynamoDBStorage := storage2.NewDynamoDBStorage(client)
-	rabbitMQClient, err := publisher.NewRabbitMQClient(envConfig)
+	rabbitMQClient, cleanup, err := publisher.NewRabbitMQClient(envConfig)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	rabbitMQPublisher := publisher.NewRabbitMQPublisher(rabbitMQClient)
 	priorityPublisher := publisher.NewPriorityPublisher(rabbitMQPublisher, envConfig, dynamoDBStorage)
 	redisClient, err := internal.NewRedisClient(envConfig)
 	if err != nil {
-		return nil, err
+		cleanup()
+		return nil, nil, err
 	}
 	redisBroker, err := broker.NewRedisBroker(redisClient, envConfig)
 	if err != nil {
-		return nil, err
+		cleanup()
+		return nil, nil, err
 	}
 	engine := NewEngine(dynamoDBStorage, priorityPublisher, redisBroker)
-	return engine, nil
+	return engine, func() {
+		cleanup()
+	}, nil
 }
 
-func InjectPgPrioritySQSIntegrationTest(ctx context.Context) (*PostgresPrioritySQSIntegrationTest, error) {
-	postgresContainer, err := containers.NewPostgresContainer(ctx)
+func InjectPgPrioritySQSIntegrationTest(ctx context.Context) (*PostgresPrioritySQSIntegrationTest, func(), error) {
+	postgresContainer, cleanup, err := containers.NewPostgresContainer(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	sqsPriorityContainer, err := containers.NewSQSPriorityContainer(ctx)
+	sqsPriorityContainer, cleanup2, err := containers.NewSQSPriorityContainer(ctx)
 	if err != nil {
-		return nil, err
+		cleanup()
+		return nil, nil, err
 	}
-	redisContainer, err := containers.NewRedisContainer(ctx)
+	redisContainer, cleanup3, err := containers.NewRedisContainer(ctx)
 	if err != nil {
-		return nil, err
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
 	postgresStorage, err := storage.NewPostgresStorage(postgresContainer)
 	if err != nil {
-		return nil, err
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
 	client, err := publisher.NewSQSClient(sqsPriorityContainer)
 	if err != nil {
-		return nil, err
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
 	sqsPublisher := publisher.NewSQSPublisher(client)
 	redisClient, err := internal.NewRedisClient(redisContainer)
 	if err != nil {
-		return nil, err
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
 	redisBroker, err := broker.NewRedisBroker(redisClient, redisContainer)
 	if err != nil {
-		return nil, err
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
 	priorityPublisher := publisher.NewPriorityPublisher(sqsPublisher, sqsPriorityContainer, postgresStorage)
 	engine := NewEngine(postgresStorage, priorityPublisher, redisBroker)
@@ -179,39 +201,61 @@ func InjectPgPrioritySQSIntegrationTest(ctx context.Context) (*PostgresPriorityS
 		Broker:            redisBroker,
 		Engine:            engine,
 	}
-	return postgresPrioritySQSIntegrationTest, nil
+	return postgresPrioritySQSIntegrationTest, func() {
+		cleanup3()
+		cleanup2()
+		cleanup()
+	}, nil
 }
 
-func InjectPgPriorityRabbitMQIntegrationTest(ctx context.Context) (*PostgresPriorityRabbitMQIntegrationTest, error) {
-	postgresContainer, err := containers.NewPostgresContainer(ctx)
+func InjectPgPriorityRabbitMQIntegrationTest(ctx context.Context) (*PostgresPriorityRabbitMQIntegrationTest, func(), error) {
+	postgresContainer, cleanup, err := containers.NewPostgresContainer(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	rabbitMQPriorityContainer, err := containers.NewRabbitMQPriorityContainer(ctx)
+	rabbitMQPriorityContainer, cleanup2, err := containers.NewRabbitMQPriorityContainer(ctx)
 	if err != nil {
-		return nil, err
+		cleanup()
+		return nil, nil, err
 	}
-	rabbitMQClient, err := publisher.NewRabbitMQClient(rabbitMQPriorityContainer)
+	rabbitMQClient, cleanup3, err := publisher.NewRabbitMQClient(rabbitMQPriorityContainer)
 	if err != nil {
-		return nil, err
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
-	redisContainer, err := containers.NewRedisContainer(ctx)
+	redisContainer, cleanup4, err := containers.NewRedisContainer(ctx)
 	if err != nil {
-		return nil, err
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
 	postgresStorage, err := storage.NewPostgresStorage(postgresContainer)
 	if err != nil {
-		return nil, err
+		cleanup4()
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
 	rabbitMQPublisher := publisher.NewRabbitMQPublisher(rabbitMQClient)
 	priorityPublisher := publisher.NewPriorityPublisher(rabbitMQPublisher, rabbitMQPriorityContainer, postgresStorage)
 	client, err := internal.NewRedisClient(redisContainer)
 	if err != nil {
-		return nil, err
+		cleanup4()
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
 	redisBroker, err := broker.NewRedisBroker(client, redisContainer)
 	if err != nil {
-		return nil, err
+		cleanup4()
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
 	engine := NewEngine(postgresStorage, priorityPublisher, redisBroker)
 	postgresPriorityRabbitMQIntegrationTest := &PostgresPriorityRabbitMQIntegrationTest{
@@ -224,39 +268,59 @@ func InjectPgPriorityRabbitMQIntegrationTest(ctx context.Context) (*PostgresPrio
 		Broker:            redisBroker,
 		Engine:            engine,
 	}
-	return postgresPriorityRabbitMQIntegrationTest, nil
+	return postgresPriorityRabbitMQIntegrationTest, func() {
+		cleanup4()
+		cleanup3()
+		cleanup2()
+		cleanup()
+	}, nil
 }
 
-func InjectDynamoPrioritySQSIntegrationTest(ctx context.Context) (*DynamoPrioritySQSIntegrationTest, error) {
-	dynamoContainer, err := containers.NewDynamoContainer(ctx)
+func InjectDynamoPrioritySQSIntegrationTest(ctx context.Context) (*DynamoPrioritySQSIntegrationTest, func(), error) {
+	dynamoContainer, cleanup, err := containers.NewDynamoContainer(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	sqsPriorityContainer, err := containers.NewSQSPriorityContainer(ctx)
+	sqsPriorityContainer, cleanup2, err := containers.NewSQSPriorityContainer(ctx)
 	if err != nil {
-		return nil, err
+		cleanup()
+		return nil, nil, err
 	}
-	redisContainer, err := containers.NewRedisContainer(ctx)
+	redisContainer, cleanup3, err := containers.NewRedisContainer(ctx)
 	if err != nil {
-		return nil, err
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
 	client, err := storage2.NewDynamoDBClient(dynamoContainer)
 	if err != nil {
-		return nil, err
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
 	dynamoDBStorage := storage2.NewDynamoDBStorage(client)
 	sqsClient, err := publisher.NewSQSClient(sqsPriorityContainer)
 	if err != nil {
-		return nil, err
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
 	sqsPublisher := publisher.NewSQSPublisher(sqsClient)
 	redisClient, err := internal.NewRedisClient(redisContainer)
 	if err != nil {
-		return nil, err
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
 	redisBroker, err := broker.NewRedisBroker(redisClient, redisContainer)
 	if err != nil {
-		return nil, err
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
 	priorityPublisher := publisher.NewPriorityPublisher(sqsPublisher, sqsPriorityContainer, dynamoDBStorage)
 	engine := NewEngine(dynamoDBStorage, priorityPublisher, redisBroker)
@@ -269,40 +333,62 @@ func InjectDynamoPrioritySQSIntegrationTest(ctx context.Context) (*DynamoPriorit
 		Broker:          redisBroker,
 		Engine:          engine,
 	}
-	return dynamoPrioritySQSIntegrationTest, nil
+	return dynamoPrioritySQSIntegrationTest, func() {
+		cleanup3()
+		cleanup2()
+		cleanup()
+	}, nil
 }
 
-func InjectDynamoPriorityRabbitMQIntegrationTest(ctx context.Context) (*DynamoPriorityRabbitMQIntegrationTest, error) {
-	dynamoContainer, err := containers.NewDynamoContainer(ctx)
+func InjectDynamoPriorityRabbitMQIntegrationTest(ctx context.Context) (*DynamoPriorityRabbitMQIntegrationTest, func(), error) {
+	dynamoContainer, cleanup, err := containers.NewDynamoContainer(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	rabbitMQPriorityContainer, err := containers.NewRabbitMQPriorityContainer(ctx)
+	rabbitMQPriorityContainer, cleanup2, err := containers.NewRabbitMQPriorityContainer(ctx)
 	if err != nil {
-		return nil, err
+		cleanup()
+		return nil, nil, err
 	}
-	rabbitMQClient, err := publisher.NewRabbitMQClient(rabbitMQPriorityContainer)
+	rabbitMQClient, cleanup3, err := publisher.NewRabbitMQClient(rabbitMQPriorityContainer)
 	if err != nil {
-		return nil, err
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
-	redisContainer, err := containers.NewRedisContainer(ctx)
+	redisContainer, cleanup4, err := containers.NewRedisContainer(ctx)
 	if err != nil {
-		return nil, err
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
 	client, err := storage2.NewDynamoDBClient(dynamoContainer)
 	if err != nil {
-		return nil, err
+		cleanup4()
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
 	dynamoDBStorage := storage2.NewDynamoDBStorage(client)
 	rabbitMQPublisher := publisher.NewRabbitMQPublisher(rabbitMQClient)
 	priorityPublisher := publisher.NewPriorityPublisher(rabbitMQPublisher, rabbitMQPriorityContainer, dynamoDBStorage)
 	redisClient, err := internal.NewRedisClient(redisContainer)
 	if err != nil {
-		return nil, err
+		cleanup4()
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
 	redisBroker, err := broker.NewRedisBroker(redisClient, redisContainer)
 	if err != nil {
-		return nil, err
+		cleanup4()
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
 	}
 	engine := NewEngine(dynamoDBStorage, priorityPublisher, redisBroker)
 	dynamoPriorityRabbitMQIntegrationTest := &DynamoPriorityRabbitMQIntegrationTest{
@@ -315,7 +401,12 @@ func InjectDynamoPriorityRabbitMQIntegrationTest(ctx context.Context) (*DynamoPr
 		Broker:            redisBroker,
 		Engine:            engine,
 	}
-	return dynamoPriorityRabbitMQIntegrationTest, nil
+	return dynamoPriorityRabbitMQIntegrationTest, func() {
+		cleanup4()
+		cleanup3()
+		cleanup2()
+		cleanup()
+	}, nil
 }
 
 func InjectRabbitMQPriorityDeployer(envfile string) (*deployments.RabbitMQPriorityDeployer, func(), error) {
@@ -337,12 +428,11 @@ func InjectSQSPriorityDeployer(envfile string) (*deployments.SQSPriorityDeployer
 	if err != nil {
 		return nil, nil, err
 	}
-	sqsPriorityDeployer, cleanup, err := deployments.NewSQSPriorityDeployer(envConfig)
+	sqsPriorityDeployer, err := deployments.NewSQSPriorityDeployer(envConfig)
 	if err != nil {
 		return nil, nil, err
 	}
 	return sqsPriorityDeployer, func() {
-		cleanup()
 	}, nil
 }
 
@@ -394,82 +484,6 @@ type DynamoPriorityRabbitMQIntegrationTest struct {
 	Publisher         *publisher.PriorityPublisher
 	Broker            *broker.RedisBroker
 	Engine            *gin.Engine
-}
-
-func (it *PostgresPrioritySQSIntegrationTest) Cleanup() error {
-
-	if err := it.PostgresContainer.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup postgres container - %w", err)
-	}
-
-	if err := it.SQSContainer.Container.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup sqs container - %w", err)
-	}
-
-	if err := it.RedisContainer.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup redis container - %w", err)
-	}
-
-	return nil
-}
-
-func (it *DynamoPrioritySQSIntegrationTest) Cleanup() error {
-
-	if err := it.DynamoContainer.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup dynamo container - %w", err)
-	}
-
-	if err := it.SQSContainer.Container.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup sqs container - %w", err)
-	}
-
-	if err := it.RedisContainer.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup redis container - %w", err)
-	}
-
-	return nil
-}
-
-func (it *PostgresPriorityRabbitMQIntegrationTest) Cleanup() error {
-
-	if err := it.PostgresContainer.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup postgres container - %w", err)
-	}
-
-	if err := it.RabbitMQClient.Close(); err != nil {
-		return fmt.Errorf("failed to close rabbitmq connection - %w", err)
-	}
-
-	if err := it.RabbitMQContainer.Container.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup rabbitmq container - %w", err)
-	}
-
-	if err := it.RedisContainer.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup redis container - %w", err)
-	}
-
-	return nil
-}
-
-func (it *DynamoPriorityRabbitMQIntegrationTest) Cleanup() error {
-
-	if err := it.DynamoContainer.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup dynamo container - %w", err)
-	}
-
-	if err := it.RabbitMQClient.Close(); err != nil {
-		return fmt.Errorf("failed to close rabbitmq connection - %w", err)
-	}
-
-	if err := it.RabbitMQContainer.Container.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup rabbitmq container - %w", err)
-	}
-
-	if err := it.RedisContainer.Cleanup(); err != nil {
-		return fmt.Errorf("failed to cleanup redis container - %w", err)
-	}
-
-	return nil
 }
 
 var DynamoSet = wire.NewSet(storage2.NewDynamoDBClient, storage2.NewDynamoDBStorage, wire.Bind(new(storage2.DynamoDBAPI), new(*dynamodb.Client)), wire.Bind(new(Storage), new(*storage2.DynamoDBStorage)), wire.Bind(new(controllers.NotificationStorage), new(*storage2.DynamoDBStorage)))

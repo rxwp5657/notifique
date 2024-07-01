@@ -2,7 +2,6 @@ package deployments
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/notifique/internal/publisher"
 )
@@ -61,18 +60,10 @@ func createRabbitMQQueue(client publisher.RabbitMQClient, name string) error {
 
 func NewRabbitMQPriorityDeployer(c publisher.RabbitMQPriorityConfigurator) (*RabbitMQPriorityDeployer, func(), error) {
 
-	client, err := publisher.NewRabbitMQClient(c)
+	client, close, err := publisher.NewRabbitMQClient(c)
 
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create rabbitmq client - %w", err)
-	}
-
-	cleanup := func() {
-		err := client.Close()
-
-		if err != nil {
-			log.Fatal(err)
-		}
 	}
 
 	deployer := RabbitMQPriorityDeployer{
@@ -80,5 +71,5 @@ func NewRabbitMQPriorityDeployer(c publisher.RabbitMQPriorityConfigurator) (*Rab
 		Queues: c.GetPriorityQueues(),
 	}
 
-	return &deployer, cleanup, nil
+	return &deployer, func() { close() }, nil
 }

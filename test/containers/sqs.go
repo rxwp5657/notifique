@@ -3,6 +3,7 @@ package containers
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/docker/go-connections/nat"
 	"github.com/notifique/internal/deployments"
@@ -13,8 +14,7 @@ import (
 
 type SQSContainer struct {
 	testcontainers.Container
-	URI     string
-	Cleanup func() error
+	URI string
 }
 
 type SQSPriorityContainer struct {
@@ -32,7 +32,7 @@ func (sc *SQSPriorityContainer) GetPriorityQueues() publisher.PriorityQueues {
 	return sc.Queues
 }
 
-func NewSQSContainer(ctx context.Context) (SQSContainer, error) {
+func NewSQSContainer(ctx context.Context) (SQSContainer, func(), error) {
 
 	port := "4566"
 
@@ -45,40 +45,45 @@ func NewSQSContainer(ctx context.Context) (SQSContainer, error) {
 	)
 
 	if err != nil {
-		return SQSContainer{}, fmt.Errorf("failed to create sqs container - %w", err)
+		return SQSContainer{}, nil, fmt.Errorf("failed to create sqs container - %w", err)
 	}
 
 	ip, err := container.Host(ctx)
 
 	if err != nil {
-		return SQSContainer{}, fmt.Errorf("failed to get the sqs host - %w", err)
+		return SQSContainer{}, nil, fmt.Errorf("failed to get the sqs host - %w", err)
 	}
 
 	mappedPort, err := container.MappedPort(ctx, nat.Port(port))
 
 	if err != nil {
-		return SQSContainer{}, err
+		return SQSContainer{}, nil, err
 	}
 
 	uri := fmt.Sprintf("http://%s:%s", ip, mappedPort.Port())
 
-	cleanup := func() error { return container.Terminate(ctx) }
+	close := func() {
+		err := container.Terminate(ctx)
+
+		if err != nil {
+			slog.Error("failed to terminate sqs container", "reason", err)
+		}
+	}
 
 	sqsContainer := SQSContainer{
 		Container: container,
 		URI:       uri,
-		Cleanup:   cleanup,
 	}
 
-	return sqsContainer, nil
+	return sqsContainer, close, nil
 }
 
-func NewSQSPriorityContainer(ctx context.Context) (*SQSPriorityContainer, error) {
+func NewSQSPriorityContainer(ctx context.Context) (*SQSPriorityContainer, func(), error) {
 	queues := NewPriorityQueueConfig()
-	container, err := NewSQSContainer(ctx)
+	container, close, err := NewSQSContainer(ctx)
 
 	if err != nil {
-		return nil, nil
+		return nil, nil, err
 	}
 
 	pc := SQSPriorityContainer{
@@ -86,21 +91,19 @@ func NewSQSPriorityContainer(ctx context.Context) (*SQSPriorityContainer, error)
 		Queues:    queues,
 	}
 
-	deployer, cleanup, err := deployments.NewSQSPriorityDeployer(&pc)
+	deployer, err := deployments.NewSQSPriorityDeployer(&pc)
 
 	if err != nil {
-		return nil, err
+		return nil, close, err
 	}
-
-	defer cleanup()
 
 	deployedQueues, err := deployer.Deploy()
 
 	if err != nil {
-		return nil, err
+		return nil, close, err
 	}
 
 	pc.Queues = deployedQueues
 
-	return &pc, nil
+	return &pc, close, nil
 }

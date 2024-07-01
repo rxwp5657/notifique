@@ -3,6 +3,7 @@ package containers
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -17,15 +18,14 @@ import (
 
 type DynamoContainer struct {
 	testcontainers.Container
-	URI     string
-	Cleanup func() error
+	URI string
 }
 
 func (ddbc *DynamoContainer) GetURI() string {
 	return ddbc.URI
 }
 
-func NewDynamoContainer(ctx context.Context) (*DynamoContainer, error) {
+func NewDynamoContainer(ctx context.Context) (*DynamoContainer, func(), error) {
 
 	port := "8000"
 
@@ -40,19 +40,19 @@ func NewDynamoContainer(ctx context.Context) (*DynamoContainer, error) {
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to init the dynamodb container - %w", err)
+		return nil, nil, fmt.Errorf("failed to init the dynamodb container - %w", err)
 	}
 
 	ip, err := container.Host(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get the dynamodb's host - %w", err)
+		return nil, nil, fmt.Errorf("failed to get the dynamodb's host - %w", err)
 	}
 
 	mappedPort, err := container.MappedPort(ctx, nat.Port(port))
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to acquire mapped port")
+		return nil, nil, fmt.Errorf("failed to acquire mapped port")
 	}
 
 	uri := fmt.Sprintf("http://%s:%s", ip, mappedPort.Port())
@@ -60,7 +60,7 @@ func NewDynamoContainer(ctx context.Context) (*DynamoContainer, error) {
 	cfg, err := config.LoadDefaultConfig(ctx)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to load default config - %w", err)
+		return nil, nil, fmt.Errorf("failed to load default config - %w", err)
 	}
 
 	client := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
@@ -70,18 +70,23 @@ func NewDynamoContainer(ctx context.Context) (*DynamoContainer, error) {
 	err = ddb.CreateTables(client)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create tables - %v", err)
+		return nil, nil, fmt.Errorf("failed to create tables - %v", err)
 	}
 
-	cleanup := func() error { return container.Terminate(ctx) }
+	close := func() {
+		err := container.Terminate(ctx)
+
+		if err != nil {
+			slog.Error("failed to terminate dynamo container", "reason", err)
+		}
+	}
 
 	dc := DynamoContainer{
 		Container: container,
 		URI:       uri,
-		Cleanup:   cleanup,
 	}
 
-	return &dc, nil
+	return &dc, close, nil
 }
 
 func (dc *DynamoContainer) GetDynamoClientConfig() storage.DynamoClientConfig {
