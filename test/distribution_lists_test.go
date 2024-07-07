@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/golang/mock/gomock"
 	di "github.com/notifique/dependency_injection"
 	"github.com/notifique/dto"
 	"github.com/stretchr/testify/assert"
@@ -16,15 +17,18 @@ import (
 
 func TestDistributionListController(t *testing.T) {
 
-	testApp, close, err := di.InjectPgPrioritySQSIntegrationTest(context.TODO())
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+
+	testApp, close, err := di.InjectPgMockedPubIntegrationTest(context.TODO(), controller)
 
 	if err != nil {
 		t.Fatalf("failed to create container app - %v", err)
 	}
 
-	userId := "1234"
-
 	defer close()
+
+	userId := "1234"
 
 	dl := dto.DistributionList{
 		Name:       "TestDL",

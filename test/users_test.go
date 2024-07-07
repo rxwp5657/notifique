@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 
 	"github.com/notifique/controllers"
@@ -26,15 +27,18 @@ type UserNotificationsTester interface {
 
 func TestUserController(t *testing.T) {
 
-	testApp, close, err := di.InjectPgPrioritySQSIntegrationTest(context.TODO())
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+
+	testApp, close, err := di.InjectPgMockedPubIntegrationTest(context.TODO(), controller)
 
 	if err != nil {
 		t.Fatalf("failed to create container app - %v", err)
 	}
 
-	userId := "1234"
-
 	defer close()
+
+	userId := "1234"
 
 	t.Run("TestGetUserNotifications", func(t *testing.T) {
 
