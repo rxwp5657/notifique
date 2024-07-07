@@ -16,6 +16,8 @@ import (
 
 func TestNotificationsController(t *testing.T) {
 
+	notificationsUrl := "/notifications"
+
 	controller := gomock.NewController(t)
 	defer controller.Finish()
 
@@ -48,7 +50,7 @@ func TestNotificationsController(t *testing.T) {
 
 		w := httptest.NewRecorder()
 
-		req, _ := http.NewRequest("POST", "/v0/notifications", reader)
+		req, _ := http.NewRequest("POST", notificationsUrl, reader)
 		req.Header.Add("userId", userId)
 
 		testApp.Engine.ServeHTTP(w, req)

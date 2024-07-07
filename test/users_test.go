@@ -27,6 +27,9 @@ type UserNotificationsTester interface {
 
 func TestUserController(t *testing.T) {
 
+	usersMeNotificationsUrl := "/users/me/notifications"
+	usersMeNotificationsConfigUrl := "/users/me/notifications/config"
+
 	controller := gomock.NewController(t)
 	defer controller.Finish()
 
@@ -53,7 +56,7 @@ func TestUserController(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			req, _ := http.NewRequest("GET", "/v0/users/me/notifications", nil)
+			req, _ := http.NewRequest("GET", usersMeNotificationsUrl, nil)
 			req.Header.Add("userId", userId)
 
 			addPaginationFilters(req, filters)
@@ -130,7 +133,7 @@ func TestUserController(t *testing.T) {
 
 			w := httptest.NewRecorder()
 
-			url := fmt.Sprintf("/v0/users/me/notifications/%s", notificationId)
+			url := fmt.Sprintf("%s/%s", usersMeNotificationsUrl, notificationId)
 			req, _ := http.NewRequest("PATCH", url, nil)
 			req.Header.Add("userId", userId)
 
@@ -154,7 +157,7 @@ func TestUserController(t *testing.T) {
 				t.FailNow()
 			}
 
-			errTemplate := "Notification %v not found"
+			errTemplate := "Notification %s not found"
 			errMsg := fmt.Sprintf(errTemplate, notificationId)
 
 			assert.Equal(t, http.StatusNotFound, w.Code)
@@ -167,7 +170,7 @@ func TestUserController(t *testing.T) {
 		getUserConfig := func(userId string) *httptest.ResponseRecorder {
 			w := httptest.NewRecorder()
 
-			req, _ := http.NewRequest("GET", "/v0/users/me/notifications/config", nil)
+			req, _ := http.NewRequest("GET", usersMeNotificationsConfigUrl, nil)
 			req.Header.Add("userId", userId)
 
 			testApp.Engine.ServeHTTP(w, req)
@@ -182,7 +185,7 @@ func TestUserController(t *testing.T) {
 			marshalled, _ := json.Marshal(config)
 			reader := bytes.NewReader(marshalled)
 
-			req, _ := http.NewRequest("PUT", "/v0/users/me/notifications/config", reader)
+			req, _ := http.NewRequest("PUT", usersMeNotificationsConfigUrl, reader)
 			req.Header.Add("userId", userId)
 
 			testApp.Engine.ServeHTTP(w, req)

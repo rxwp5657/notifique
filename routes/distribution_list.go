@@ -10,11 +10,11 @@ import (
 	"github.com/notifique/internal"
 )
 
-func SetupDistributionListRoutes(r *gin.Engine, dls c.DistributionListStorage) {
+func SetupDistributionListRoutes(r *gin.Engine, version string, dls c.DistributionListStorage) {
 
 	controller := c.DistributionListController{Storage: dls}
 
-	g := r.Group("/v0")
+	g := r.Group(version)
 	{
 		g.GET("/distribution-lists", controller.GetDistributionLists)
 		g.POST("/distribution-lists", controller.CreateDistributionList)

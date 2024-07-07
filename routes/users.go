@@ -9,14 +9,14 @@ import (
 	"github.com/notifique/internal"
 )
 
-func SetupUsersRoutes(r *gin.Engine, us c.UserStorage, bk c.UserNotificationBroker) {
+func SetupUsersRoutes(r *gin.Engine, version string, us c.UserStorage, bk c.UserNotificationBroker) {
 
 	controller := c.UserController{
 		Storage: us,
 		Broker:  bk,
 	}
 
-	g := r.Group("/v0")
+	g := r.Group(version)
 	{
 		g.GET("/users/me/notifications", controller.GetUserNotifications)
 		g.GET("/users/me/notifications/live", controller.GetLiveUserNotifications)

@@ -22,15 +22,10 @@ import (
 	pub "github.com/notifique/internal/publisher"
 	ddb "github.com/notifique/internal/storage/dynamodb"
 	pg "github.com/notifique/internal/storage/postgres"
+	tcfg "github.com/notifique/test/config"
 	c "github.com/notifique/test/containers"
 	mk "github.com/notifique/test/mocks"
 )
-
-type Storage interface {
-	controllers.NotificationStorage
-	controllers.UserStorage
-	controllers.DistributionListStorage
-}
 
 type PostgresMockedPubIntegrationTest struct {
 	PostgresContainer *c.PostgresContainer
@@ -82,13 +77,13 @@ var DynamoSet = wire.NewSet(
 	ddb.NewDynamoDBClient,
 	ddb.NewDynamoDBStorage,
 	wire.Bind(new(ddb.DynamoDBAPI), new(*dynamodb.Client)),
-	wire.Bind(new(Storage), new(*ddb.DynamoDBStorage)),
+	wire.Bind(new(routes.Storage), new(*ddb.DynamoDBStorage)),
 	wire.Bind(new(controllers.NotificationStorage), new(*ddb.DynamoDBStorage)),
 )
 
 var PostgresSet = wire.NewSet(
 	pg.NewPostgresStorage,
-	wire.Bind(new(Storage), new(*pg.PostgresStorage)),
+	wire.Bind(new(routes.Storage), new(*pg.PostgresStorage)),
 	wire.Bind(new(controllers.NotificationStorage), new(*pg.PostgresStorage)),
 )
 
@@ -174,6 +169,11 @@ var MockedPublihserSet = wire.NewSet(
 	wire.Bind(new(controllers.NotificationPublisher), new(*mk.MockNotificationPublisher)),
 )
 
+var TestVersionConfiguratorSet = wire.NewSet(
+	tcfg.NewTestVersionConfigurator,
+	wire.Bind(new(routes.VersionConfigurator), new(tcfg.TestVersionConfiguratorFunc)),
+)
+
 var EnvConfigSet = wire.NewSet(
 	cfg.NewEnvConfig,
 	wire.Bind(new(pg.PostgresConfigurator), new(*cfg.EnvConfig)),
@@ -185,18 +185,8 @@ var EnvConfigSet = wire.NewSet(
 	wire.Bind(new(pub.SQSPriorityConfigurator), new(*cfg.EnvConfig)),
 	wire.Bind(new(internal.RedisConfigurator), new(*cfg.EnvConfig)),
 	wire.Bind(new(bk.BrokerConfigurator), new(*cfg.EnvConfig)),
+	wire.Bind(new(routes.VersionConfigurator), new(*cfg.EnvConfig)),
 )
-
-func NewEngine(storage Storage, pub controllers.NotificationPublisher, bk controllers.UserNotificationBroker) *gin.Engine {
-
-	r := gin.Default()
-
-	routes.SetupNotificationRoutes(r, storage, pub)
-	routes.SetupDistributionListRoutes(r, storage)
-	routes.SetupUsersRoutes(r, storage, bk)
-
-	return r
-}
 
 func InjectPgPrioritySQS(envfile string) (*gin.Engine, error) {
 
@@ -204,7 +194,7 @@ func InjectPgPrioritySQS(envfile string) (*gin.Engine, error) {
 		EnvConfigSet,
 		PostgresSQSPriroritySet,
 		RedisUserNotificationBrokerSet,
-		NewEngine,
+		routes.NewEngine,
 	)
 
 	return nil, nil
@@ -216,7 +206,7 @@ func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
 		EnvConfigSet,
 		PostgresRabbitMQPriroritySet,
 		RedisUserNotificationBrokerSet,
-		NewEngine,
+		routes.NewEngine,
 	)
 
 	return nil, nil, nil
@@ -228,7 +218,7 @@ func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
 		EnvConfigSet,
 		DynamoSQSPriroritySet,
 		RedisUserNotificationBrokerSet,
-		NewEngine,
+		routes.NewEngine,
 	)
 
 	return nil, nil
@@ -240,7 +230,7 @@ func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
 		EnvConfigSet,
 		DynamoRabbitMQPriroritySet,
 		RedisUserNotificationBrokerSet,
-		NewEngine,
+		routes.NewEngine,
 	)
 
 	return nil, nil, nil
@@ -249,12 +239,13 @@ func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
 func InjectPgMockedPubIntegrationTest(ctx context.Context, mockController *gomock.Controller) (*PostgresMockedPubIntegrationTest, func(), error) {
 
 	wire.Build(
+		TestVersionConfiguratorSet,
 		PostgresContainerSet,
 		RedisContainerSet,
 		PostgresSet,
 		MockedPublihserSet,
 		RedisUserNotificationBrokerSet,
-		NewEngine,
+		routes.NewEngine,
 		wire.Struct(new(PostgresMockedPubIntegrationTest), "*"),
 	)
 
@@ -264,12 +255,13 @@ func InjectPgMockedPubIntegrationTest(ctx context.Context, mockController *gomoc
 func InjectDynamoMockedPubIntegrationTest(ctx context.Context, mockController *gomock.Controller) (*DynamoMockedPubIntegrationTest, func(), error) {
 
 	wire.Build(
+		TestVersionConfiguratorSet,
 		DynamoContainerSet,
 		RedisContainerSet,
 		DynamoSet,
 		MockedPublihserSet,
 		RedisUserNotificationBrokerSet,
-		NewEngine,
+		routes.NewEngine,
 		wire.Struct(new(DynamoMockedPubIntegrationTest), "*"),
 	)
 

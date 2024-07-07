@@ -6,11 +6,11 @@ import (
 	c "github.com/notifique/controllers"
 )
 
-func SetupNotificationRoutes(r *gin.Engine, ns c.NotificationStorage, p c.NotificationPublisher) {
+func SetupNotificationRoutes(r *gin.Engine, version string, ns c.NotificationStorage, p c.NotificationPublisher) {
 
 	controller := c.NotificationController{Storage: ns, Publisher: p}
 
-	g := r.Group("/v0")
+	g := r.Group(version)
 	{
 		g.POST("/notifications", controller.CreateNotification)
 	}
