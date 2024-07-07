@@ -17,6 +17,8 @@ import (
 
 func TestDistributionListController(t *testing.T) {
 
+	distributionListUrl := "/distribution-lists"
+
 	controller := gomock.NewController(t)
 	defer controller.Finish()
 
@@ -41,7 +43,7 @@ func TestDistributionListController(t *testing.T) {
 		marshalled, _ := json.Marshal(dl)
 		reader := bytes.NewReader(marshalled)
 
-		req, _ := http.NewRequest("POST", "/v0/distribution-lists", reader)
+		req, _ := http.NewRequest("POST", distributionListUrl, reader)
 		req.Header.Add("userId", userId)
 
 		testApp.Engine.ServeHTTP(w, req)
@@ -59,7 +61,7 @@ func TestDistributionListController(t *testing.T) {
 		marshalled, _ := json.Marshal(body)
 		reader := bytes.NewReader(marshalled)
 
-		url := fmt.Sprintf("/v0/distribution-lists/%v/recipients", dlName)
+		url := fmt.Sprintf("%s/%s/recipients", distributionListUrl, dlName)
 
 		req, _ := http.NewRequest("PATCH", url, reader)
 		req.Header.Add("userId", userId)
@@ -79,7 +81,7 @@ func TestDistributionListController(t *testing.T) {
 		marshalled, _ := json.Marshal(body)
 		reader := bytes.NewReader(marshalled)
 
-		url := fmt.Sprintf("/v0/distribution-lists/%v/recipients", dlName)
+		url := fmt.Sprintf("%s/%s/recipients", distributionListUrl, dlName)
 
 		req, _ := http.NewRequest("DELETE", url, reader)
 		req.Header.Add("userId", userId)
@@ -136,7 +138,7 @@ func TestDistributionListController(t *testing.T) {
 				t.FailNow()
 			}
 
-			errTemplate := "Distribution list %v already exists"
+			errTemplate := "Distribution list %s already exists"
 			expectedMsg := fmt.Sprintf(errTemplate, dl.Name)
 
 			assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -155,7 +157,7 @@ func TestDistributionListController(t *testing.T) {
 		getDistributionLists := func(userId string, filters *dto.PageFilter) *httptest.ResponseRecorder {
 			w := httptest.NewRecorder()
 
-			req, _ := http.NewRequest("GET", "/v0/distribution-lists", nil)
+			req, _ := http.NewRequest("GET", distributionListUrl, nil)
 			req.Header.Add("userId", userId)
 
 			addPaginationFilters(req, filters)
@@ -168,7 +170,7 @@ func TestDistributionListController(t *testing.T) {
 		distributionLists, err := crateTestDistributionLists(3, testApp.Storage)
 
 		if err != nil {
-			t.Fatalf("failed to create distribution lists - %v", err)
+			t.Fatalf("failed to create distribution lists - %s", err)
 		}
 
 		t.Run("Should be able to get the default page", func(t *testing.T) {
@@ -235,7 +237,7 @@ func TestDistributionListController(t *testing.T) {
 		getRecipients := func(dlName string, filters *dto.PageFilter) *httptest.ResponseRecorder {
 			w := httptest.NewRecorder()
 
-			url := fmt.Sprintf("/v0/distribution-lists/%v/recipients", dlName)
+			url := fmt.Sprintf("%s/%s/recipients", distributionListUrl, dlName)
 
 			req, _ := http.NewRequest("GET", url, nil)
 			req.Header.Add("userId", userId)
@@ -288,7 +290,7 @@ func TestDistributionListController(t *testing.T) {
 				t.FailNow()
 			}
 
-			errorTemplate := "Distribution list %v not found"
+			errorTemplate := "Distribution list %s not found"
 			expectedError := fmt.Sprintf(errorTemplate, missingDL)
 
 			assert.Equal(t, http.StatusNotFound, w.Code)
@@ -373,7 +375,7 @@ func TestDistributionListController(t *testing.T) {
 				t.FailNow()
 			}
 
-			errTemplate := "Distribution list %v not found"
+			errTemplate := "Distribution list %s not found"
 			expectedMsg := fmt.Sprintf(errTemplate, dlName)
 
 			assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -458,7 +460,7 @@ func TestDistributionListController(t *testing.T) {
 				t.FailNow()
 			}
 
-			errTemplate := "Distribution list %v not found"
+			errTemplate := "Distribution list %s not found"
 			errMsg := fmt.Sprintf(errTemplate, dlName)
 
 			assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -574,7 +576,7 @@ func TestDistributionListController(t *testing.T) {
 
 		w := httptest.NewRecorder()
 
-		url := fmt.Sprintf("/v0/distribution-lists/%v", dl.Name)
+		url := fmt.Sprintf("%s/%s", distributionListUrl, dl.Name)
 
 		req, _ := http.NewRequest("DELETE", url, nil)
 		req.Header.Add("userId", userId)

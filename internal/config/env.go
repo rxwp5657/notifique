@@ -23,6 +23,7 @@ const (
 	sqsRegion           = "SQS_REGION"
 	brokerCapacity      = "BROKER_CAPACITY"
 	redisUrl            = "REDIS_URL"
+	apiVersion          = "API_VERSION"
 )
 
 type EnvConfig struct{}
@@ -117,6 +118,16 @@ func (cfg EnvConfig) GetRedisUrl() (string, error) {
 	}
 
 	return url, nil
+}
+
+func (cfg EnvConfig) GetVersion() (string, error) {
+	version, ok := os.LookupEnv(apiVersion)
+
+	if !ok {
+		return "", fmt.Errorf("api version env variable %s not found", apiVersion)
+	}
+
+	return version, nil
 }
 
 func NewEnvConfig(envFile string) (*EnvConfig, error) {
