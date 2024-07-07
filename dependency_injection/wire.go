@@ -9,6 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/gin-gonic/gin"
+	"github.com/golang/mock/gomock"
 	"github.com/google/wire"
 	"github.com/notifique/controllers"
 	"github.com/notifique/routes"
@@ -22,6 +23,7 @@ import (
 	ddb "github.com/notifique/internal/storage/dynamodb"
 	pg "github.com/notifique/internal/storage/postgres"
 	c "github.com/notifique/test/containers"
+	mk "github.com/notifique/test/mocks"
 )
 
 type Storage interface {
@@ -30,46 +32,50 @@ type Storage interface {
 	controllers.DistributionListStorage
 }
 
-type PostgresPrioritySQSIntegrationTest struct {
+type PostgresMockedPubIntegrationTest struct {
 	PostgresContainer *c.PostgresContainer
-	SQSContainer      *c.SQSPriorityContainer
 	RedisContainer    *c.RedisContainer
 	Storage           *pg.PostgresStorage
-	Publisher         *pub.SQSPublisher
+	Publisher         *mk.MockNotificationPublisher
 	Broker            *bk.RedisBroker
 	Engine            *gin.Engine
 }
 
-type DynamoPrioritySQSIntegrationTest struct {
+type DynamoMockedPubIntegrationTest struct {
 	DynamoContainer *c.DynamoContainer
-	SQSContainer    *c.SQSPriorityContainer
 	RedisContainer  *c.RedisContainer
 	Storage         *ddb.DynamoDBStorage
-	Publisher       *pub.SQSPublisher
+	Publisher       *mk.MockNotificationPublisher
 	Broker          *bk.RedisBroker
 	Engine          *gin.Engine
 }
 
-type PostgresPriorityRabbitMQIntegrationTest struct {
+type PgSQSPriorityIntegrationTest struct {
 	PostgresContainer *c.PostgresContainer
-	RabbitMQContainer *c.RabbitMQPriorityContainer
-	RabbitMQClient    *pub.RabbitMQClient
-	RedisContainer    *c.RedisContainer
+	SQSContainer      *c.SQSPriorityContainer
 	Storage           *pg.PostgresStorage
 	Publisher         *pub.PriorityPublisher
-	Broker            *bk.RedisBroker
-	Engine            *gin.Engine
 }
 
-type DynamoPriorityRabbitMQIntegrationTest struct {
+type PgRabbitMQPriorityIntegrationTest struct {
+	PostgresContainer *c.PostgresContainer
+	RabbitMQContainer *c.RabbitMQPriorityContainer
+	Storage           *pg.PostgresStorage
+	Publisher         *pub.PriorityPublisher
+}
+
+type DynamoSQSPriorityIntegrationTest struct {
+	DynamoContainer *c.DynamoContainer
+	SQSContainer    *c.SQSPriorityContainer
+	Storage         *ddb.DynamoDBStorage
+	Publisher       *pub.PriorityPublisher
+}
+
+type DynamoRabbitMQPriorityIntegrationTest struct {
 	DynamoContainer   *c.DynamoContainer
 	RabbitMQContainer *c.RabbitMQPriorityContainer
-	RabbitMQClient    *pub.RabbitMQClient
-	RedisContainer    *c.RedisContainer
 	Storage           *ddb.DynamoDBStorage
 	Publisher         *pub.PriorityPublisher
-	Broker            *bk.RedisBroker
-	Engine            *gin.Engine
 }
 
 var DynamoSet = wire.NewSet(
@@ -163,6 +169,11 @@ var RedisContainerSet = wire.NewSet(
 	wire.Bind(new(bk.BrokerConfigurator), new(*c.RedisContainer)),
 )
 
+var MockedPublihserSet = wire.NewSet(
+	mk.NewMockNotificationPublisher,
+	wire.Bind(new(controllers.NotificationPublisher), new(*mk.MockNotificationPublisher)),
+)
+
 var EnvConfigSet = wire.NewSet(
 	cfg.NewEnvConfig,
 	wire.Bind(new(pg.PostgresConfigurator), new(*cfg.EnvConfig)),
@@ -235,61 +246,79 @@ func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
 	return nil, nil, nil
 }
 
-func InjectPgPrioritySQSIntegrationTest(ctx context.Context) (*PostgresPrioritySQSIntegrationTest, func(), error) {
+func InjectPgMockedPubIntegrationTest(ctx context.Context, mockController *gomock.Controller) (*PostgresMockedPubIntegrationTest, func(), error) {
+
+	wire.Build(
+		PostgresContainerSet,
+		RedisContainerSet,
+		PostgresSet,
+		MockedPublihserSet,
+		RedisUserNotificationBrokerSet,
+		NewEngine,
+		wire.Struct(new(PostgresMockedPubIntegrationTest), "*"),
+	)
+
+	return nil, nil, nil
+}
+
+func InjectDynamoMockedPubIntegrationTest(ctx context.Context, mockController *gomock.Controller) (*DynamoMockedPubIntegrationTest, func(), error) {
+
+	wire.Build(
+		DynamoContainerSet,
+		RedisContainerSet,
+		DynamoSet,
+		MockedPublihserSet,
+		RedisUserNotificationBrokerSet,
+		NewEngine,
+		wire.Struct(new(DynamoMockedPubIntegrationTest), "*"),
+	)
+
+	return nil, nil, nil
+}
+
+func InjectPgSQSPriorityIntegrationTest(ctx context.Context) (*PgSQSPriorityIntegrationTest, func(), error) {
 
 	wire.Build(
 		PostgresContainerSet,
 		SQSPriorityContainerSet,
-		RedisContainerSet,
 		PostgresSQSPriroritySet,
-		RedisUserNotificationBrokerSet,
-		NewEngine,
-		wire.Struct(new(PostgresPrioritySQSIntegrationTest), "*"),
+		wire.Struct(new(PgSQSPriorityIntegrationTest), "*"),
 	)
 
 	return nil, nil, nil
 }
 
-func InjectPgPriorityRabbitMQIntegrationTest(ctx context.Context) (*PostgresPriorityRabbitMQIntegrationTest, func(), error) {
+func InjectPgRabbitMQPriorityIntegrationTest(ctx context.Context) (*PgRabbitMQPriorityIntegrationTest, func(), error) {
 
 	wire.Build(
 		PostgresContainerSet,
 		RabbitMQPriorityContainerSet,
-		RedisContainerSet,
 		PostgresRabbitMQPriroritySet,
-		RedisUserNotificationBrokerSet,
-		NewEngine,
-		wire.Struct(new(PostgresPriorityRabbitMQIntegrationTest), "*"),
+		wire.Struct(new(PgRabbitMQPriorityIntegrationTest), "*"),
 	)
 
 	return nil, nil, nil
 }
 
-func InjectDynamoPrioritySQSIntegrationTest(ctx context.Context) (*DynamoPrioritySQSIntegrationTest, func(), error) {
+func InjectDynamoSQSPriorityIntegrationTest(ctx context.Context) (*DynamoSQSPriorityIntegrationTest, func(), error) {
 
 	wire.Build(
 		DynamoContainerSet,
 		SQSPriorityContainerSet,
-		RedisContainerSet,
 		DynamoSQSPriroritySet,
-		RedisUserNotificationBrokerSet,
-		NewEngine,
-		wire.Struct(new(DynamoPrioritySQSIntegrationTest), "*"),
+		wire.Struct(new(DynamoSQSPriorityIntegrationTest), "*"),
 	)
 
 	return nil, nil, nil
 }
 
-func InjectDynamoPriorityRabbitMQIntegrationTest(ctx context.Context) (*DynamoPriorityRabbitMQIntegrationTest, func(), error) {
+func InjectDynamoRabbitMQPriorityIntegrationTest(ctx context.Context) (*DynamoRabbitMQPriorityIntegrationTest, func(), error) {
 
 	wire.Build(
 		DynamoContainerSet,
 		RabbitMQPriorityContainerSet,
-		RedisContainerSet,
 		DynamoRabbitMQPriroritySet,
-		RedisUserNotificationBrokerSet,
-		NewEngine,
-		wire.Struct(new(DynamoPriorityRabbitMQIntegrationTest), "*"),
+		wire.Struct(new(DynamoRabbitMQPriorityIntegrationTest), "*"),
 	)
 
 	return nil, nil, nil
