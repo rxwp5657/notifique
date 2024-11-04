@@ -14,6 +14,7 @@ import (
 	"github.com/notifique/internal"
 
 	c "github.com/notifique/controllers"
+	conv "github.com/notifique/internal/convertors"
 )
 
 type PostgresStorage struct {
@@ -145,24 +146,6 @@ func batchInsert[T any](ctx context.Context, query string, data []T, builder nam
 	return nil
 }
 
-func addNotificationStatusLog(ctx context.Context, log notificationStatusLog, tx pgx.Tx) error {
-
-	args := pgx.NamedArgs{
-		"notificationId": log.NotificationId,
-		"statusDate":     log.StatusDate,
-		"status":         log.Status,
-		"errorMessage":   log.Error,
-	}
-
-	_, err := tx.Exec(ctx, InsertNotificationStatusLog, args)
-
-	if err != nil {
-		return fmt.Errorf("failed to insert notification status log - %w", err)
-	}
-
-	return nil
-}
-
 func (ps *PostgresStorage) SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error) {
 
 	tx, err := ps.conn.Begin(ctx)
@@ -179,21 +162,22 @@ func (ps *PostgresStorage) SaveNotification(ctx context.Context, createdBy strin
 		"priority":         notification.Priority,
 		"distributionList": notification.DistributionList,
 		"createdAt":        time.Now().Format(time.RFC3339Nano),
-		"status":           string(c.Created),
 	}
 
-	var notificationId uuid.UUID
+	var notificationIdUUID uuid.UUID
 
-	err = tx.QueryRow(ctx, InsertNotification, notificationArgs).Scan(&notificationId)
+	err = tx.QueryRow(ctx, InsertNotification, notificationArgs).Scan(&notificationIdUUID)
 
 	if err != nil {
 		tx.Rollback(ctx)
 		return "", fmt.Errorf("failed to insert notification - %w", err)
 	}
 
+	notificationId := notificationIdUUID.String()
+
 	recipientsBuilder := func(recipient string) pgx.NamedArgs {
 		return pgx.NamedArgs{
-			"notificationId": notificationId.String(),
+			"notificationId": notificationId,
 			"recipient":      recipient,
 		}
 	}
@@ -212,7 +196,7 @@ func (ps *PostgresStorage) SaveNotification(ctx context.Context, createdBy strin
 
 	channelsBuilder := func(channel string) pgx.NamedArgs {
 		return pgx.NamedArgs{
-			"notificationId": notificationId.String(),
+			"notificationId": notificationId,
 			"channel":        channel,
 		}
 	}
@@ -230,18 +214,16 @@ func (ps *PostgresStorage) SaveNotification(ctx context.Context, createdBy strin
 		return "", err
 	}
 
-	statusLog := notificationStatusLog{
-		NotificationId: notificationId.String(),
-		Status:         string(c.Created),
-		StatusDate:     time.Now(),
-		Error:          nil,
-	}
+	logs := conv.MakeStatusLogs(c.Notification{
+		NotificationReq: notification,
+		Id:              notificationId,
+	}, c.Created, nil)
 
-	err = addNotificationStatusLog(ctx, statusLog, tx)
+	err = ps.createStatusLogs(ctx, tx, logs...)
 
 	if err != nil {
 		tx.Rollback(ctx)
-		return "", fmt.Errorf("failed to create notification status log - %w", err)
+		return "", fmt.Errorf("failed to create notification status logs - %w", err)
 	}
 
 	err = tx.Commit(ctx)
@@ -250,7 +232,7 @@ func (ps *PostgresStorage) SaveNotification(ctx context.Context, createdBy strin
 		return "", fmt.Errorf("failed to commit notification insert - %w", err)
 	}
 
-	return notificationId.String(), nil
+	return notificationId, nil
 }
 
 func (ps *PostgresStorage) makeUserConfig(ctx context.Context, userId string) (*userConfig, error) {
@@ -812,7 +794,31 @@ func (ps *PostgresStorage) DeleteRecipients(ctx context.Context, distlistName st
 	return summary, nil
 }
 
-func (ps *PostgresStorage) CreateNotificationStatusLog(ctx context.Context, notificationId string, status c.NotificationStatus, errMsg *string) error {
+func (ps *PostgresStorage) createStatusLogs(ctx context.Context, tx pgx.Tx, statusLogs ...c.NotificationStatusLog) error {
+
+	statusBuilder := func(log c.NotificationStatusLog) pgx.NamedArgs {
+		statusDate := time.Now().Format(time.RFC3339Nano)
+		return pgx.NamedArgs{
+			"notificationId": log.NotificationId,
+			"recipient":      log.Recipient,
+			"statusDate":     statusDate,
+			"status":         log.Status,
+			"errorMessage":   log.ErrorMsg,
+		}
+	}
+
+	err := batchInsert(
+		ctx,
+		InsertNotificationStatusLog,
+		statusLogs,
+		statusBuilder,
+		tx,
+	)
+
+	return err
+}
+
+func (ps *PostgresStorage) CreateNotificationStatusLog(ctx context.Context, statusLogs ...c.NotificationStatusLog) error {
 
 	tx, err := ps.conn.Begin(ctx)
 
@@ -820,30 +826,11 @@ func (ps *PostgresStorage) CreateNotificationStatusLog(ctx context.Context, noti
 		return fmt.Errorf("failed to start transaction - %w", err)
 	}
 
-	args := pgx.NamedArgs{
-		"notificationId": notificationId,
-		"statusDate":     time.Now().Format(time.RFC3339Nano),
-		"status":         status,
-		"errorMessage":   errMsg,
-	}
-
-	_, err = tx.Exec(ctx, InsertNotificationStatusLog, args)
+	err = ps.createStatusLogs(ctx, tx, statusLogs...)
 
 	if err != nil {
 		tx.Rollback(ctx)
-		return fmt.Errorf("failed to insert notification status log - %w", err)
-	}
-
-	updateArgs := pgx.NamedArgs{
-		"status": string(status),
-		"id":     notificationId,
-	}
-
-	_, err = tx.Exec(ctx, UpdateNotificationStatus, updateArgs)
-
-	if err != nil {
-		tx.Rollback(ctx)
-		return fmt.Errorf("failed to update notification status - %w", err)
+		return fmt.Errorf("failed to insert notification status logs - %w", err)
 	}
 
 	err = tx.Commit(ctx)

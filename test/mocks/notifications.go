@@ -37,17 +37,22 @@ func (m *MockNotificationStorage) EXPECT() *MockNotificationStorageMockRecorder 
 }
 
 // CreateNotificationStatusLog mocks base method.
-func (m *MockNotificationStorage) CreateNotificationStatusLog(ctx context.Context, notificationId string, status controllers.NotificationStatus, errMsg *string) error {
+func (m *MockNotificationStorage) CreateNotificationStatusLog(ctx context.Context, statusLogs ...controllers.NotificationStatusLog) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateNotificationStatusLog", ctx, notificationId, status, errMsg)
+	varargs := []interface{}{ctx}
+	for _, a := range statusLogs {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CreateNotificationStatusLog", varargs...)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // CreateNotificationStatusLog indicates an expected call of CreateNotificationStatusLog.
-func (mr *MockNotificationStorageMockRecorder) CreateNotificationStatusLog(ctx, notificationId, status, errMsg interface{}) *gomock.Call {
+func (mr *MockNotificationStorageMockRecorder) CreateNotificationStatusLog(ctx interface{}, statusLogs ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateNotificationStatusLog", reflect.TypeOf((*MockNotificationStorage)(nil).CreateNotificationStatusLog), ctx, notificationId, status, errMsg)
+	varargs := append([]interface{}{ctx}, statusLogs...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateNotificationStatusLog", reflect.TypeOf((*MockNotificationStorage)(nil).CreateNotificationStatusLog), varargs...)
 }
 
 // SaveNotification mocks base method.

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -19,6 +20,7 @@ import (
 	c "github.com/notifique/controllers"
 	"github.com/notifique/dto"
 	"github.com/notifique/internal"
+	conv "github.com/notifique/internal/convertors"
 )
 
 type DynamoDBAPI interface {
@@ -57,6 +59,7 @@ type DynamoConfigurator interface {
 
 type DynamoKey map[string]types.AttributeValue
 type DynamoObj map[string]types.AttributeValue
+type BatchWriteRequest map[string][]types.WriteRequest
 
 func marshallNextToken[T any](key *T, lastEvaluatedKey DynamoKey) (string, error) {
 	err := attributevalue.UnmarshalMap(lastEvaluatedKey, &key)
@@ -88,6 +91,30 @@ func unmarshallNextToken[T any](nextToken string, key *T) error {
 	}
 
 	return nil
+}
+
+func makeBatchWriteRequest[T any](table string, data []T) (BatchWriteRequest, error) {
+	requests := make([]types.WriteRequest, 0, len(data))
+
+	for _, d := range data {
+		item, err := attributevalue.MarshalMap(d)
+
+		if err != nil {
+			return BatchWriteRequest{}, fmt.Errorf("failed to marshall - %w", err)
+		}
+
+		requests = append(requests, types.WriteRequest{
+			PutRequest: &types.PutRequest{
+				Item: item,
+			},
+		})
+	}
+
+	batchRequest := BatchWriteRequest{
+		table: requests,
+	}
+
+	return batchRequest, nil
 }
 
 func (s *DynamoDBStorage) getUserConfig(ctx context.Context, userId string) (*userConfig, error) {
@@ -173,41 +200,24 @@ func (s *DynamoDBStorage) SaveNotification(ctx context.Context, createdBy string
 		return "", fmt.Errorf("failed to marshall notification - %w", err)
 	}
 
-	statusLog := notificationStatusLog{
-		NotificationId: id,
-		Status:         string(c.Created),
-		StatusDate:     time.Now().Format(time.RFC3339Nano),
-		Error:          nil,
-	}
-
-	statusLogItem, err := attributevalue.MarshalMap(statusLog)
-
-	if err != nil {
-		return "", fmt.Errorf("failed to marshall notification status log - %w", err)
-	}
-
-	_, err = s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
-		TransactItems: []types.TransactWriteItem{{
-			Put: &types.Put{
-				TableName: aws.String(NotificationsTable),
-				Item:      item,
-			},
-		}, {
-			Put: &types.Put{
-				TableName: aws.String(NotificationStatusLogTable),
-				Item:      statusLogItem,
-			},
-		}},
+	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
+		TableName: aws.String(NotificationsTable),
+		Item:      item,
 	})
 
 	if err != nil {
 		return "", fmt.Errorf("failed to store notification - %w", err)
 	}
 
-	err = s.CreateNotificationStatusLog(ctx, id, c.Created, nil)
+	logs := conv.MakeStatusLogs(c.Notification{
+		NotificationReq: notificationReq,
+		Id:              id,
+	}, c.Created, nil)
+
+	err = s.CreateNotificationStatusLog(ctx, logs...)
 
 	if err != nil {
-		return "", err
+		return id, fmt.Errorf("failed to store notification status logs - %w", err)
 	}
 
 	return id, nil
@@ -492,27 +502,13 @@ func (s *DynamoDBStorage) UpdateUserConfig(ctx context.Context, userId string, c
 
 func (s *DynamoDBStorage) addRecipients(ctx context.Context, recipients []distListRecipient) (int, error) {
 
-	writeReq := make([]types.WriteRequest, 0, len(recipients))
+	requestItems, err := makeBatchWriteRequest(DistListRecipientsTable, recipients)
 
-	for _, r := range recipients {
-		item, err := attributevalue.MarshalMap(r)
-
-		if err != nil {
-			return 0, fmt.Errorf("failed to marshal dl distListRecipient - %w", err)
-		}
-
-		writeReq = append(writeReq, types.WriteRequest{
-			PutRequest: &types.PutRequest{
-				Item: item,
-			},
-		})
+	if err != nil {
+		return 0, fmt.Errorf("failed create batch request for DL - %w", err)
 	}
 
-	requestItems := map[string][]types.WriteRequest{
-		DistListRecipientsTable: writeReq,
-	}
-
-	_, err := s.client.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
+	_, err = s.client.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
 		RequestItems: requestItems,
 	})
 
@@ -1089,28 +1085,45 @@ func (s *DynamoDBStorage) DeleteRecipients(ctx context.Context, listName string,
 	return &summary, nil
 }
 
-func (s *DynamoDBStorage) CreateNotificationStatusLog(ctx context.Context, notificationId string, status c.NotificationStatus, errMsg *string) error {
+func (s *DynamoDBStorage) CreateNotificationStatusLog(ctx context.Context, statusLogs ...c.NotificationStatusLog) error {
 
-	statusLog := notificationStatusLog{
-		NotificationId: notificationId,
-		Status:         string(status),
-		StatusDate:     time.Now().Format(time.RFC3339Nano),
-		Error:          errMsg,
+	makeSortKey := func(recipient, statusDate string) string {
+		var sb strings.Builder
+
+		sb.WriteString(recipient)
+		sb.WriteString("#")
+		sb.WriteString(statusDate)
+
+		return sb.String()
 	}
 
-	item, err := attributevalue.MarshalMap(statusLog)
+	logs := make([]notificationStatusLog, 0, len(statusLogs))
+
+	for _, log := range statusLogs {
+		statusDate := time.Now().Format(time.RFC3339Nano)
+
+		logs = append(logs, notificationStatusLog{
+			NotificationId: log.NotificationId,
+			SortKey:        makeSortKey(log.Recipient, statusDate),
+			Recipient:      log.Recipient,
+			Status:         string(log.Status),
+			StatusDate:     statusDate,
+			Error:          log.ErrorMsg,
+		})
+	}
+
+	requestItems, err := makeBatchWriteRequest(NotificationStatusLogTable, logs)
 
 	if err != nil {
-		return fmt.Errorf("failed to marshall the user config - %w", err)
+		return fmt.Errorf("failed to create batch request for notification status log - %w", err)
 	}
 
-	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(NotificationStatusLogTable),
-		Item:      item,
+	_, err = s.client.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
+		RequestItems: requestItems,
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to store notification status log - %w", err)
+		return fmt.Errorf("failed to store notification status logs - %w", err)
 	}
 
 	return nil
