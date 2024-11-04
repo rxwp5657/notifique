@@ -24,9 +24,16 @@ type Notification struct {
 	Id string `json:"id"`
 }
 
+type NotificationStatusLog struct {
+	NotificationId string
+	Recipient      string
+	Status         NotificationStatus
+	ErrorMsg       *string
+}
+
 type NotificationStorage interface {
 	SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error)
-	CreateNotificationStatusLog(ctx context.Context, notificationId string, status NotificationStatus, errMsg *string) error
+	CreateNotificationStatusLog(ctx context.Context, statusLogs ...NotificationStatusLog) error
 }
 
 type NotificationPublisher interface {

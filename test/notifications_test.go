@@ -21,7 +21,7 @@ func TestNotificationsController(t *testing.T) {
 	controller := gomock.NewController(t)
 	defer controller.Finish()
 
-	testApp, close, err := di.InjectPgMockedPubIntegrationTest(context.TODO(), controller)
+	testApp, close, err := di.InjectDynamoMockedPubIntegrationTest(context.TODO(), controller)
 
 	if err != nil {
 		t.Fatalf("failed to create container app - %v", err)

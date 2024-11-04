@@ -4,12 +4,14 @@ const (
 	NotificationsTable           = "Notifications"
 	NotificationHashKey          = "id"
 	NotificationStatusLogTable   = "NotificationStatusLogs"
-	NotificationStatusLogHashKey = "id"
-	NotificationStatusLogKey     = "statusDate"
+	NotificationStatusLogHashKey = "notificationId"
+	NotificationStatusLogSortKey = "notificationStatusLogSortKey"
 )
 
 type notificationStatusLog struct {
-	NotificationId string  `dynamodbav:"id"`
+	NotificationId string  `dynamodbav:"notificationId"`
+	SortKey        string  `dynamodbav:"notificationStatusLogSortKey"`
+	Recipient      string  `dynamodbav:"recipient"`
 	Status         string  `dynamodbav:"status"`
 	StatusDate     string  `dynamodbav:"statusDate"`
 	Error          *string `dynamodbav:"errorMsg"`

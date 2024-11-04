@@ -210,14 +210,14 @@ func createNotificationStatusLogTable(client *dynamodb.Client) error {
 			AttributeName: aws.String(sdb.NotificationStatusLogHashKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}, {
-			AttributeName: aws.String(sdb.NotificationStatusLogKey),
+			AttributeName: aws.String(sdb.NotificationStatusLogSortKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
 			AttributeName: aws.String(sdb.NotificationStatusLogHashKey),
 			KeyType:       types.KeyTypeHash,
 		}, {
-			AttributeName: aws.String(sdb.NotificationStatusLogKey),
+			AttributeName: aws.String(sdb.NotificationStatusLogSortKey),
 			KeyType:       types.KeyTypeRange,
 		}},
 		TableName: aws.String(tableName),
@@ -231,6 +231,10 @@ func createNotificationStatusLogTable(client *dynamodb.Client) error {
 }
 
 func CreateTables(client *dynamodb.Client) error {
+
+	if client == nil {
+		return fmt.Errorf("client is nil")
+	}
 
 	if err := createNotificationTable(client); err != nil {
 		return fmt.Errorf("notifications table - %w", err)
