@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	c "github.com/notifique/controllers"
-	conv "github.com/notifique/internal/convertors"
 )
 
 type Priority string
@@ -68,8 +67,13 @@ func (p PriorityPublisher) Publish(ctx context.Context, n c.Notification) error 
 	if err != nil {
 		errMsg := err.Error()
 
-		statusLogs := conv.MakeStatusLogs(n, c.PublishFailed, &errMsg)
-		statuslogErr := p.storage.CreateNotificationStatusLog(ctx, statusLogs...)
+		statusLog := c.NotificationStatusLog{
+			NotificationId: n.Id,
+			Status:         c.Published,
+			ErrorMsg:       &errMsg,
+		}
+
+		statuslogErr := p.storage.CreateNotificationStatusLog(ctx, statusLog)
 
 		if statuslogErr != nil {
 			errs := errors.Join(err, statuslogErr)
@@ -79,8 +83,13 @@ func (p PriorityPublisher) Publish(ctx context.Context, n c.Notification) error 
 		return fmt.Errorf("failed to publish notification - %w", err)
 	}
 
-	statusLogs := conv.MakeStatusLogs(n, c.Published, nil)
-	err = p.storage.CreateNotificationStatusLog(ctx, statusLogs...)
+	statusLog := c.NotificationStatusLog{
+		NotificationId: n.Id,
+		Status:         c.Published,
+		ErrorMsg:       nil,
+	}
+
+	err = p.storage.CreateNotificationStatusLog(ctx, statusLog)
 
 	if err != nil {
 		return fmt.Errorf("failed to create notification status log - %w", err)

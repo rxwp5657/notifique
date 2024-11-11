@@ -14,9 +14,10 @@ import (
 type NotificationStatus string
 
 const (
-	Created       NotificationStatus = "CREATED"
-	Published     NotificationStatus = "PUBLISHED"
-	PublishFailed NotificationStatus = "PUBLISH_FAILED"
+	Created        NotificationStatus = "CREATED"
+	CreationFailed NotificationStatus = "CREATION_FAILED"
+	Published      NotificationStatus = "PUBLISHED"
+	PublishFailed  NotificationStatus = "PUBLISH_FAILED"
 )
 
 type Notification struct {
@@ -26,14 +27,13 @@ type Notification struct {
 
 type NotificationStatusLog struct {
 	NotificationId string
-	Recipient      string
 	Status         NotificationStatus
 	ErrorMsg       *string
 }
 
 type NotificationStorage interface {
 	SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error)
-	CreateNotificationStatusLog(ctx context.Context, statusLogs ...NotificationStatusLog) error
+	CreateNotificationStatusLog(ctx context.Context, statusLog NotificationStatusLog) error
 }
 
 type NotificationPublisher interface {

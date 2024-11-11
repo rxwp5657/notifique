@@ -8,7 +8,8 @@ INSERT INTO notifications (
 	topic,
 	priority,
 	distribution_list,
-	created_at
+	created_at,
+	status
 ) VALUES (
 	@title,
 	@contents,
@@ -16,7 +17,8 @@ INSERT INTO notifications (
 	@topic,
 	@priority,
 	@distributionList,
-	@createdAt
+	@createdAt,
+	@status
 ) RETURNING
 	id;
 `
@@ -44,13 +46,11 @@ INSERT INTO notification_channels (
 const InsertNotificationStatusLog = `
 INSERT INTO notification_status_log (
 	notification_id,
-	recipient,
     status_date,
     "status",
     error_message
 ) VALUES (
 	@notificationId,
-	@recipient,
 	@statusDate,
 	@status,
 	@errorMessage
@@ -63,5 +63,5 @@ UPDATE
 SET
 	status = @status
 WHERE
-	id = @id;
+	id = @notificationId;
 `

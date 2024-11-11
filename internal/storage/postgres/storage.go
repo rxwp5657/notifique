@@ -14,7 +14,6 @@ import (
 	"github.com/notifique/internal"
 
 	c "github.com/notifique/controllers"
-	conv "github.com/notifique/internal/convertors"
 )
 
 type PostgresStorage struct {
@@ -162,6 +161,7 @@ func (ps *PostgresStorage) SaveNotification(ctx context.Context, createdBy strin
 		"priority":         notification.Priority,
 		"distributionList": notification.DistributionList,
 		"createdAt":        time.Now().Format(time.RFC3339Nano),
+		"status":           c.Created,
 	}
 
 	var notificationIdUUID uuid.UUID
@@ -214,12 +214,13 @@ func (ps *PostgresStorage) SaveNotification(ctx context.Context, createdBy strin
 		return "", err
 	}
 
-	logs := conv.MakeStatusLogs(c.Notification{
-		NotificationReq: notification,
-		Id:              notificationId,
-	}, c.Created, nil)
+	statusLog := c.NotificationStatusLog{
+		NotificationId: notificationId,
+		Status:         c.Created,
+		ErrorMsg:       nil,
+	}
 
-	err = ps.createStatusLogs(ctx, tx, logs...)
+	err = ps.createStatusLog(ctx, tx, statusLog)
 
 	if err != nil {
 		tx.Rollback(ctx)
@@ -794,31 +795,21 @@ func (ps *PostgresStorage) DeleteRecipients(ctx context.Context, distlistName st
 	return summary, nil
 }
 
-func (ps *PostgresStorage) createStatusLogs(ctx context.Context, tx pgx.Tx, statusLogs ...c.NotificationStatusLog) error {
+func (ps *PostgresStorage) createStatusLog(ctx context.Context, tx pgx.Tx, statusLog c.NotificationStatusLog) error {
 
-	statusBuilder := func(log c.NotificationStatusLog) pgx.NamedArgs {
-		statusDate := time.Now().Format(time.RFC3339Nano)
-		return pgx.NamedArgs{
-			"notificationId": log.NotificationId,
-			"recipient":      log.Recipient,
-			"statusDate":     statusDate,
-			"status":         log.Status,
-			"errorMessage":   log.ErrorMsg,
-		}
+	args := pgx.NamedArgs{
+		"notificationId": statusLog.NotificationId,
+		"statusDate":     time.Now().Format(time.RFC3339Nano),
+		"status":         statusLog.Status,
+		"errorMessage":   statusLog.ErrorMsg,
 	}
 
-	err := batchInsert(
-		ctx,
-		InsertNotificationStatusLog,
-		statusLogs,
-		statusBuilder,
-		tx,
-	)
+	_, err := tx.Exec(ctx, InsertNotificationStatusLog, args)
 
 	return err
 }
 
-func (ps *PostgresStorage) CreateNotificationStatusLog(ctx context.Context, statusLogs ...c.NotificationStatusLog) error {
+func (ps *PostgresStorage) CreateNotificationStatusLog(ctx context.Context, statusLog c.NotificationStatusLog) error {
 
 	tx, err := ps.conn.Begin(ctx)
 
@@ -826,7 +817,19 @@ func (ps *PostgresStorage) CreateNotificationStatusLog(ctx context.Context, stat
 		return fmt.Errorf("failed to start transaction - %w", err)
 	}
 
-	err = ps.createStatusLogs(ctx, tx, statusLogs...)
+	args := pgx.NamedArgs{
+		"notificationId": statusLog.NotificationId,
+		"status":         statusLog.Status,
+	}
+
+	_, err = tx.Exec(ctx, UpdateNotificationStatus, args)
+
+	if err != nil {
+		tx.Rollback(ctx)
+		return fmt.Errorf("failed to update notification status logs - %w", err)
+	}
+
+	err = ps.createStatusLog(ctx, tx, statusLog)
 
 	if err != nil {
 		tx.Rollback(ctx)
