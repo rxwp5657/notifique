@@ -36,25 +36,6 @@ func (m *MockNotificationStorage) EXPECT() *MockNotificationStorageMockRecorder 
 	return m.recorder
 }
 
-// CreateNotificationStatusLog mocks base method.
-func (m *MockNotificationStorage) CreateNotificationStatusLog(ctx context.Context, statusLogs ...controllers.NotificationStatusLog) error {
-	m.ctrl.T.Helper()
-	varargs := []interface{}{ctx}
-	for _, a := range statusLogs {
-		varargs = append(varargs, a)
-	}
-	ret := m.ctrl.Call(m, "CreateNotificationStatusLog", varargs...)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// CreateNotificationStatusLog indicates an expected call of CreateNotificationStatusLog.
-func (mr *MockNotificationStorageMockRecorder) CreateNotificationStatusLog(ctx interface{}, statusLogs ...interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{ctx}, statusLogs...)
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateNotificationStatusLog", reflect.TypeOf((*MockNotificationStorage)(nil).CreateNotificationStatusLog), varargs...)
-}
-
 // SaveNotification mocks base method.
 func (m *MockNotificationStorage) SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error) {
 	m.ctrl.T.Helper()
@@ -68,6 +49,20 @@ func (m *MockNotificationStorage) SaveNotification(ctx context.Context, createdB
 func (mr *MockNotificationStorageMockRecorder) SaveNotification(ctx, createdBy, notification interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SaveNotification", reflect.TypeOf((*MockNotificationStorage)(nil).SaveNotification), ctx, createdBy, notification)
+}
+
+// UpdateNotificationStatus mocks base method.
+func (m *MockNotificationStorage) UpdateNotificationStatus(ctx context.Context, statusLog controllers.NotificationStatusLog) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateNotificationStatus", ctx, statusLog)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateNotificationStatus indicates an expected call of UpdateNotificationStatus.
+func (mr *MockNotificationStorageMockRecorder) UpdateNotificationStatus(ctx, statusLog interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateNotificationStatus", reflect.TypeOf((*MockNotificationStorage)(nil).UpdateNotificationStatus), ctx, statusLog)
 }
 
 // MockNotificationPublisher is a mock of NotificationPublisher interface.

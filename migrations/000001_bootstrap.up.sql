@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     "priority" notification_priority DEFAULT 'LOW',
     distribution_list VARCHAR,
     created_at TIMESTAMPTZ NOT NULL,
+    "status" notification_status NOT NULL,
     CONSTRAINT distribution_list_fk
         FOREIGN KEY (distribution_list)
         REFERENCES distribution_lists("name")
@@ -61,7 +62,6 @@ ON notifications(id, created_at);
 
 CREATE TABLE IF NOT EXISTS notification_status_log(
     notification_id uuid NOT NULL,
-    recipient VARCHAR NOT NULL,
     status_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     "status" notification_status NOT NULL,
     error_message VARCHAR,
@@ -69,11 +69,11 @@ CREATE TABLE IF NOT EXISTS notification_status_log(
         FOREIGN KEY (notification_id)
         REFERENCES notifications(id),
     CONSTRAINT notification_status_log_pk
-        PRIMARY KEY(notification_id, recipient, status_date)
+        PRIMARY KEY(notification_id, status_date)
 );
 
 CREATE INDEX IF NOT EXISTS notification_status_idx
-ON notification_status_log(notification_id, recipient);
+ON notification_status_log(notification_id, status_date);
 
 CREATE TABLE IF NOT EXISTS user_notifications (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

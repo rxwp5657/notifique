@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -20,7 +19,6 @@ import (
 	c "github.com/notifique/controllers"
 	"github.com/notifique/dto"
 	"github.com/notifique/internal"
-	conv "github.com/notifique/internal/convertors"
 )
 
 type DynamoDBAPI interface {
@@ -192,6 +190,7 @@ func (s *DynamoDBStorage) SaveNotification(ctx context.Context, createdBy string
 		DistributionList: notificationReq.DistributionList,
 		Recipients:       notificationReq.Recipients,
 		Channels:         notificationReq.Channels,
+		Status:           string(c.Created),
 	}
 
 	item, err := attributevalue.MarshalMap(notification)
@@ -209,12 +208,13 @@ func (s *DynamoDBStorage) SaveNotification(ctx context.Context, createdBy string
 		return "", fmt.Errorf("failed to store notification - %w", err)
 	}
 
-	logs := conv.MakeStatusLogs(c.Notification{
-		NotificationReq: notificationReq,
-		Id:              id,
-	}, c.Created, nil)
+	log := c.NotificationStatusLog{
+		NotificationId: id,
+		Status:         c.Created,
+		ErrorMsg:       nil,
+	}
 
-	err = s.CreateNotificationStatusLog(ctx, logs...)
+	err = s.UpdateNotificationStatus(ctx, log)
 
 	if err != nil {
 		return id, fmt.Errorf("failed to store notification status logs - %w", err)
@@ -1085,45 +1085,56 @@ func (s *DynamoDBStorage) DeleteRecipients(ctx context.Context, listName string,
 	return &summary, nil
 }
 
-func (s *DynamoDBStorage) CreateNotificationStatusLog(ctx context.Context, statusLogs ...c.NotificationStatusLog) error {
+func (s *DynamoDBStorage) UpdateNotificationStatus(ctx context.Context, statusLog c.NotificationStatusLog) error {
 
-	makeSortKey := func(recipient, statusDate string) string {
-		var sb strings.Builder
-
-		sb.WriteString(recipient)
-		sb.WriteString("#")
-		sb.WriteString(statusDate)
-
-		return sb.String()
-	}
-
-	logs := make([]notificationStatusLog, 0, len(statusLogs))
-
-	for _, log := range statusLogs {
-		statusDate := time.Now().Format(time.RFC3339Nano)
-
-		logs = append(logs, notificationStatusLog{
-			NotificationId: log.NotificationId,
-			SortKey:        makeSortKey(log.Recipient, statusDate),
-			Recipient:      log.Recipient,
-			Status:         string(log.Status),
-			StatusDate:     statusDate,
-			Error:          log.ErrorMsg,
-		})
-	}
-
-	requestItems, err := makeBatchWriteRequest(NotificationStatusLogTable, logs)
+	update := expression.Set(expression.Name("status"), expression.Value((statusLog.Status)))
+	condEx := expression.AttributeExists(expression.Name(NotificationHashKey))
+	expr, err := expression.NewBuilder().WithUpdate(update).WithCondition(condEx).Build()
 
 	if err != nil {
-		return fmt.Errorf("failed to create batch request for notification status log - %w", err)
+		return fmt.Errorf("failed to make update query - %w", err)
 	}
 
-	_, err = s.client.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
-		RequestItems: requestItems,
+	n := notification{Id: statusLog.NotificationId}
+	notificationKey, err := n.GetKey()
+
+	if err != nil {
+		return err
+	}
+
+	log := notificationStatusLog{
+		NotificationId: statusLog.NotificationId,
+		Status:         string(statusLog.Status),
+		StatusDate:     time.Now().Format(time.RFC3339Nano),
+		Error:          statusLog.ErrorMsg,
+	}
+
+	item, err := attributevalue.MarshalMap(log)
+
+	if err != nil {
+		return fmt.Errorf("failed to marshal notification status log - %w", err)
+	}
+
+	_, err = s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: []types.TransactWriteItem{{
+			Put: &types.Put{
+				TableName: aws.String(NotificationStatusLogTable),
+				Item:      item,
+			}}, {
+			Update: &types.Update{
+				TableName:                           aws.String(NotificationsTable),
+				Key:                                 notificationKey,
+				ExpressionAttributeNames:            expr.Names(),
+				ExpressionAttributeValues:           expr.Values(),
+				UpdateExpression:                    expr.Update(),
+				ConditionExpression:                 expr.Condition(),
+				ReturnValuesOnConditionCheckFailure: types.ReturnValuesOnConditionCheckFailureNone,
+			},
+		}},
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to store notification status logs - %w", err)
+		return fmt.Errorf("failed to insert notification status log or update notification status - %w", err)
 	}
 
 	return nil
