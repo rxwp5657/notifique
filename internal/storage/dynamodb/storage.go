@@ -214,7 +214,7 @@ func (s *DynamoDBStorage) SaveNotification(ctx context.Context, createdBy string
 		ErrorMsg:       nil,
 	}
 
-	err = s.CreateNotificationStatusLog(ctx, log)
+	err = s.UpdateNotificationStatus(ctx, log)
 
 	if err != nil {
 		return id, fmt.Errorf("failed to store notification status logs - %w", err)
@@ -1085,7 +1085,7 @@ func (s *DynamoDBStorage) DeleteRecipients(ctx context.Context, listName string,
 	return &summary, nil
 }
 
-func (s *DynamoDBStorage) CreateNotificationStatusLog(ctx context.Context, statusLog c.NotificationStatusLog) error {
+func (s *DynamoDBStorage) UpdateNotificationStatus(ctx context.Context, statusLog c.NotificationStatusLog) error {
 
 	update := expression.Set(expression.Name("status"), expression.Value((statusLog.Status)))
 	condEx := expression.AttributeExists(expression.Name(NotificationHashKey))

@@ -33,7 +33,7 @@ type NotificationStatusLog struct {
 
 type NotificationStorage interface {
 	SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error)
-	CreateNotificationStatusLog(ctx context.Context, statusLog NotificationStatusLog) error
+	UpdateNotificationStatus(ctx context.Context, statusLog NotificationStatusLog) error
 }
 
 type NotificationPublisher interface {

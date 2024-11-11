@@ -809,7 +809,7 @@ func (ps *PostgresStorage) createStatusLog(ctx context.Context, tx pgx.Tx, statu
 	return err
 }
 
-func (ps *PostgresStorage) CreateNotificationStatusLog(ctx context.Context, statusLog c.NotificationStatusLog) error {
+func (ps *PostgresStorage) UpdateNotificationStatus(ctx context.Context, statusLog c.NotificationStatusLog) error {
 
 	tx, err := ps.conn.Begin(ctx)
 

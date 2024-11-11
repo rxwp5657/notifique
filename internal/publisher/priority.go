@@ -73,7 +73,7 @@ func (p PriorityPublisher) Publish(ctx context.Context, n c.Notification) error 
 			ErrorMsg:       &errMsg,
 		}
 
-		statuslogErr := p.storage.CreateNotificationStatusLog(ctx, statusLog)
+		statuslogErr := p.storage.UpdateNotificationStatus(ctx, statusLog)
 
 		if statuslogErr != nil {
 			errs := errors.Join(err, statuslogErr)
@@ -89,7 +89,7 @@ func (p PriorityPublisher) Publish(ctx context.Context, n c.Notification) error 
 		ErrorMsg:       nil,
 	}
 
-	err = p.storage.CreateNotificationStatusLog(ctx, statusLog)
+	err = p.storage.UpdateNotificationStatus(ctx, statusLog)
 
 	if err != nil {
 		return fmt.Errorf("failed to create notification status log - %w", err)
