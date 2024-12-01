@@ -9,15 +9,16 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
+
+	dlc "github.com/notifique/controllers"
 	di "github.com/notifique/dependency_injection"
 	"github.com/notifique/dto"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestDistributionListController(t *testing.T) {
-
-	distributionListUrl := "/distribution-lists"
+func TestDistributionListControllerPostgres(t *testing.T) {
 
 	controller := gomock.NewController(t)
 	defer controller.Finish()
@@ -29,6 +30,28 @@ func TestDistributionListController(t *testing.T) {
 	}
 
 	defer close()
+
+	testDistributionListController(t, testApp.Engine, testApp.Storage)
+}
+
+func TestDistributionListDynamo(t *testing.T) {
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+
+	testApp, close, err := di.InjectDynamoMockedPubIntegrationTest(context.TODO(), controller)
+
+	if err != nil {
+		t.Fatalf("failed to create container app - %v", err)
+	}
+
+	defer close()
+
+	testDistributionListController(t, testApp.Engine, testApp.Storage)
+}
+
+func testDistributionListController(t *testing.T, e *gin.Engine, s dlc.DistributionListStorage) {
+
+	distributionListUrl := "/distribution-lists"
 
 	userId := "1234"
 
@@ -46,7 +69,7 @@ func TestDistributionListController(t *testing.T) {
 		req, _ := http.NewRequest("POST", distributionListUrl, reader)
 		req.Header.Add("userId", userId)
 
-		testApp.Engine.ServeHTTP(w, req)
+		e.ServeHTTP(w, req)
 
 		return w
 	}
@@ -66,7 +89,7 @@ func TestDistributionListController(t *testing.T) {
 		req, _ := http.NewRequest("PATCH", url, reader)
 		req.Header.Add("userId", userId)
 
-		testApp.Engine.ServeHTTP(w, req)
+		e.ServeHTTP(w, req)
 
 		return w
 	}
@@ -86,7 +109,7 @@ func TestDistributionListController(t *testing.T) {
 		req, _ := http.NewRequest("DELETE", url, reader)
 		req.Header.Add("userId", userId)
 
-		testApp.Engine.ServeHTTP(w, req)
+		e.ServeHTTP(w, req)
 
 		return w
 	}
@@ -118,12 +141,12 @@ func TestDistributionListController(t *testing.T) {
 			assert.Contains(t, resp["error"], expectedMsg)
 		})
 
-		testApp.Storage.DeleteDistributionList(context.TODO(), dl.Name)
+		s.DeleteDistributionList(context.TODO(), dl.Name)
 	})
 
 	t.Run("TestDuplicatedDistributionList", func(t *testing.T) {
 
-		err := testApp.Storage.CreateDistributionList(context.TODO(), dl)
+		err := s.CreateDistributionList(context.TODO(), dl)
 
 		if err != nil {
 			t.Fatal("failed to create distribution list")
@@ -145,7 +168,7 @@ func TestDistributionListController(t *testing.T) {
 			assert.Equal(t, expectedMsg, resp["error"])
 		})
 
-		err = testApp.Storage.DeleteDistributionList(context.TODO(), dl.Name)
+		err = s.DeleteDistributionList(context.TODO(), dl.Name)
 
 		if err != nil {
 			t.Fatal("failed to delete distribution list")
@@ -162,12 +185,12 @@ func TestDistributionListController(t *testing.T) {
 
 			addPaginationFilters(req, filters)
 
-			testApp.Engine.ServeHTTP(w, req)
+			e.ServeHTTP(w, req)
 
 			return w
 		}
 
-		distributionLists, err := crateTestDistributionLists(3, testApp.Storage)
+		distributionLists, err := crateTestDistributionLists(3, s)
 
 		if err != nil {
 			t.Fatalf("failed to create distribution lists - %s", err)
@@ -225,7 +248,7 @@ func TestDistributionListController(t *testing.T) {
 			assert.Equal(t, len(distributionLists), len(pages))
 		})
 
-		err = deleteDistributionLists(distributionLists, testApp.Storage)
+		err = deleteDistributionLists(distributionLists, s)
 
 		if err != nil {
 			t.Fatalf("failed to delete distribution lists - %v", err)
@@ -244,12 +267,12 @@ func TestDistributionListController(t *testing.T) {
 
 			addPaginationFilters(req, filters)
 
-			testApp.Engine.ServeHTTP(w, req)
+			e.ServeHTTP(w, req)
 
 			return w
 		}
 
-		err := testApp.Storage.CreateDistributionList(context.TODO(), dl)
+		err := s.CreateDistributionList(context.TODO(), dl)
 
 		if err != nil {
 			t.Fatal("failed to create distribution list")
@@ -327,7 +350,7 @@ func TestDistributionListController(t *testing.T) {
 			assert.Equal(t, len(dl.Recipients), len(pages))
 		})
 
-		err = testApp.Storage.DeleteDistributionList(context.TODO(), dl.Name)
+		err = s.DeleteDistributionList(context.TODO(), dl.Name)
 
 		if err != nil {
 			t.Fatal("failed to delete distribution list")
@@ -336,7 +359,7 @@ func TestDistributionListController(t *testing.T) {
 
 	t.Run("TestAddRecipients", func(t *testing.T) {
 
-		err := testApp.Storage.CreateDistributionList(context.TODO(), dl)
+		err := s.CreateDistributionList(context.TODO(), dl)
 
 		if err != nil {
 			t.Fatalf("failed to create distribution list - %v", err)
@@ -414,7 +437,7 @@ func TestDistributionListController(t *testing.T) {
 			assert.Contains(t, resp["error"], errMsg)
 		})
 
-		err = testApp.Storage.DeleteDistributionList(context.TODO(), dl.Name)
+		err = s.DeleteDistributionList(context.TODO(), dl.Name)
 
 		if err != nil {
 			t.Fatalf("failed to delete distribution list - %v", err)
@@ -423,7 +446,7 @@ func TestDistributionListController(t *testing.T) {
 
 	t.Run("TestRemoveRecipients", func(t *testing.T) {
 
-		err := testApp.Storage.CreateDistributionList(context.TODO(), dl)
+		err := s.CreateDistributionList(context.TODO(), dl)
 
 		if err != nil {
 			t.Fatalf("failed to create distribution list - %v", err)
@@ -499,7 +522,7 @@ func TestDistributionListController(t *testing.T) {
 			assert.Contains(t, resp["error"], errMsg)
 		})
 
-		err = testApp.Storage.DeleteDistributionList(context.TODO(), dl.Name)
+		err = s.DeleteDistributionList(context.TODO(), dl.Name)
 
 		if err != nil {
 			t.Fatalf("failed to delete distribution list - %v", err)
@@ -508,7 +531,7 @@ func TestDistributionListController(t *testing.T) {
 
 	t.Run("TestDuplicatedRecipients", func(t *testing.T) {
 
-		err := testApp.Storage.CreateDistributionList(context.TODO(), dl)
+		err := s.CreateDistributionList(context.TODO(), dl)
 
 		if err != nil {
 			t.Fatalf("failed to create distribution list - %v", err)
@@ -554,7 +577,7 @@ func TestDistributionListController(t *testing.T) {
 			assert.Equal(t, expectedSummary, resp)
 		})
 
-		err = testApp.Storage.DeleteDistributionList(context.TODO(), dl.Name)
+		err = s.DeleteDistributionList(context.TODO(), dl.Name)
 
 		if err != nil {
 			t.Fatalf("failed to delete distribution list - %v", err)
@@ -568,7 +591,7 @@ func TestDistributionListController(t *testing.T) {
 			Recipients: []string{"1", "2", "123"},
 		}
 
-		err := testApp.Storage.CreateDistributionList(context.TODO(), dl)
+		err := s.CreateDistributionList(context.TODO(), dl)
 
 		if err != nil {
 			t.Fatalf("failed to create distribution list - %v", err)
@@ -581,7 +604,7 @@ func TestDistributionListController(t *testing.T) {
 		req, _ := http.NewRequest("DELETE", url, nil)
 		req.Header.Add("userId", userId)
 
-		testApp.Engine.ServeHTTP(w, req)
+		e.ServeHTTP(w, req)
 
 		assert.Equal(t, 204, w.Code)
 	})

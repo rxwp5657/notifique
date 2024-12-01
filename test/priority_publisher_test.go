@@ -10,8 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPriorityPublisher(t *testing.T) {
-
+func TestRabbitMQPriorityPublisher(t *testing.T) {
 	testApp, close, err := di.InjectPgRabbitMQPriorityIntegrationTest(context.TODO())
 
 	if err != nil {
@@ -19,6 +18,23 @@ func TestPriorityPublisher(t *testing.T) {
 	}
 
 	defer close()
+
+	testPriorityPublisher(t, testApp.Storage, testApp.Publisher)
+}
+
+func TestSQSPriorityPublisher(t *testing.T) {
+	testApp, close, err := di.InjectPgSQSPriorityIntegrationTest(context.TODO())
+
+	if err != nil {
+		t.Fatalf("failed to create container app - %v", err)
+	}
+
+	defer close()
+
+	testPriorityPublisher(t, testApp.Storage, testApp.Publisher)
+}
+
+func testPriorityPublisher(t *testing.T, s c.NotificationStorage, p c.NotificationPublisher) {
 
 	userId := "1234"
 
@@ -32,7 +48,7 @@ func TestPriorityPublisher(t *testing.T) {
 		Channels:         []string{"in-app", "e-mail"},
 	}
 
-	notificationId, err := testApp.Storage.SaveNotification(context.TODO(), userId, testNotificationReq)
+	notificationId, err := s.SaveNotification(context.TODO(), userId, testNotificationReq)
 
 	if err != nil {
 		t.Fatalf("failed to insert test notification - %v", err)
@@ -44,7 +60,7 @@ func TestPriorityPublisher(t *testing.T) {
 	}
 
 	t.Run("Can publish a new notification", func(t *testing.T) {
-		err := testApp.Publisher.Publish(context.TODO(), testNotification)
+		err := p.Publish(context.TODO(), testNotification)
 		assert.Nil(t, err)
 	})
 }
