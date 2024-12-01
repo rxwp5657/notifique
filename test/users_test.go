@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 
@@ -25,10 +26,7 @@ type UserNotificationsTester interface {
 	DeleteUserNotification(ctx context.Context, userId string, un dto.UserNotification) error
 }
 
-func TestUserController(t *testing.T) {
-
-	usersMeNotificationsUrl := "/users/me/notifications"
-	usersMeNotificationsConfigUrl := "/users/me/notifications/config"
+func TestUserControllerPostgres(t *testing.T) {
 
 	controller := gomock.NewController(t)
 	defer controller.Finish()
@@ -41,12 +39,36 @@ func TestUserController(t *testing.T) {
 
 	defer close()
 
+	testUserController(t, testApp.Engine, testApp.Storage)
+}
+
+func TestUserControllerDynamo(t *testing.T) {
+
+	controller := gomock.NewController(t)
+	defer controller.Finish()
+
+	testApp, close, err := di.InjectDynamoMockedPubIntegrationTest(context.TODO(), controller)
+
+	if err != nil {
+		t.Fatalf("failed to create container app - %v", err)
+	}
+
+	defer close()
+
+	testUserController(t, testApp.Engine, testApp.Storage)
+}
+
+func testUserController(t *testing.T, e *gin.Engine, s UserNotificationsTester) {
+
+	usersMeNotificationsUrl := "/users/me/notifications"
+	usersMeNotificationsConfigUrl := "/users/me/notifications/config"
+
 	userId := "1234"
 
 	t.Run("TestGetUserNotifications", func(t *testing.T) {
 
 		numNotifications := 3
-		testNotifications, err := createTestUserNotifications(numNotifications, userId, testApp.Storage)
+		testNotifications, err := createTestUserNotifications(numNotifications, userId, s)
 
 		if err != nil {
 			t.Fatalf("failed to create user notifications - %s", err)
@@ -61,7 +83,7 @@ func TestUserController(t *testing.T) {
 
 			addPaginationFilters(req, filters)
 
-			testApp.Engine.ServeHTTP(w, req)
+			e.ServeHTTP(w, req)
 
 			return w
 		}
@@ -116,12 +138,12 @@ func TestUserController(t *testing.T) {
 			assert.Equal(t, maxResults, page.ResultCount)
 		})
 
-		deleteTestUserNotifications(userId, testNotifications, testApp.Storage)
+		deleteTestUserNotifications(userId, testNotifications, s)
 	})
 
 	t.Run("TestSetReadStatus", func(t *testing.T) {
 
-		testNotifications, err := createTestUserNotifications(1, userId, testApp.Storage)
+		testNotifications, err := createTestUserNotifications(1, userId, s)
 
 		if err != nil {
 			t.Fatalf("failed to create user notifications - %s", err)
@@ -137,7 +159,7 @@ func TestUserController(t *testing.T) {
 			req, _ := http.NewRequest("PATCH", url, nil)
 			req.Header.Add("userId", userId)
 
-			testApp.Engine.ServeHTTP(w, req)
+			e.ServeHTTP(w, req)
 
 			return w
 		}
@@ -173,7 +195,7 @@ func TestUserController(t *testing.T) {
 			req, _ := http.NewRequest("GET", usersMeNotificationsConfigUrl, nil)
 			req.Header.Add("userId", userId)
 
-			testApp.Engine.ServeHTTP(w, req)
+			e.ServeHTTP(w, req)
 
 			return w
 		}
@@ -188,7 +210,7 @@ func TestUserController(t *testing.T) {
 			req, _ := http.NewRequest("PUT", usersMeNotificationsConfigUrl, reader)
 			req.Header.Add("userId", userId)
 
-			testApp.Engine.ServeHTTP(w, req)
+			e.ServeHTTP(w, req)
 
 			return w
 		}

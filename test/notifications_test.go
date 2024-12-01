@@ -8,16 +8,30 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	di "github.com/notifique/dependency_injection"
 	"github.com/notifique/dto"
+	mock_controllers "github.com/notifique/test/mocks"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNotificationsController(t *testing.T) {
+func TestNotificationsControllerPostgres(t *testing.T) {
+	controller := gomock.NewController(t)
+	defer controller.Finish()
 
-	notificationsUrl := "/notifications"
+	testApp, close, err := di.InjectPgMockedPubIntegrationTest(context.TODO(), controller)
 
+	if err != nil {
+		t.Fatalf("failed to create container app - %v", err)
+	}
+
+	defer close()
+
+	testNotificationsController(t, testApp.Engine, testApp.Publisher)
+}
+
+func TestNotificationsControllerDynamo(t *testing.T) {
 	controller := gomock.NewController(t)
 	defer controller.Finish()
 
@@ -29,8 +43,15 @@ func TestNotificationsController(t *testing.T) {
 
 	defer close()
 
+	testNotificationsController(t, testApp.Engine, testApp.Publisher)
+}
+
+func testNotificationsController(t *testing.T, e *gin.Engine, p *mock_controllers.MockNotificationPublisher) {
+
 	// Setup Mock
-	testApp.Publisher.EXPECT().Publish(gomock.Any(), gomock.Any()).Return(nil)
+	p.EXPECT().Publish(gomock.Any(), gomock.Any()).Return(nil)
+
+	notificationsUrl := "/notifications"
 
 	userId := "1234"
 
@@ -53,7 +74,7 @@ func TestNotificationsController(t *testing.T) {
 		req, _ := http.NewRequest("POST", notificationsUrl, reader)
 		req.Header.Add("userId", userId)
 
-		testApp.Engine.ServeHTTP(w, req)
+		e.ServeHTTP(w, req)
 
 		return w
 	}
