@@ -923,3 +923,12 @@ func NewPostgresStorage(configurator PostgresConfigurator) (*PostgresStorage, er
 
 	return &PostgresStorage{conn: conn}, nil
 }
+
+func NewPostgresStorageFromPool(p *pgxpool.Pool) (*PostgresStorage, error) {
+
+	if p == nil {
+		return nil, fmt.Errorf("pool can't be nil")
+	}
+
+	return &PostgresStorage{conn: p}, nil
+}

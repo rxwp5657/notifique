@@ -11,7 +11,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/gin-gonic/gin"
-	"github.com/golang/mock/gomock"
 	"github.com/google/wire"
 	"github.com/notifique/controllers"
 	"github.com/notifique/internal"
@@ -26,6 +25,7 @@ import (
 	"github.com/notifique/test/containers"
 	"github.com/notifique/test/mocks"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/mock/gomock"
 )
 
 // Injectors from wire.go:
@@ -411,6 +411,27 @@ func InjectDynamoRabbitMQPriorityIntegrationTest(ctx context.Context) (*DynamoRa
 	}, nil
 }
 
+func InjectMockedBackend(ctx context.Context, mockController *gomock.Controller) (*MockedBackend, error) {
+	mockDistributionListStorage := mock_controllers.NewMockDistributionListStorage(mockController)
+	mockUserStorage := mock_controllers.NewMockUserStorage(mockController)
+	mockNotificationStorage := mock_controllers.NewMockNotificationStorage(mockController)
+	mockedStorage := mock_controllers.NewMockedStorage(mockDistributionListStorage, mockUserStorage, mockNotificationStorage)
+	mockNotificationPublisher := mock_controllers.NewMockNotificationPublisher(mockController)
+	mockUserNotificationBroker := mock_controllers.NewMockUserNotificationBroker(mockController)
+	testVersionConfiguratorFunc := config_test.NewTestVersionConfigurator()
+	engine, err := routes.NewEngine(mockedStorage, mockNotificationPublisher, mockUserNotificationBroker, testVersionConfiguratorFunc)
+	if err != nil {
+		return nil, err
+	}
+	mockedBackend := &MockedBackend{
+		Storage:   mockedStorage,
+		Publisher: mockNotificationPublisher,
+		Broker:    mockUserNotificationBroker,
+		Engine:    engine,
+	}
+	return mockedBackend, nil
+}
+
 func InjectRabbitMQPriorityDeployer(envfile string) (*deployments.RabbitMQPriorityDeployer, func(), error) {
 	envConfig, err := config.NewEnvConfig(envfile)
 	if err != nil {
@@ -486,6 +507,13 @@ type DynamoRabbitMQPriorityIntegrationTest struct {
 	Publisher         *publisher.PriorityPublisher
 }
 
+type MockedBackend struct {
+	Storage   *mock_controllers.MockedStorage
+	Publisher *mock_controllers.MockNotificationPublisher
+	Broker    *mock_controllers.MockUserNotificationBroker
+	Engine    *gin.Engine
+}
+
 var DynamoSet = wire.NewSet(storage2.NewDynamoDBClient, storage2.NewDynamoDBStorage, wire.Bind(new(storage2.DynamoDBAPI), new(*dynamodb.Client)), wire.Bind(new(routes.Storage), new(*storage2.DynamoDBStorage)), wire.Bind(new(controllers.NotificationStorage), new(*storage2.DynamoDBStorage)))
 
 var PostgresSet = wire.NewSet(storage.NewPostgresStorage, wire.Bind(new(routes.Storage), new(*storage.PostgresStorage)), wire.Bind(new(controllers.NotificationStorage), new(*storage.PostgresStorage)))
@@ -527,6 +555,20 @@ var DynamoContainerSet = wire.NewSet(containers.NewDynamoContainer, wire.Bind(ne
 var RedisContainerSet = wire.NewSet(containers.NewRedisContainer, wire.Bind(new(internal.RedisConfigurator), new(*containers.RedisContainer)), wire.Bind(new(broker.BrokerConfigurator), new(*containers.RedisContainer)))
 
 var MockedPublihserSet = wire.NewSet(mock_controllers.NewMockNotificationPublisher, wire.Bind(new(controllers.NotificationPublisher), new(*mock_controllers.MockNotificationPublisher)))
+
+var MockedDistributionListStorageSet = wire.NewSet(mock_controllers.NewMockDistributionListStorage, wire.Bind(new(controllers.DistributionListStorage), new(*mock_controllers.MockDistributionListStorage)))
+
+var MockedUserStorageSet = wire.NewSet(mock_controllers.NewMockUserStorage, wire.Bind(new(controllers.UserStorage), new(*mock_controllers.MockUserStorage)))
+
+var MockedNotificationStorageSet = wire.NewSet(mock_controllers.NewMockNotificationStorage, wire.Bind(new(controllers.NotificationStorage), new(*mock_controllers.MockNotificationStorage)))
+
+var MockedUserNotificationBroker = wire.NewSet(mock_controllers.NewMockUserNotificationBroker, wire.Bind(new(controllers.UserNotificationBroker), new(*mock_controllers.MockUserNotificationBroker)))
+
+var MockedStorageSet = wire.NewSet(
+	MockedDistributionListStorageSet,
+	MockedUserStorageSet,
+	MockedNotificationStorageSet, mock_controllers.NewMockedStorage, wire.Bind(new(routes.Storage), new(*mock_controllers.MockedStorage)),
+)
 
 var TestVersionConfiguratorSet = wire.NewSet(config_test.NewTestVersionConfigurator, wire.Bind(new(routes.VersionConfigurator), new(config_test.TestVersionConfiguratorFunc)))
 

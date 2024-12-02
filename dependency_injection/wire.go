@@ -9,11 +9,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/gin-gonic/gin"
-	"github.com/golang/mock/gomock"
 	"github.com/google/wire"
 	"github.com/notifique/controllers"
 	"github.com/notifique/routes"
 	"github.com/redis/go-redis/v9"
+	gomock "go.uber.org/mock/gomock"
 
 	"github.com/notifique/internal"
 	bk "github.com/notifique/internal/broker"
@@ -71,6 +71,13 @@ type DynamoRabbitMQPriorityIntegrationTest struct {
 	RabbitMQContainer *c.RabbitMQPriorityContainer
 	Storage           *ddb.DynamoDBStorage
 	Publisher         *pub.PriorityPublisher
+}
+
+type MockedBackend struct {
+	Storage   *mk.MockedStorage
+	Publisher *mk.MockNotificationPublisher
+	Broker    *mk.MockUserNotificationBroker
+	Engine    *gin.Engine
 }
 
 var DynamoSet = wire.NewSet(
@@ -167,6 +174,34 @@ var RedisContainerSet = wire.NewSet(
 var MockedPublihserSet = wire.NewSet(
 	mk.NewMockNotificationPublisher,
 	wire.Bind(new(controllers.NotificationPublisher), new(*mk.MockNotificationPublisher)),
+)
+
+var MockedDistributionListStorageSet = wire.NewSet(
+	mk.NewMockDistributionListStorage,
+	wire.Bind(new(controllers.DistributionListStorage), new(*mk.MockDistributionListStorage)),
+)
+
+var MockedUserStorageSet = wire.NewSet(
+	mk.NewMockUserStorage,
+	wire.Bind(new(controllers.UserStorage), new(*mk.MockUserStorage)),
+)
+
+var MockedNotificationStorageSet = wire.NewSet(
+	mk.NewMockNotificationStorage,
+	wire.Bind(new(controllers.NotificationStorage), new(*mk.MockNotificationStorage)),
+)
+
+var MockedUserNotificationBroker = wire.NewSet(
+	mk.NewMockUserNotificationBroker,
+	wire.Bind(new(controllers.UserNotificationBroker), new(*mk.MockUserNotificationBroker)),
+)
+
+var MockedStorageSet = wire.NewSet(
+	MockedDistributionListStorageSet,
+	MockedUserStorageSet,
+	MockedNotificationStorageSet,
+	mk.NewMockedStorage,
+	wire.Bind(new(routes.Storage), new(*mk.MockedStorage)),
 )
 
 var TestVersionConfiguratorSet = wire.NewSet(
@@ -314,6 +349,20 @@ func InjectDynamoRabbitMQPriorityIntegrationTest(ctx context.Context) (*DynamoRa
 	)
 
 	return nil, nil, nil
+}
+
+func InjectMockedBackend(ctx context.Context, mockController *gomock.Controller) (*MockedBackend, error) {
+
+	wire.Build(
+		TestVersionConfiguratorSet,
+		MockedStorageSet,
+		MockedPublihserSet,
+		MockedUserNotificationBroker,
+		routes.NewEngine,
+		wire.Struct(new(MockedBackend), "*"),
+	)
+
+	return nil, nil
 }
 
 func InjectRabbitMQPriorityDeployer(envfile string) (*deployments.RabbitMQPriorityDeployer, func(), error) {

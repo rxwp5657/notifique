@@ -9,11 +9,11 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang/mock/gomock"
 	di "github.com/notifique/dependency_injection"
 	"github.com/notifique/dto"
 	mock_controllers "github.com/notifique/test/mocks"
 	"github.com/stretchr/testify/assert"
+	gomock "go.uber.org/mock/gomock"
 )
 
 func TestNotificationsControllerPostgres(t *testing.T) {
