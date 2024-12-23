@@ -3,8 +3,6 @@ package integration_test
 import (
 	"context"
 	"fmt"
-	"math/rand"
-	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,25 +10,26 @@ import (
 	"github.com/notifique/controllers"
 	"github.com/notifique/dto"
 	"github.com/notifique/internal"
-	"github.com/notifique/test/integration/testers"
+	"github.com/notifique/test"
+	st "github.com/notifique/test/integration/store"
 )
 
 type DistributionListTester interface {
 	controllers.DistributionListStorage
-	ClearDB(ctx context.Context) error
+	st.ContainerTester
 	GetDistributionList(ctx context.Context, dlName string) (dto.DistributionList, error)
 	DistributionListExists(ctx context.Context, dlName string) (bool, error)
 }
 
 func TestDistributionListStoragePostgres(t *testing.T) {
 	ctx := context.Background()
-	tester, closer, err := testers.NewPostgresIntegrationTester(ctx)
+	tester, close, err := st.NewPostgresIntegrationTester(ctx)
 
 	if err != nil {
 		t.Fatal("failed to init postgres tester - ", err)
 	}
 
-	defer closer()
+	defer close()
 
 	testCreateDistributionList(ctx, t, tester)
 	testGetDistributionListsSummaries(ctx, t, tester)
@@ -44,58 +43,6 @@ func TestDistributionListStoragePostgres(t *testing.T) {
 
 func TestDistributionListStorageDynamo(t *testing.T) {
 
-}
-
-func clearDB(ctx context.Context, t *testing.T, dlt DistributionListTester) {
-	err := dlt.ClearDB(ctx)
-
-	if err != nil {
-		t.Fatal(fmt.Errorf("failed to clear the database - %w", err))
-	}
-}
-
-func makeTestDistributionLists(numLists int) []dto.DistributionList {
-	lists := make([]dto.DistributionList, 0, numLists)
-
-	makeRecipientsList := func(numRecipients int) []string {
-		recipients := make([]string, 0, numRecipients)
-
-		for i := range numRecipients {
-			recipients = append(recipients, fmt.Sprint(i))
-		}
-
-		return recipients
-	}
-
-	for i := range numLists {
-		list := dto.DistributionList{
-			Name:       fmt.Sprintf("Test List %d", i),
-			Recipients: makeRecipientsList(rand.Intn(10)),
-		}
-
-		lists = append(lists, list)
-	}
-
-	return lists
-}
-
-func makeSummaries(lists []dto.DistributionList) []dto.DistributionListSummary {
-	summaries := make([]dto.DistributionListSummary, 0, len(lists))
-
-	for _, l := range lists {
-		summary := dto.DistributionListSummary{
-			Name:               l.Name,
-			NumberOfRecipients: len(l.Recipients),
-		}
-
-		summaries = append(summaries, summary)
-	}
-
-	sort.Slice(summaries, func(i, j int) bool {
-		return summaries[i].Name < summaries[j].Name
-	})
-
-	return summaries
 }
 
 func setupTestDL(ctx context.Context, t *testing.T, dlt DistributionListTester) dto.DistributionList {
@@ -133,7 +80,7 @@ func testCreateDistributionList(ctx context.Context, t *testing.T, dlt Distribut
 		assert.Equal(t, dl, newDL)
 	})
 
-	clearDB(ctx, t, dlt)
+	st.Clear(ctx, t, dlt)
 
 	t.Run("Should fail if the distribution list already exists", func(t *testing.T) {
 		err := dlt.CreateDistributionList(context.TODO(), dl)
@@ -147,13 +94,13 @@ func testCreateDistributionList(ctx context.Context, t *testing.T, dlt Distribut
 		assert.ErrorAs(t, err, &internal.DistributionListAlreadyExists{Name: dl.Name})
 	})
 
-	clearDB(ctx, t, dlt)
+	st.Clear(ctx, t, dlt)
 }
 
 func testGetDistributionListsSummaries(ctx context.Context, t *testing.T, dlt DistributionListTester) {
 
-	testDLs := makeTestDistributionLists(3)
-	testSummaries := makeSummaries(testDLs)
+	testDLs := test.MakeDistributionLists(3)
+	testSummaries := test.MakeSummaries(testDLs)
 
 	for _, dl := range testDLs {
 		err := dlt.CreateDistributionList(ctx, dl)
@@ -163,7 +110,7 @@ func testGetDistributionListsSummaries(ctx context.Context, t *testing.T, dlt Di
 		}
 	}
 
-	defer clearDB(ctx, t, dlt)
+	defer st.Clear(ctx, t, dlt)
 
 	t.Run("Can retrieve a page of distribution lists summaries", func(t *testing.T) {
 		pageFilters := dto.PageFilter{}
@@ -213,7 +160,7 @@ func testDeleteDistributionList(ctx context.Context, t *testing.T, dlt Distribut
 
 	dl := setupTestDL(ctx, t, dlt)
 
-	defer clearDB(ctx, t, dlt)
+	defer st.Clear(ctx, t, dlt)
 
 	t.Run("Can delete a distribution list with all of its recipients", func(t *testing.T) {
 		err := dlt.DeleteDistributionList(ctx, dl.Name)
@@ -233,7 +180,7 @@ func testGetDistributionListRecipients(ctx context.Context, t *testing.T, dlt Di
 
 	dl := setupTestDL(ctx, t, dlt)
 
-	defer clearDB(ctx, t, dlt)
+	defer st.Clear(ctx, t, dlt)
 
 	t.Run("Can retrieve the recipients of a distribution list", func(t *testing.T) {
 		pageFilters := dto.PageFilter{}
@@ -286,7 +233,7 @@ func testAddRecipients(ctx context.Context, t *testing.T, dlt DistributionListTe
 
 	dl := setupTestDL(ctx, t, dlt)
 
-	defer clearDB(ctx, t, dlt)
+	defer st.Clear(ctx, t, dlt)
 
 	newRecipients := []string{"4", "5", "6"}
 
@@ -321,7 +268,7 @@ func testAddRecipientsThatAreOnTheDL(ctx context.Context, t *testing.T, dlt Dist
 
 	dl := setupTestDL(ctx, t, dlt)
 
-	defer clearDB(ctx, t, dlt)
+	defer st.Clear(ctx, t, dlt)
 
 	t.Run("Should do nothing when adding users that are on the dl already", func(t *testing.T) {
 		summary, err := dlt.AddRecipients(ctx, dl.Name, dl.Recipients)
@@ -347,7 +294,7 @@ func testRemoveRecipients(ctx context.Context, t *testing.T, dlt DistributionLis
 
 	dl := setupTestDL(ctx, t, dlt)
 
-	defer clearDB(ctx, t, dlt)
+	defer st.Clear(ctx, t, dlt)
 
 	recipientsToDelete := []string{"1", "2"}
 
@@ -381,7 +328,7 @@ func testDeleteRecipientsThatAreNotOnDL(ctx context.Context, t *testing.T, dlt D
 
 	dl := setupTestDL(ctx, t, dlt)
 
-	defer clearDB(ctx, t, dlt)
+	defer st.Clear(ctx, t, dlt)
 
 	t.Run("Should do nothing if when deleting recipients that are not on the dl", func(t *testing.T) {
 

@@ -43,7 +43,7 @@ func (ps *PostgresStorage) GetUserNotifications(ctx context.Context, filters dto
 	}
 
 	if filters.NextToken != nil {
-		nextTokenFilter := "(id, user_id, created_at) <= (@id, @user_id, @created_at)"
+		nextTokenFilter := "(user_id, id) < (@user_id, @id)"
 		whereFilters = append(whereFilters, nextTokenFilter)
 
 		var unmarsalledKey userNotificationKey
@@ -59,11 +59,10 @@ func (ps *PostgresStorage) GetUserNotifications(ctx context.Context, filters dto
 
 		args["id"] = unmarsalledKey.Id
 		args["user_id"] = unmarsalledKey.UserId
-		args["created_at"] = unmarsalledKey.CreatedAt
 	}
 
 	if len(filters.Topics) != 0 {
-		whereFilters = append(whereFilters, "topics ANY (@topics)")
+		whereFilters = append(whereFilters, "topic = ANY(@topics)")
 		args["topics"] = filters.Topics
 	}
 
@@ -101,9 +100,8 @@ func (ps *PostgresStorage) GetUserNotifications(ctx context.Context, filters dto
 		lastNotification := userNotifications[numUserNotifications-1]
 
 		lastNotificationKey := userNotificationKey{
-			Id:        lastNotification.Id,
-			UserId:    filters.UserId,
-			CreatedAt: lastNotification.CreatedAt,
+			Id:     lastNotification.Id,
+			UserId: filters.UserId,
 		}
 
 		key, err := marshallKey(lastNotificationKey)
@@ -840,68 +838,6 @@ func (ps *PostgresStorage) UpdateNotificationStatus(ctx context.Context, statusL
 
 	if err != nil {
 		return fmt.Errorf("failed to commit notification status log - %w", err)
-	}
-
-	return nil
-}
-
-func (ps *PostgresStorage) CreateUserNotification(ctx context.Context, userId string, un dto.UserNotification) error {
-
-	tx, err := ps.conn.Begin(ctx)
-
-	if err != nil {
-		return fmt.Errorf("failed to start transaction - %w", err)
-	}
-
-	args := pgx.NamedArgs{
-		"id":        un.Id,
-		"userId":    userId,
-		"title":     un.Title,
-		"contents":  un.Contents,
-		"createdAt": un.CreatedAt,
-		"imageUrl":  un.Image,
-		"topic":     un.Topic,
-		"readAt":    un.ReadAt,
-	}
-
-	_, err = tx.Exec(ctx, InsertUserNotifications, args)
-
-	if err != nil {
-		tx.Rollback(ctx)
-		return fmt.Errorf("failed to insert user notifications - %w", err)
-	}
-
-	err = tx.Commit(ctx)
-
-	if err != nil {
-		return fmt.Errorf("failed to commit user notification insert - %w", err)
-	}
-
-	return nil
-}
-
-func (ps *PostgresStorage) DeleteUserNotification(ctx context.Context, userId string, un dto.UserNotification) error {
-	tx, err := ps.conn.Begin(ctx)
-
-	if err != nil {
-		return fmt.Errorf("failed to start transaction - %w", err)
-	}
-
-	args := pgx.NamedArgs{
-		"id": un.Id,
-	}
-
-	_, err = tx.Exec(ctx, DeleteUserNotification, args)
-
-	if err != nil {
-		tx.Rollback(ctx)
-		return fmt.Errorf("failed to delete user notification - %w", err)
-	}
-
-	err = tx.Commit(ctx)
-
-	if err != nil {
-		return fmt.Errorf("failed to commit user notification delete - %w", err)
 	}
 
 	return nil

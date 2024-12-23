@@ -76,7 +76,7 @@ CREATE INDEX IF NOT EXISTS notification_status_idx
 ON notification_status_log(notification_id, status_date);
 
 CREATE TABLE IF NOT EXISTS user_notifications (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id uuid PRIMARY KEY,
     user_id VARCHAR NOT NULL,
     title VARCHAR NOT NULL,
     contents VARCHAR NOT NULL,
@@ -86,7 +86,7 @@ CREATE TABLE IF NOT EXISTS user_notifications (
     topic VARCHAR
 );
 
-CREATE INDEX IF NOT EXISTS user_notifications_idx
+CREATE UNIQUE INDEX IF NOT EXISTS user_notifications_idx
 ON user_notifications(id, user_id, created_at);
 
 CREATE TABLE IF NOT EXISTS notification_recipients (

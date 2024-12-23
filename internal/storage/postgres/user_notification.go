@@ -17,9 +17,8 @@ type userNotification struct {
 }
 
 type userNotificationKey struct {
-	Id        string `json:"id"`
-	UserId    string `json:"userId"`
-	CreatedAt string `json:"createdAt"`
+	Id     string `json:"id"`
+	UserId string `json:"userId"`
 }
 
 func (n *userNotification) toDTO() dto.UserNotification {
@@ -59,35 +58,6 @@ ORDER BY
 	created_at DESC
 LIMIT
 	@limit;
-`
-
-const InsertUserNotifications = `
-INSERT INTO user_notifications(
-	id,
-	user_id,
-	title,
-	contents,
-	created_at,
-	read_at,
-	image_url,
-	topic
-) VALUES (
-	@id,
-	@userId,
-	@title,
-	@contents,
-	@createdAt,
-	@readAt,
-	@imageUrl,
-	@topic
-);
-`
-
-const DeleteUserNotification = `
-DELETE FROM 
-	ser_notifications
-WHERE
-	id = @id;
 `
 
 const UpdateReadAt = `
