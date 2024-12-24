@@ -11,9 +11,6 @@ import (
 	"github.com/notifique/dto"
 )
 
-// Reduce milisec resolution to match postgre's resolution.
-const PostgresTimeFormat string = "2006-01-02T15:04:05.9999999Z07:00"
-
 func MakeRecipients(numRecipients int) []string {
 
 	recipients := make([]string, 0, numRecipients)
