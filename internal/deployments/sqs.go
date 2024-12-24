@@ -6,19 +6,19 @@ import (
 	"path"
 
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
-	"github.com/notifique/internal/publisher"
+	"github.com/notifique/internal/publish"
 )
 
 type SQSDeployer interface {
-	Deploy() (publisher.PriorityQueues, error)
+	Deploy() (publish.PriorityQueues, error)
 }
 
 type SQSPriorityDeployer struct {
 	Client *sqs.Client
-	Queues publisher.PriorityQueues
+	Queues publish.PriorityQueues
 }
 
-func (d *SQSPriorityDeployer) Deploy() (urls publisher.PriorityQueues, err error) {
+func (d *SQSPriorityDeployer) Deploy() (urls publish.PriorityQueues, err error) {
 
 	availableQueues, err := getQueues(d.Client)
 
@@ -106,8 +106,8 @@ func createSQSQueue(c *sqs.Client, queueName string) (queueUrl string, err error
 	return
 }
 
-func NewSQSPriorityDeployer(c publisher.SQSPriorityConfigurator) (*SQSPriorityDeployer, error) {
-	client, err := publisher.NewSQSClient(c)
+func NewSQSPriorityDeployer(c publish.SQSPriorityConfigurator) (*SQSPriorityDeployer, error) {
+	client, err := publish.NewSQSClient(c)
 
 	if err != nil {
 		return nil, nil

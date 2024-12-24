@@ -21,7 +21,7 @@ run: vet
 .PHONY:run
 
 test: vet
-	go test ./test
+	go test ./test/unit/... ./test/integration/...
 .PHONY:test
 
 deploy-dynamodb: vet

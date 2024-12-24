@@ -1,4 +1,4 @@
-package storage
+package dynamostorage
 
 import (
 	"context"
@@ -31,17 +31,19 @@ type DynamoDBAPI interface {
 	Scan(ctx context.Context, params *dynamodb.ScanInput, optFns ...func(*dynamodb.Options)) (*dynamodb.ScanOutput, error)
 	BatchWriteItem(ctx context.Context, params *dynamodb.BatchWriteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.BatchWriteItemOutput, error)
 	TransactWriteItems(ctx context.Context, params *dynamodb.TransactWriteItemsInput, optFns ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error)
+
+	DeleteTable(ctx context.Context, params *dynamodb.DeleteTableInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteTableOutput, error)
 }
 
-type DynamoDBStorage struct {
+type Storage struct {
 	client DynamoDBAPI
 }
 
-type DynamodbPrimaryKey interface {
+type DynamoPrimaryKey interface {
 	GetKey() (DynamoKey, error)
 }
 
-type DynamoDBPageParams struct {
+type DynamoPageParams struct {
 	Limit             *int32
 	ExclusiveStartKey map[string]types.AttributeValue
 }
@@ -91,7 +93,7 @@ func unmarshallNextToken[T any](nextToken string, key *T) error {
 	return nil
 }
 
-func makeBatchWriteRequest[T any](table string, data []T) (BatchWriteRequest, error) {
+func MakeBatchWriteRequest[T any](table string, data []T) (BatchWriteRequest, error) {
 	requests := make([]types.WriteRequest, 0, len(data))
 
 	for _, d := range data {
@@ -115,9 +117,9 @@ func makeBatchWriteRequest[T any](table string, data []T) (BatchWriteRequest, er
 	return batchRequest, nil
 }
 
-func (s *DynamoDBStorage) getUserConfig(ctx context.Context, userId string) (*userConfig, error) {
+func (s *Storage) getUserConfig(ctx context.Context, userId string) (*UserConfig, error) {
 
-	tmpConfig := userConfig{UserId: userId}
+	tmpConfig := UserConfig{UserId: userId}
 	key, err := tmpConfig.GetKey()
 
 	if err != nil {
@@ -137,7 +139,7 @@ func (s *DynamoDBStorage) getUserConfig(ctx context.Context, userId string) (*us
 		return nil, nil
 	}
 
-	config := userConfig{}
+	config := UserConfig{}
 
 	err = attributevalue.UnmarshalMap(resp.Item, &config)
 
@@ -148,12 +150,12 @@ func (s *DynamoDBStorage) getUserConfig(ctx context.Context, userId string) (*us
 	return &config, nil
 }
 
-func (s *DynamoDBStorage) createUserConfig(ctx context.Context, userId string) (*userConfig, error) {
-	config := userConfig{
+func (s *Storage) createUserConfig(ctx context.Context, userId string) (*UserConfig, error) {
+	config := UserConfig{
 		UserId:      userId,
-		EmailConfig: channelConfig{OptIn: true, SnoozeUntil: nil},
-		SMSConfig:   channelConfig{OptIn: true, SnoozeUntil: nil},
-		InAppConfig: channelConfig{OptIn: true, SnoozeUntil: nil},
+		EmailConfig: ChannelConfig{OptIn: true, SnoozeUntil: nil},
+		SMSConfig:   ChannelConfig{OptIn: true, SnoozeUntil: nil},
+		InAppConfig: ChannelConfig{OptIn: true, SnoozeUntil: nil},
 	}
 
 	item, err := attributevalue.MarshalMap(config)
@@ -174,11 +176,11 @@ func (s *DynamoDBStorage) createUserConfig(ctx context.Context, userId string) (
 	return &config, nil
 }
 
-func (s *DynamoDBStorage) SaveNotification(ctx context.Context, createdBy string, notificationReq dto.NotificationReq) (string, error) {
+func (s *Storage) SaveNotification(ctx context.Context, createdBy string, notificationReq dto.NotificationReq) (string, error) {
 
 	id := uuid.NewString()
 
-	notification := notification{
+	notification := Notification{
 		Id:               id,
 		CreatedBy:        createdBy,
 		CreatedAt:        time.Now().Format(time.RFC3339Nano),
@@ -246,9 +248,9 @@ func makeInFilter(expName string, values []string) *expression.ConditionBuilder 
 	return &cond
 }
 
-func makePageFilters[T DynamodbPrimaryKey](key T, filters dto.PageFilter) (DynamoDBPageParams, error) {
+func makePageFilters[T DynamoPrimaryKey](key T, filters dto.PageFilter) (DynamoPageParams, error) {
 
-	params := DynamoDBPageParams{}
+	params := DynamoPageParams{}
 
 	params.Limit = aws.Int32(internal.PageSize)
 
@@ -276,7 +278,7 @@ func makePageFilters[T DynamodbPrimaryKey](key T, filters dto.PageFilter) (Dynam
 	return params, nil
 }
 
-func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.UserNotificationFilters) (dto.Page[dto.UserNotification], error) {
+func (s *Storage) GetUserNotifications(ctx context.Context, filters dto.UserNotificationFilters) (dto.Page[dto.UserNotification], error) {
 
 	page := dto.Page[dto.UserNotification]{}
 
@@ -310,7 +312,6 @@ func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.
 		ScanIndexForward:          aws.Bool(false),
 		Limit:                     pageParams.Limit,
 		ExclusiveStartKey:         pageParams.ExclusiveStartKey,
-		IndexName:                 aws.String(UserNotificationsCreatedAtIdx),
 	}
 
 	response, err := s.client.Query(ctx, &queryInput)
@@ -319,7 +320,7 @@ func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.
 		return page, fmt.Errorf("failed to get notifications - %w", err)
 	}
 
-	var notifications []userNotification
+	var notifications []UserNotification
 	err = attributevalue.UnmarshalListOfMaps(response.Items, &notifications)
 
 	if err != nil {
@@ -363,7 +364,7 @@ func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.
 	return page, nil
 }
 
-func (s *DynamoDBStorage) GetUserConfig(ctx context.Context, userId string) (dto.UserConfig, error) {
+func (s *Storage) GetUserConfig(ctx context.Context, userId string) (dto.UserConfig, error) {
 
 	config, err := s.getUserConfig(ctx, userId)
 
@@ -397,7 +398,7 @@ func (s *DynamoDBStorage) GetUserConfig(ctx context.Context, userId string) (dto
 	return cfg, nil
 }
 
-func (s *DynamoDBStorage) SetReadStatus(ctx context.Context, userId, notificationId string) error {
+func (s *Storage) SetReadStatus(ctx context.Context, userId, notificationId string) error {
 
 	reatAt := time.Now().Format(time.RFC3339Nano)
 	update := expression.Set(expression.Name("readAt"), expression.Value(reatAt))
@@ -408,7 +409,7 @@ func (s *DynamoDBStorage) SetReadStatus(ctx context.Context, userId, notificatio
 		return fmt.Errorf("failed to make update query - %w", err)
 	}
 
-	notification := userNotification{UserId: userId, Id: notificationId}
+	notification := UserNotification{UserId: userId, Id: notificationId}
 	key, err := notification.GetKey()
 
 	if err != nil {
@@ -437,7 +438,7 @@ func (s *DynamoDBStorage) SetReadStatus(ctx context.Context, userId, notificatio
 	return nil
 }
 
-func (s *DynamoDBStorage) UpdateUserConfig(ctx context.Context, userId string, config dto.UserConfig) error {
+func (s *Storage) UpdateUserConfig(ctx context.Context, userId string, config dto.UserConfig) error {
 
 	usrCfg, err := s.getUserConfig(ctx, userId)
 
@@ -476,7 +477,7 @@ func (s *DynamoDBStorage) UpdateUserConfig(ctx context.Context, userId string, c
 		return fmt.Errorf("failed to make update query - %w", err)
 	}
 
-	tmpConfig := userConfig{UserId: userId}
+	tmpConfig := UserConfig{UserId: userId}
 	key, err := tmpConfig.GetKey()
 
 	if err != nil {
@@ -500,9 +501,9 @@ func (s *DynamoDBStorage) UpdateUserConfig(ctx context.Context, userId string, c
 	return nil
 }
 
-func (s *DynamoDBStorage) addRecipients(ctx context.Context, recipients []distListRecipient) (int, error) {
+func (s *Storage) addRecipients(ctx context.Context, recipients []DistListRecipient) (int, error) {
 
-	requestItems, err := makeBatchWriteRequest(DistListRecipientsTable, recipients)
+	requestItems, err := MakeBatchWriteRequest(DistListRecipientsTable, recipients)
 
 	if err != nil {
 		return 0, fmt.Errorf("failed create batch request for DL - %w", err)
@@ -519,8 +520,8 @@ func (s *DynamoDBStorage) addRecipients(ctx context.Context, recipients []distLi
 	return len(recipients), nil
 }
 
-func (s *DynamoDBStorage) queryDistListSummary(ctx context.Context, listName string) (*map[string]types.AttributeValue, error) {
-	summary := distListSummary{Name: listName}
+func (s *Storage) queryDistListSummary(ctx context.Context, listName string) (*map[string]types.AttributeValue, error) {
+	summary := DistListSummary{Name: listName}
 	key, err := summary.GetKey()
 
 	if err != nil {
@@ -539,14 +540,14 @@ func (s *DynamoDBStorage) queryDistListSummary(ctx context.Context, listName str
 	return &resp.Item, nil
 }
 
-func (s *DynamoDBStorage) getDistListSummary(ctx context.Context, listName string) (*distListSummary, error) {
+func (s *Storage) getDistListSummary(ctx context.Context, listName string) (*DistListSummary, error) {
 	resp, err := s.queryDistListSummary(ctx, listName)
 
 	if err != nil {
 		return nil, err
 	}
 
-	summary := distListSummary{}
+	summary := DistListSummary{}
 
 	err = attributevalue.UnmarshalMap(*resp, &summary)
 
@@ -557,7 +558,7 @@ func (s *DynamoDBStorage) getDistListSummary(ctx context.Context, listName strin
 	return &summary, nil
 }
 
-func (s *DynamoDBStorage) distListExists(ctx context.Context, listName string) (bool, error) {
+func (s *Storage) distListExists(ctx context.Context, listName string) (bool, error) {
 
 	resp, err := s.queryDistListSummary(ctx, listName)
 
@@ -568,8 +569,8 @@ func (s *DynamoDBStorage) distListExists(ctx context.Context, listName string) (
 	return len(*resp) != 0, nil
 }
 
-func (s *DynamoDBStorage) deleteSummary(ctx context.Context, listName string) error {
-	summary := distListSummary{Name: listName}
+func (s *Storage) deleteSummary(ctx context.Context, listName string) error {
+	summary := DistListSummary{Name: listName}
 	key, err := summary.GetKey()
 
 	if err != nil {
@@ -584,7 +585,7 @@ func (s *DynamoDBStorage) deleteSummary(ctx context.Context, listName string) er
 	return err
 }
 
-func (s *DynamoDBStorage) CreateDistributionList(ctx context.Context, dlReq dto.DistributionList) error {
+func (s *Storage) CreateDistributionList(ctx context.Context, dlReq dto.DistributionList) error {
 
 	exists, err := s.distListExists(ctx, dlReq.Name)
 
@@ -596,7 +597,7 @@ func (s *DynamoDBStorage) CreateDistributionList(ctx context.Context, dlReq dto.
 		return internal.DistributionListAlreadyExists{Name: dlReq.Name}
 	}
 
-	summary := distListSummary{
+	summary := DistListSummary{
 		Name:          dlReq.Name,
 		NumRecipients: len(dlReq.Recipients),
 	}
@@ -616,10 +617,10 @@ func (s *DynamoDBStorage) CreateDistributionList(ctx context.Context, dlReq dto.
 		return fmt.Errorf("failed to create summary - %w", err)
 	}
 
-	recipients := make([]distListRecipient, 0, len(dlReq.Recipients))
+	recipients := make([]DistListRecipient, 0, len(dlReq.Recipients))
 
 	for _, r := range dlReq.Recipients {
-		recipients = append(recipients, distListRecipient{
+		recipients = append(recipients, DistListRecipient{
 			DistListName: dlReq.Name,
 			UserId:       r,
 		})
@@ -645,11 +646,11 @@ func (s *DynamoDBStorage) CreateDistributionList(ctx context.Context, dlReq dto.
 	return err
 }
 
-func (s *DynamoDBStorage) GetDistributionLists(ctx context.Context, filters dto.PageFilter) (dto.Page[dto.DistributionListSummary], error) {
+func (s *Storage) GetDistributionLists(ctx context.Context, filters dto.PageFilter) (dto.Page[dto.DistributionListSummary], error) {
 
 	page := dto.Page[dto.DistributionListSummary]{}
 
-	pageParams, err := makePageFilters(&distListSummaryKey{}, filters)
+	pageParams, err := makePageFilters(&DistListSummaryKey{}, filters)
 
 	if err != nil {
 		return page, fmt.Errorf("failed to make page params - %w", err)
@@ -667,7 +668,7 @@ func (s *DynamoDBStorage) GetDistributionLists(ctx context.Context, filters dto.
 		return page, fmt.Errorf("failed to get the summaries - %w", err)
 	}
 
-	var summaries []distListSummary
+	var summaries []DistListSummary
 	err = attributevalue.UnmarshalListOfMaps(response.Items, &summaries)
 
 	if err != nil {
@@ -677,7 +678,7 @@ func (s *DynamoDBStorage) GetDistributionLists(ctx context.Context, filters dto.
 	var nextToken *string = nil
 
 	if len(response.LastEvaluatedKey) != 0 {
-		key := distListSummaryKey{}
+		key := DistListSummaryKey{}
 		encoded, err := marshallNextToken(&key, response.LastEvaluatedKey)
 
 		if err != nil {
@@ -706,7 +707,7 @@ func (s *DynamoDBStorage) GetDistributionLists(ctx context.Context, filters dto.
 	return page, nil
 }
 
-func (s *DynamoDBStorage) deleteRecipients(ctx context.Context, recipients []distListRecipient) (int, error) {
+func (s *Storage) deleteRecipients(ctx context.Context, recipients []DistListRecipient) (int, error) {
 
 	if len(recipients) == 0 {
 		return 0, nil
@@ -714,8 +715,8 @@ func (s *DynamoDBStorage) deleteRecipients(ctx context.Context, recipients []dis
 
 	deleteReq := make([]types.WriteRequest, 0, len(recipients))
 
-	for _, distListRecipient := range recipients {
-		key, _ := distListRecipient.GetKey()
+	for _, DistListRecipient := range recipients {
+		key, _ := DistListRecipient.GetKey()
 		deleteReq = append(deleteReq, types.WriteRequest{
 			DeleteRequest: &types.DeleteRequest{
 				Key: key,
@@ -738,7 +739,7 @@ func (s *DynamoDBStorage) deleteRecipients(ctx context.Context, recipients []dis
 	return len(recipients), nil
 }
 
-func (s *DynamoDBStorage) DeleteDistributionList(ctx context.Context, listName string) error {
+func (s *Storage) DeleteDistributionList(ctx context.Context, listName string) error {
 
 	keyEx := expression.Key(DistListRecipientHashKey).Equal(expression.Value(listName))
 	expr, err := expression.NewBuilder().WithKeyCondition(keyEx).Build()
@@ -761,7 +762,7 @@ func (s *DynamoDBStorage) DeleteDistributionList(ctx context.Context, listName s
 			return fmt.Errorf("failed to retrieve user page - %w", err)
 		}
 
-		var recipients []distListRecipient
+		var recipients []DistListRecipient
 		err = attributevalue.UnmarshalListOfMaps(resp.Items, &recipients)
 
 		if err != nil {
@@ -784,7 +785,7 @@ func (s *DynamoDBStorage) DeleteDistributionList(ctx context.Context, listName s
 	return nil
 }
 
-func (s *DynamoDBStorage) GetRecipients(ctx context.Context, distlistName string, filters dto.PageFilter) (dto.Page[string], error) {
+func (s *Storage) GetRecipients(ctx context.Context, distlistName string, filters dto.PageFilter) (dto.Page[string], error) {
 
 	page := dto.Page[string]{}
 
@@ -808,7 +809,7 @@ func (s *DynamoDBStorage) GetRecipients(ctx context.Context, distlistName string
 		return page, fmt.Errorf("failed to build query - %w", err)
 	}
 
-	pageParams, err := makePageFilters(&distListRecipient{}, filters)
+	pageParams, err := makePageFilters(&DistListRecipient{}, filters)
 
 	if err != nil {
 		return page, fmt.Errorf("failed to make page params - %w", err)
@@ -830,7 +831,7 @@ func (s *DynamoDBStorage) GetRecipients(ctx context.Context, distlistName string
 		return page, fmt.Errorf("failed to get recipients - %w", err)
 	}
 
-	var recipients []distListRecipient
+	var recipients []DistListRecipient
 	err = attributevalue.UnmarshalListOfMaps(response.Items, &recipients)
 
 	if err != nil {
@@ -840,7 +841,7 @@ func (s *DynamoDBStorage) GetRecipients(ctx context.Context, distlistName string
 	var nextToken *string = nil
 
 	if len(response.LastEvaluatedKey) != 0 {
-		key := distListRecipient{}
+		key := DistListRecipient{}
 		encoded, err := marshallNextToken(&key, response.LastEvaluatedKey)
 
 		if err != nil {
@@ -865,9 +866,9 @@ func (s *DynamoDBStorage) GetRecipients(ctx context.Context, distlistName string
 	return page, nil
 }
 
-func (s *DynamoDBStorage) getRecipientsInDL(ctx context.Context, listName string, recipients []string) ([]distListRecipient, error) {
+func (s *Storage) getRecipientsInDL(ctx context.Context, listName string, recipients []string) ([]DistListRecipient, error) {
 
-	result := make([]distListRecipient, 0)
+	result := make([]DistListRecipient, 0)
 
 	if len(recipients) == 0 {
 		return result, nil
@@ -895,14 +896,14 @@ func (s *DynamoDBStorage) getRecipientsInDL(ctx context.Context, listName string
 		resp, err := scanPaginator.NextPage(ctx)
 
 		if err != nil {
-			return []distListRecipient{}, fmt.Errorf("failed to retrieve recipients page - %w", err)
+			return []DistListRecipient{}, fmt.Errorf("failed to retrieve recipients page - %w", err)
 		}
 
-		var page []distListRecipient
+		var page []DistListRecipient
 		err = attributevalue.UnmarshalListOfMaps(resp.Items, &page)
 
 		if err != nil {
-			return []distListRecipient{}, fmt.Errorf("failed to unmarshall recipients page - %w", err)
+			return []DistListRecipient{}, fmt.Errorf("failed to unmarshall recipients page - %w", err)
 		}
 
 		result = append(result, page...)
@@ -911,9 +912,9 @@ func (s *DynamoDBStorage) getRecipientsInDL(ctx context.Context, listName string
 	return result, nil
 }
 
-func (s *DynamoDBStorage) updateRecipientCount(ctx context.Context, listName string, numRecipients int) (int, error) {
+func (s *Storage) updateRecipientCount(ctx context.Context, listName string, numRecipients int) (int, error) {
 
-	summary := distListSummary{Name: listName}
+	summary := DistListSummary{Name: listName}
 	key, err := summary.GetKey()
 
 	if err != nil {
@@ -951,7 +952,7 @@ func (s *DynamoDBStorage) updateRecipientCount(ctx context.Context, listName str
 	return attrMap["numOfRecipients"], nil
 }
 
-func (s *DynamoDBStorage) getNewRecipients(recipientsInDL []distListRecipient, toCheck []string) []string {
+func (s *Storage) getNewRecipients(recipientsInDL []DistListRecipient, toCheck []string) []string {
 
 	newRecipients := make([]string, 0)
 	recipientSet := make(map[string]struct{})
@@ -969,7 +970,7 @@ func (s *DynamoDBStorage) getNewRecipients(recipientsInDL []distListRecipient, t
 	return newRecipients
 }
 
-func (s *DynamoDBStorage) AddRecipients(ctx context.Context, listName string, recipients []string) (*dto.DistributionListSummary, error) {
+func (s *Storage) AddRecipients(ctx context.Context, listName string, recipients []string) (*dto.DistributionListSummary, error) {
 
 	exists, err := s.distListExists(ctx, listName)
 
@@ -988,10 +989,10 @@ func (s *DynamoDBStorage) AddRecipients(ctx context.Context, listName string, re
 	}
 
 	newRecipients := s.getNewRecipients(recipientsInDL, recipients)
-	toAdd := make([]distListRecipient, 0, len(recipients))
+	toAdd := make([]DistListRecipient, 0, len(recipients))
 
 	for _, r := range newRecipients {
-		toAdd = append(toAdd, distListRecipient{
+		toAdd = append(toAdd, DistListRecipient{
 			DistListName: listName,
 			UserId:       r,
 		})
@@ -1032,7 +1033,7 @@ func (s *DynamoDBStorage) AddRecipients(ctx context.Context, listName string, re
 	return &summary, nil
 }
 
-func (s *DynamoDBStorage) DeleteRecipients(ctx context.Context, listName string, recipients []string) (*dto.DistributionListSummary, error) {
+func (s *Storage) DeleteRecipients(ctx context.Context, listName string, recipients []string) (*dto.DistributionListSummary, error) {
 
 	exists, err := s.distListExists(ctx, listName)
 
@@ -1085,7 +1086,7 @@ func (s *DynamoDBStorage) DeleteRecipients(ctx context.Context, listName string,
 	return &summary, nil
 }
 
-func (s *DynamoDBStorage) UpdateNotificationStatus(ctx context.Context, statusLog c.NotificationStatusLog) error {
+func (s *Storage) UpdateNotificationStatus(ctx context.Context, statusLog c.NotificationStatusLog) error {
 
 	update := expression.Set(expression.Name("status"), expression.Value((statusLog.Status)))
 	condEx := expression.AttributeExists(expression.Name(NotificationHashKey))
@@ -1095,14 +1096,14 @@ func (s *DynamoDBStorage) UpdateNotificationStatus(ctx context.Context, statusLo
 		return fmt.Errorf("failed to make update query - %w", err)
 	}
 
-	n := notification{Id: statusLog.NotificationId}
+	n := Notification{Id: statusLog.NotificationId}
 	notificationKey, err := n.GetKey()
 
 	if err != nil {
 		return err
 	}
 
-	log := notificationStatusLog{
+	log := NotificationStatusLog{
 		NotificationId: statusLog.NotificationId,
 		Status:         string(statusLog.Status),
 		StatusDate:     time.Now().Format(time.RFC3339Nano),
@@ -1140,58 +1141,6 @@ func (s *DynamoDBStorage) UpdateNotificationStatus(ctx context.Context, statusLo
 	return nil
 }
 
-func (s *DynamoDBStorage) CreateUserNotification(ctx context.Context, userId string, un dto.UserNotification) error {
-
-	notification := userNotification{
-		Id:        un.Id,
-		UserId:    userId,
-		Title:     un.Title,
-		Contents:  un.Contents,
-		CreatedAt: un.CreatedAt,
-		Image:     un.Image,
-		ReadAt:    un.ReadAt,
-		Topic:     un.Topic,
-	}
-
-	item, err := attributevalue.MarshalMap(notification)
-
-	if err != nil {
-		return fmt.Errorf("failed to marshall user notification - %w", err)
-	}
-
-	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(UserNotificationsTable),
-		Item:      item,
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to store user notification - %w", err)
-	}
-
-	return nil
-}
-
-func (s *DynamoDBStorage) DeleteUserNotification(ctx context.Context, userId string, un dto.UserNotification) error {
-
-	notification := userNotification{
-		UserId: userId,
-		ReadAt: un.ReadAt,
-	}
-
-	key, err := notification.GetKey()
-
-	if err != nil {
-		return err
-	}
-
-	_, err = s.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
-		TableName: aws.String(UserNotificationsTable),
-		Key:       key,
-	})
-
-	return err
-}
-
 func NewDynamoDBClient(c DynamoConfigurator) (client *dynamodb.Client, err error) {
 
 	clientCfg := c.GetDynamoClientConfig()
@@ -1215,6 +1164,6 @@ func NewDynamoDBClient(c DynamoConfigurator) (client *dynamodb.Client, err error
 	return
 }
 
-func NewDynamoDBStorage(a DynamoDBAPI) *DynamoDBStorage {
-	return &DynamoDBStorage{client: a}
+func NewDynamoDBStorage(a DynamoDBAPI) *Storage {
+	return &Storage{client: a}
 }

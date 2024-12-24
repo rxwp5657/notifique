@@ -11,7 +11,7 @@ type DistributionListSummary struct {
 }
 
 type DistributionListRecipients struct {
-	Recipients []string `json:"recipients" binding:"unique,max=256,dive,min=1"`
+	Recipients []string `json:"recipients" binding:"unique,max=256,min=1,dive,min=1"`
 }
 
 type DistributionListUriParams struct {

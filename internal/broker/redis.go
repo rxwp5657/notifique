@@ -25,13 +25,13 @@ type RedisApi interface {
 	Publish(ctx context.Context, channel string, message interface{}) *redis.IntCmd
 }
 
-type RedisBroker struct {
+type Redis struct {
 	client          RedisApi
 	channels        map[string]userChannel
 	channelCapacity int
 }
 
-func (rb *RedisBroker) Suscribe(ctx context.Context, userId string) (<-chan dto.UserNotification, error) {
+func (rb *Redis) Suscribe(ctx context.Context, userId string) (<-chan dto.UserNotification, error) {
 
 	if rb == nil {
 		return nil, fmt.Errorf("redis broker is nil")
@@ -72,7 +72,7 @@ func (rb *RedisBroker) Suscribe(ctx context.Context, userId string) (<-chan dto.
 	return userCh.NotificationCh, nil
 }
 
-func (rb *RedisBroker) Unsubscribe(ctx context.Context, userId string) error {
+func (rb *Redis) Unsubscribe(ctx context.Context, userId string) error {
 
 	if rb == nil {
 		return fmt.Errorf("redis broker is nil")
@@ -89,7 +89,7 @@ func (rb *RedisBroker) Unsubscribe(ctx context.Context, userId string) error {
 	return nil
 }
 
-func (rb *RedisBroker) Publish(ctx context.Context, userId string, un dto.UserNotification) error {
+func (rb *Redis) Publish(ctx context.Context, userId string, un dto.UserNotification) error {
 
 	if rb == nil {
 		return fmt.Errorf("redis broker is nil")
@@ -108,7 +108,7 @@ func (rb *RedisBroker) Publish(ctx context.Context, userId string, un dto.UserNo
 	return nil
 }
 
-func NewRedisBroker(client RedisApi, bc BrokerConfigurator) (*RedisBroker, error) {
+func NewRedisBroker(client RedisApi, bc BrokerConfigurator) (*Redis, error) {
 
 	channelSize, err := bc.GetBrokerChannelSize()
 
@@ -120,7 +120,7 @@ func NewRedisBroker(client RedisApi, bc BrokerConfigurator) (*RedisBroker, error
 		return nil, fmt.Errorf("broker channel size must be > 0")
 	}
 
-	broker := &RedisBroker{
+	broker := &Redis{
 		client:          client,
 		channels:        make(map[string]userChannel),
 		channelCapacity: channelSize,

@@ -1,4 +1,4 @@
-package storage
+package dynamostorage
 
 import (
 	"fmt"
@@ -14,14 +14,14 @@ const (
 	NotificationStatusLogSortKey = "statusDate"
 )
 
-type notificationStatusLog struct {
+type NotificationStatusLog struct {
 	NotificationId string  `dynamodbav:"notificationId"`
 	Status         string  `dynamodbav:"status"`
 	StatusDate     string  `dynamodbav:"statusDate"`
 	Error          *string `dynamodbav:"errorMsg"`
 }
 
-type notification struct {
+type Notification struct {
 	Id               string   `dynamodbav:"id"`
 	CreatedBy        string   `dynamodbav:"createdBy"`
 	CreatedAt        string   `dynamodbav:"createdAt"`
@@ -36,7 +36,7 @@ type notification struct {
 	Status           string   `dynamodbav:"status"`
 }
 
-func (n notification) GetKey() (DynamoKey, error) {
+func (n Notification) GetKey() (DynamoKey, error) {
 	key := make(DynamoKey)
 
 	notificationId, err := attributevalue.Marshal(n.Id)

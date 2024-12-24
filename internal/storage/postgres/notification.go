@@ -1,4 +1,4 @@
-package storage
+package postgresstorage
 
 const InsertNotification = `
 INSERT INTO notifications (

@@ -1,6 +1,6 @@
 package containers
 
-import "github.com/notifique/internal/publisher"
+import "github.com/notifique/internal/publish"
 
 const (
 	LowPriorityQueue    = "notifique-low"
@@ -8,7 +8,7 @@ const (
 	HighPriorityQueue   = "notifique-high"
 )
 
-func NewPriorityQueueConfig() (queues publisher.PriorityQueues) {
+func NewPriorityQueueConfig() (queues publish.PriorityQueues) {
 
 	low := LowPriorityQueue
 	medium := MediumPriorityQueue

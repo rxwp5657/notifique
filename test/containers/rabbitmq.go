@@ -7,7 +7,7 @@ import (
 
 	"github.com/docker/go-connections/nat"
 	"github.com/notifique/internal/deployments"
-	"github.com/notifique/internal/publisher"
+	"github.com/notifique/internal/publish"
 
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/rabbitmq"
@@ -20,15 +20,15 @@ type RabbitMQContainer struct {
 
 type RabbitMQPriorityContainer struct {
 	Container RabbitMQContainer
-	Client    publisher.RabbitMQClient
-	Queues    publisher.PriorityQueues
+	Client    publish.RabbitMQClient
+	Queues    publish.PriorityQueues
 }
 
 func (rc *RabbitMQPriorityContainer) GetRabbitMQUrl() (string, error) {
 	return rc.Container.URI, nil
 }
 
-func (rc *RabbitMQPriorityContainer) GetPriorityQueues() publisher.PriorityQueues {
+func (rc *RabbitMQPriorityContainer) GetPriorityQueues() publish.PriorityQueues {
 	return rc.Queues
 }
 

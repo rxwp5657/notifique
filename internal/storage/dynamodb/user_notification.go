@@ -1,4 +1,4 @@
-package storage
+package dynamostorage
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ const (
 	UserNotificationsCreatedAtIdxSortKey = "createdAt"
 )
 
-type userNotification struct {
+type UserNotification struct {
 	Id        string  `dynamodbav:"id"`
 	UserId    string  `dynamodbav:"userId"`
 	Title     string  `dynamodbav:"title"`
@@ -27,11 +27,11 @@ type userNotification struct {
 }
 
 type userNotificationKey struct {
-	UserId    string `dynamodbav:"userId" json:"userId"`
-	CreatedAt string `dynamodbav:"createdAt" json:"createdAt"`
+	Id     string `dynamodbav:"id" json:"id"`
+	UserId string `dynamodbav:"userId" json:"userId"`
 }
 
-func (n *userNotification) GetKey() (DynamoKey, error) {
+func (n *UserNotification) GetKey() (DynamoKey, error) {
 	key := make(map[string]types.AttributeValue)
 
 	userId, err := attributevalue.Marshal(n.UserId)
@@ -52,29 +52,11 @@ func (n *userNotification) GetKey() (DynamoKey, error) {
 	return key, nil
 }
 
-func (n *userNotification) GetSecondaryIdxKey() (DynamoKey, error) {
-	key := make(map[string]types.AttributeValue)
-
-	id, err := attributevalue.Marshal(n.UserId)
-
-	if err != nil {
-		return key, fmt.Errorf("failed to marshall userId - %w", err)
-	}
-
-	createdAt, err := attributevalue.Marshal(n.CreatedAt)
-
-	if err != nil {
-		return key, fmt.Errorf("failed to marshall createdAt - %w", err)
-	}
-
-	key["userId"] = id
-	key["createdAt"] = createdAt
-
-	return key, nil
-}
-
 func (n *userNotificationKey) GetKey() (DynamoKey, error) {
-	un := userNotification{UserId: n.UserId, Id: n.UserId}
+	un := UserNotification{
+		UserId: n.UserId,
+		Id:     n.Id,
+	}
 
 	return un.GetKey()
 }

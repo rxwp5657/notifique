@@ -1,4 +1,4 @@
-package storage
+package postgresstorage
 
 type distributionList struct {
 	Name      string `db:"name"`

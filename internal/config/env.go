@@ -7,7 +7,7 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"github.com/notifique/internal/publisher"
+	"github.com/notifique/internal/publish"
 	storage "github.com/notifique/internal/storage/dynamodb"
 )
 
@@ -52,7 +52,7 @@ func (cfg EnvConfig) GetDynamoClientConfig() (dcfg storage.DynamoClientConfig) {
 	return
 }
 
-func (cfg EnvConfig) GetPriorityQueues() (queues publisher.PriorityQueues) {
+func (cfg EnvConfig) GetPriorityQueues() (queues publish.PriorityQueues) {
 
 	if low, ok := os.LookupEnv(lowPriorityQueue); ok {
 		queues.Low = &low
@@ -79,7 +79,7 @@ func (cfg EnvConfig) GetRabbitMQUrl() (string, error) {
 	return url, nil
 }
 
-func (cfg EnvConfig) GetSQSClientConfig() (sqsCfg publisher.SQSClientConfig) {
+func (cfg EnvConfig) GetSQSClientConfig() (sqsCfg publish.SQSClientConfig) {
 
 	if be, ok := os.LookupEnv(sqsBaseEndpoint); ok {
 		sqsCfg.BaseEndpoint = &be
