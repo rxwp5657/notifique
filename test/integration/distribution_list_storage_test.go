@@ -11,7 +11,7 @@ import (
 	"github.com/notifique/dto"
 	"github.com/notifique/internal"
 	"github.com/notifique/test"
-	st "github.com/notifique/test/integration/store"
+	st "github.com/notifique/test/storage"
 )
 
 type DistributionListTester interface {

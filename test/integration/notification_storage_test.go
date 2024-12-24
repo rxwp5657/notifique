@@ -10,7 +10,7 @@ import (
 	"github.com/notifique/controllers"
 	"github.com/notifique/dto"
 	"github.com/notifique/test"
-	st "github.com/notifique/test/integration/store"
+	st "github.com/notifique/test/storage"
 )
 
 type NotificationStorageTester interface {
