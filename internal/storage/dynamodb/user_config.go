@@ -1,4 +1,4 @@
-package storage
+package dynamostorage
 
 import (
 	"fmt"
@@ -17,19 +17,19 @@ const (
 	UserConfigOptIn       = "optIn"
 )
 
-type channelConfig struct {
+type ChannelConfig struct {
 	OptIn       bool    `dynamodbav:"optIn"`
 	SnoozeUntil *string `dynamodbav:"snoozeUntil"`
 }
 
-type userConfig struct {
+type UserConfig struct {
 	UserId      string        `dynamodbav:"userId"`
-	EmailConfig channelConfig `dynamodbav:"emailConfig"`
-	SMSConfig   channelConfig `dynamodbav:"smsConfig"`
-	InAppConfig channelConfig `dynamodbav:"inAppConfig"`
+	EmailConfig ChannelConfig `dynamodbav:"emailConfig"`
+	SMSConfig   ChannelConfig `dynamodbav:"smsConfig"`
+	InAppConfig ChannelConfig `dynamodbav:"inAppConfig"`
 }
 
-func (cfg *userConfig) GetKey() (DynamoKey, error) {
+func (cfg *UserConfig) GetKey() (DynamoKey, error) {
 	key := make(map[string]types.AttributeValue)
 
 	userId, err := attributevalue.Marshal(cfg.UserId)

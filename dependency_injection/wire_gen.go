@@ -18,7 +18,7 @@ import (
 	"github.com/notifique/internal/config"
 	"github.com/notifique/internal/deployments"
 	"github.com/notifique/internal/publisher"
-	storage2 "github.com/notifique/internal/storage/dynamodb"
+	"github.com/notifique/internal/storage/dynamodb"
 	"github.com/notifique/internal/storage/postgres"
 	"github.com/notifique/routes"
 	"github.com/notifique/test/config"
@@ -35,7 +35,7 @@ func InjectPgPrioritySQS(envfile string) (*gin.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	postgresStorage, err := storage.NewPostgresStorage(envConfig)
+	postgresStorage, err := postgresstorage.NewPostgresStorage(envConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	postgresStorage, err := storage.NewPostgresStorage(envConfig)
+	postgresStorage, err := postgresstorage.NewPostgresStorage(envConfig)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -100,11 +100,11 @@ func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	client, err := storage2.NewDynamoDBClient(envConfig)
+	client, err := dynamostorage.NewDynamoDBClient(envConfig)
 	if err != nil {
 		return nil, err
 	}
-	dynamoDBStorage := storage2.NewDynamoDBStorage(client)
+	dynamoDBStorage := dynamostorage.NewDynamoDBStorage(client)
 	sqsClient, err := publisher.NewSQSClient(envConfig)
 	if err != nil {
 		return nil, err
@@ -131,11 +131,11 @@ func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	client, err := storage2.NewDynamoDBClient(envConfig)
+	client, err := dynamostorage.NewDynamoDBClient(envConfig)
 	if err != nil {
 		return nil, nil, err
 	}
-	dynamoDBStorage := storage2.NewDynamoDBStorage(client)
+	dynamoDBStorage := dynamostorage.NewDynamoDBStorage(client)
 	rabbitMQClient, cleanup, err := publisher.NewRabbitMQClient(envConfig)
 	if err != nil {
 		return nil, nil, err
@@ -172,7 +172,7 @@ func InjectPgMockedPubIntegrationTest(ctx context.Context, mockController *gomoc
 		cleanup()
 		return nil, nil, err
 	}
-	postgresStorage, err := storage.NewPostgresStorage(postgresContainer)
+	postgresStorage, err := postgresstorage.NewPostgresStorage(postgresContainer)
 	if err != nil {
 		cleanup2()
 		cleanup()
@@ -222,13 +222,13 @@ func InjectDynamoMockedPubIntegrationTest(ctx context.Context, mockController *g
 		cleanup()
 		return nil, nil, err
 	}
-	client, err := storage2.NewDynamoDBClient(dynamoContainer)
+	client, err := dynamostorage.NewDynamoDBClient(dynamoContainer)
 	if err != nil {
 		cleanup2()
 		cleanup()
 		return nil, nil, err
 	}
-	dynamoDBStorage := storage2.NewDynamoDBStorage(client)
+	dynamoDBStorage := dynamostorage.NewDynamoDBStorage(client)
 	mockNotificationPublisher := mock_controllers.NewMockNotificationPublisher(mockController)
 	redisClient, err := internal.NewRedisClient(redisContainer)
 	if err != nil {
@@ -273,7 +273,7 @@ func InjectPgSQSPriorityIntegrationTest(ctx context.Context) (*PgSQSPriorityInte
 		cleanup()
 		return nil, nil, err
 	}
-	postgresStorage, err := storage.NewPostgresStorage(postgresContainer)
+	postgresStorage, err := postgresstorage.NewPostgresStorage(postgresContainer)
 	if err != nil {
 		cleanup2()
 		cleanup()
@@ -309,7 +309,7 @@ func InjectPgRabbitMQPriorityIntegrationTest(ctx context.Context) (*PgRabbitMQPr
 		cleanup()
 		return nil, nil, err
 	}
-	postgresStorage, err := storage.NewPostgresStorage(postgresContainer)
+	postgresStorage, err := postgresstorage.NewPostgresStorage(postgresContainer)
 	if err != nil {
 		cleanup2()
 		cleanup()
@@ -346,13 +346,13 @@ func InjectDynamoSQSPriorityIntegrationTest(ctx context.Context) (*DynamoSQSPrio
 		cleanup()
 		return nil, nil, err
 	}
-	client, err := storage2.NewDynamoDBClient(dynamoContainer)
+	client, err := dynamostorage.NewDynamoDBClient(dynamoContainer)
 	if err != nil {
 		cleanup2()
 		cleanup()
 		return nil, nil, err
 	}
-	dynamoDBStorage := storage2.NewDynamoDBStorage(client)
+	dynamoDBStorage := dynamostorage.NewDynamoDBStorage(client)
 	sqsClient, err := publisher.NewSQSClient(sqsPriorityContainer)
 	if err != nil {
 		cleanup2()
@@ -383,13 +383,13 @@ func InjectDynamoRabbitMQPriorityIntegrationTest(ctx context.Context) (*DynamoRa
 		cleanup()
 		return nil, nil, err
 	}
-	client, err := storage2.NewDynamoDBClient(dynamoContainer)
+	client, err := dynamostorage.NewDynamoDBClient(dynamoContainer)
 	if err != nil {
 		cleanup2()
 		cleanup()
 		return nil, nil, err
 	}
-	dynamoDBStorage := storage2.NewDynamoDBStorage(client)
+	dynamoDBStorage := dynamostorage.NewDynamoDBStorage(client)
 	rabbitMQClient, cleanup3, err := publisher.NewRabbitMQClient(rabbitMQPriorityContainer)
 	if err != nil {
 		cleanup2()
@@ -464,7 +464,7 @@ func InjectSQSPriorityDeployer(envfile string) (*deployments.SQSPriorityDeployer
 type PostgresMockedPubIntegrationTest struct {
 	PostgresContainer *containers.PostgresContainer
 	RedisContainer    *containers.RedisContainer
-	Storage           *storage.PostgresStorage
+	Storage           *postgresstorage.PostgresStorage
 	Publisher         *mock_controllers.MockNotificationPublisher
 	Broker            *broker.RedisBroker
 	Engine            *gin.Engine
@@ -473,7 +473,7 @@ type PostgresMockedPubIntegrationTest struct {
 type DynamoMockedPubIntegrationTest struct {
 	DynamoContainer *containers.DynamoContainer
 	RedisContainer  *containers.RedisContainer
-	Storage         *storage2.DynamoDBStorage
+	Storage         *dynamostorage.DynamoDBStorage
 	Publisher       *mock_controllers.MockNotificationPublisher
 	Broker          *broker.RedisBroker
 	Engine          *gin.Engine
@@ -482,28 +482,28 @@ type DynamoMockedPubIntegrationTest struct {
 type PgSQSPriorityIntegrationTest struct {
 	PostgresContainer *containers.PostgresContainer
 	SQSContainer      *containers.SQSPriorityContainer
-	Storage           *storage.PostgresStorage
+	Storage           *postgresstorage.PostgresStorage
 	Publisher         *publisher.PriorityPublisher
 }
 
 type PgRabbitMQPriorityIntegrationTest struct {
 	PostgresContainer *containers.PostgresContainer
 	RabbitMQContainer *containers.RabbitMQPriorityContainer
-	Storage           *storage.PostgresStorage
+	Storage           *postgresstorage.PostgresStorage
 	Publisher         *publisher.PriorityPublisher
 }
 
 type DynamoSQSPriorityIntegrationTest struct {
 	DynamoContainer *containers.DynamoContainer
 	SQSContainer    *containers.SQSPriorityContainer
-	Storage         *storage2.DynamoDBStorage
+	Storage         *dynamostorage.DynamoDBStorage
 	Publisher       *publisher.PriorityPublisher
 }
 
 type DynamoRabbitMQPriorityIntegrationTest struct {
 	DynamoContainer   *containers.DynamoContainer
 	RabbitMQContainer *containers.RabbitMQPriorityContainer
-	Storage           *storage2.DynamoDBStorage
+	Storage           *dynamostorage.DynamoDBStorage
 	Publisher         *publisher.PriorityPublisher
 }
 
@@ -514,9 +514,9 @@ type MockedBackend struct {
 	Engine    *gin.Engine
 }
 
-var DynamoSet = wire.NewSet(storage2.NewDynamoDBClient, storage2.NewDynamoDBStorage, wire.Bind(new(storage2.DynamoDBAPI), new(*dynamodb.Client)), wire.Bind(new(routes.Storage), new(*storage2.DynamoDBStorage)), wire.Bind(new(controllers.NotificationStorage), new(*storage2.DynamoDBStorage)))
+var DynamoSet = wire.NewSet(dynamostorage.NewDynamoDBClient, dynamostorage.NewDynamoDBStorage, wire.Bind(new(dynamostorage.DynamoDBAPI), new(*dynamodb.Client)), wire.Bind(new(routes.Storage), new(*dynamostorage.DynamoDBStorage)), wire.Bind(new(controllers.NotificationStorage), new(*dynamostorage.DynamoDBStorage)))
 
-var PostgresSet = wire.NewSet(storage.NewPostgresStorage, wire.Bind(new(routes.Storage), new(*storage.PostgresStorage)), wire.Bind(new(controllers.NotificationStorage), new(*storage.PostgresStorage)))
+var PostgresSet = wire.NewSet(postgresstorage.NewPostgresStorage, wire.Bind(new(routes.Storage), new(*postgresstorage.PostgresStorage)), wire.Bind(new(controllers.NotificationStorage), new(*postgresstorage.PostgresStorage)))
 
 var SQSPublisherSet = wire.NewSet(publisher.NewSQSClient, publisher.NewSQSPublisher, wire.Bind(new(publisher.SQSAPI), new(*sqs.Client)), wire.Bind(new(publisher.Publisher), new(*publisher.SQSPublisher)))
 
@@ -544,13 +544,13 @@ var DynamoRabbitMQPriroritySet = wire.NewSet(
 
 var RedisUserNotificationBrokerSet = wire.NewSet(internal.NewRedisClient, broker.NewRedisBroker, wire.Bind(new(broker.RedisApi), new(*redis.Client)), wire.Bind(new(controllers.UserNotificationBroker), new(*broker.RedisBroker)))
 
-var PostgresContainerSet = wire.NewSet(containers.NewPostgresContainer, wire.Bind(new(storage.PostgresConfigurator), new(*containers.PostgresContainer)))
+var PostgresContainerSet = wire.NewSet(containers.NewPostgresContainer, wire.Bind(new(postgresstorage.PostgresConfigurator), new(*containers.PostgresContainer)))
 
 var SQSPriorityContainerSet = wire.NewSet(containers.NewSQSPriorityContainer, wire.Bind(new(publisher.SQSConfigurator), new(*containers.SQSPriorityContainer)), wire.Bind(new(publisher.PriorityQueueConfigurator), new(*containers.SQSPriorityContainer)))
 
 var RabbitMQPriorityContainerSet = wire.NewSet(containers.NewRabbitMQPriorityContainer, wire.Bind(new(publisher.RabbitMQConfigurator), new(*containers.RabbitMQPriorityContainer)), wire.Bind(new(publisher.PriorityQueueConfigurator), new(*containers.RabbitMQPriorityContainer)))
 
-var DynamoContainerSet = wire.NewSet(containers.NewDynamoContainer, wire.Bind(new(storage2.DynamoConfigurator), new(*containers.DynamoContainer)))
+var DynamoContainerSet = wire.NewSet(containers.NewDynamoContainer, wire.Bind(new(dynamostorage.DynamoConfigurator), new(*containers.DynamoContainer)))
 
 var RedisContainerSet = wire.NewSet(containers.NewRedisContainer, wire.Bind(new(internal.RedisConfigurator), new(*containers.RedisContainer)), wire.Bind(new(broker.BrokerConfigurator), new(*containers.RedisContainer)))
 
@@ -572,4 +572,4 @@ var MockedStorageSet = wire.NewSet(
 
 var TestVersionConfiguratorSet = wire.NewSet(config_test.NewTestVersionConfigurator, wire.Bind(new(routes.VersionConfigurator), new(config_test.TestVersionConfiguratorFunc)))
 
-var EnvConfigSet = wire.NewSet(config.NewEnvConfig, wire.Bind(new(storage.PostgresConfigurator), new(*config.EnvConfig)), wire.Bind(new(storage2.DynamoConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.PriorityQueueConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.SQSConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.RabbitMQConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.RabbitMQPriorityConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.SQSPriorityConfigurator), new(*config.EnvConfig)), wire.Bind(new(internal.RedisConfigurator), new(*config.EnvConfig)), wire.Bind(new(broker.BrokerConfigurator), new(*config.EnvConfig)), wire.Bind(new(routes.VersionConfigurator), new(*config.EnvConfig)))
+var EnvConfigSet = wire.NewSet(config.NewEnvConfig, wire.Bind(new(postgresstorage.PostgresConfigurator), new(*config.EnvConfig)), wire.Bind(new(dynamostorage.DynamoConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.PriorityQueueConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.SQSConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.RabbitMQConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.RabbitMQPriorityConfigurator), new(*config.EnvConfig)), wire.Bind(new(publisher.SQSPriorityConfigurator), new(*config.EnvConfig)), wire.Bind(new(internal.RedisConfigurator), new(*config.EnvConfig)), wire.Bind(new(broker.BrokerConfigurator), new(*config.EnvConfig)), wire.Bind(new(routes.VersionConfigurator), new(*config.EnvConfig)))

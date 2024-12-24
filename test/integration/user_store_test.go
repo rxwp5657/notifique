@@ -19,13 +19,28 @@ type UserStorageTester interface {
 	controllers.UserStorage
 	st.ContainerTester
 	InsertUserNotifications(ctx context.Context, userId string, un []dto.UserNotification) error
-	DeleteUserNotifications(ctx context.Context, userId string, ids []string) error
 }
 
 func TestUsersStoragePostgres(t *testing.T) {
 
 	ctx := context.Background()
 	tester, close, err := st.NewPostgresIntegrationTester(ctx)
+
+	if err != nil {
+		t.Fatal("failed to init postgres tester - ", err)
+	}
+
+	defer close()
+
+	testRetrieveUserNotifications(ctx, t, tester)
+	testSetReadStatus(ctx, t, tester)
+	testUserConfig(ctx, t, tester)
+}
+
+func TestUsersStorageDynamo(t *testing.T) {
+
+	ctx := context.Background()
+	tester, close, err := st.NewDynamoStorageTester(ctx)
 
 	if err != nil {
 		t.Fatal("failed to init postgres tester - ", err)

@@ -1,4 +1,4 @@
-package storage
+package dynamostorage
 
 import (
 	"fmt"
@@ -15,7 +15,7 @@ const (
 	UserNotificationsCreatedAtIdxSortKey = "createdAt"
 )
 
-type userNotification struct {
+type UserNotification struct {
 	Id        string  `dynamodbav:"id"`
 	UserId    string  `dynamodbav:"userId"`
 	Title     string  `dynamodbav:"title"`
@@ -31,7 +31,7 @@ type userNotificationKey struct {
 	CreatedAt string `dynamodbav:"createdAt" json:"createdAt"`
 }
 
-func (n *userNotification) GetKey() (DynamoKey, error) {
+func (n *UserNotification) GetKey() (DynamoKey, error) {
 	key := make(map[string]types.AttributeValue)
 
 	userId, err := attributevalue.Marshal(n.UserId)
@@ -52,7 +52,7 @@ func (n *userNotification) GetKey() (DynamoKey, error) {
 	return key, nil
 }
 
-func (n *userNotification) GetSecondaryIdxKey() (DynamoKey, error) {
+func (n *UserNotification) GetSecondaryIdxKey() (DynamoKey, error) {
 	key := make(map[string]types.AttributeValue)
 
 	id, err := attributevalue.Marshal(n.UserId)
@@ -74,7 +74,7 @@ func (n *userNotification) GetSecondaryIdxKey() (DynamoKey, error) {
 }
 
 func (n *userNotificationKey) GetKey() (DynamoKey, error) {
-	un := userNotification{UserId: n.UserId, Id: n.UserId}
+	un := UserNotification{UserId: n.UserId, Id: n.UserId}
 
 	return un.GetKey()
 }

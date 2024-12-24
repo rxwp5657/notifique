@@ -21,8 +21,25 @@ type DynamoContainer struct {
 	URI string
 }
 
-func (ddbc *DynamoContainer) GetURI() string {
-	return ddbc.URI
+func (ddbc *DynamoContainer) CreateTables(ctx context.Context) error {
+
+	cfg, err := config.LoadDefaultConfig(ctx)
+
+	if err != nil {
+		return fmt.Errorf("failed to load default config - %w", err)
+	}
+
+	client := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
+		o.BaseEndpoint = aws.String(ddbc.URI)
+	})
+
+	err = ddb.CreateTables(client)
+
+	if err != nil {
+		return fmt.Errorf("failed to create tables - %v", err)
+	}
+
+	return nil
 }
 
 func NewDynamoContainer(ctx context.Context) (*DynamoContainer, func(), error) {
@@ -57,22 +74,6 @@ func NewDynamoContainer(ctx context.Context) (*DynamoContainer, func(), error) {
 
 	uri := fmt.Sprintf("http://%s:%s", ip, mappedPort.Port())
 
-	cfg, err := config.LoadDefaultConfig(ctx)
-
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to load default config - %w", err)
-	}
-
-	client := dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
-		o.BaseEndpoint = aws.String(uri)
-	})
-
-	err = ddb.CreateTables(client)
-
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create tables - %v", err)
-	}
-
 	close := func() {
 		err := container.Terminate(ctx)
 
@@ -84,6 +85,12 @@ func NewDynamoContainer(ctx context.Context) (*DynamoContainer, func(), error) {
 	dc := DynamoContainer{
 		Container: container,
 		URI:       uri,
+	}
+
+	err = dc.CreateTables(ctx)
+
+	if err != nil {
+		return nil, nil, err
 	}
 
 	return &dc, close, nil

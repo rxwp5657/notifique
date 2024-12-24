@@ -73,28 +73,6 @@ WHERE
 	notification_id = $1;
 `
 
-const insertUserNotifications = `
-INSERT INTO user_notifications(
-	id,
-	user_id,
-	title,
-	contents,
-	created_at,
-	read_at,
-	image_url,
-	topic
-) VALUES (
-	@id,
-	@userId,
-	@title,
-	@contents,
-	@createdAt,
-	@readAt,
-	@imageUrl,
-	@topic
-);
-`
-
 const deleteUserNotification = `
 DELETE FROM 
 	ser_notifications

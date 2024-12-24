@@ -42,7 +42,23 @@ func TestDistributionListStoragePostgres(t *testing.T) {
 }
 
 func TestDistributionListStorageDynamo(t *testing.T) {
+	ctx := context.Background()
+	tester, close, err := st.NewDynamoStorageTester(ctx)
 
+	if err != nil {
+		t.Fatal("failed to init postgres tester - ", err)
+	}
+
+	defer close()
+
+	testCreateDistributionList(ctx, t, tester)
+	testGetDistributionListsSummaries(ctx, t, tester)
+	testDeleteDistributionList(ctx, t, tester)
+	testGetDistributionListRecipients(ctx, t, tester)
+	testAddRecipients(ctx, t, tester)
+	testAddRecipientsThatAreOnTheDL(ctx, t, tester)
+	testRemoveRecipients(ctx, t, tester)
+	testDeleteRecipientsThatAreNotOnDL(ctx, t, tester)
 }
 
 func setupTestDL(ctx context.Context, t *testing.T, dlt DistributionListTester) dto.DistributionList {

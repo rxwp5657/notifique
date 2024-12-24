@@ -1,4 +1,4 @@
-package storage
+package dynamostorage
 
 import (
 	"fmt"
@@ -15,21 +15,21 @@ const (
 	DistListSummaryHashKey   = "name"
 )
 
-type distListRecipient struct {
+type DistListRecipient struct {
 	DistListName string `dynamodbav:"listName"`
 	UserId       string `dynamodbav:"userId"`
 }
 
-type distListSummary struct {
+type DistListSummary struct {
 	Name          string `dynamodbav:"name"`
 	NumRecipients int    `dynamodbav:"numOfRecipients"`
 }
 
-type distListSummaryKey struct {
+type DistListSummaryKey struct {
 	Name string `dynamodbav:"name" json:"name"`
 }
 
-func (dl *distListRecipient) GetKey() (DynamoKey, error) {
+func (dl *DistListRecipient) GetKey() (DynamoKey, error) {
 	key := make(map[string]types.AttributeValue)
 
 	name, err := attributevalue.Marshal(dl.DistListName)
@@ -64,10 +64,10 @@ func getSummaryKey(listName string) (DynamoKey, error) {
 	return key, nil
 }
 
-func (dl *distListSummary) GetKey() (DynamoKey, error) {
+func (dl *DistListSummary) GetKey() (DynamoKey, error) {
 	return getSummaryKey(dl.Name)
 }
 
-func (dl *distListSummaryKey) GetKey() (DynamoKey, error) {
+func (dl *DistListSummaryKey) GetKey() (DynamoKey, error) {
 	return getSummaryKey(dl.Name)
 }

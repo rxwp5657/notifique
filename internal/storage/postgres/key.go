@@ -1,4 +1,4 @@
-package storage
+package postgresstorage
 
 import (
 	b64 "encoding/base64"

@@ -36,7 +36,17 @@ func TestNotificationStoragePostgres(t *testing.T) {
 }
 
 func TestNotificationStorageDynamo(t *testing.T) {
+	ctx := context.Background()
+	tester, close, err := st.NewDynamoStorageTester(ctx)
 
+	if err != nil {
+		t.Fatal("failed to init postgres tester - ", err)
+	}
+
+	defer close()
+
+	testCreateNotification(ctx, t, tester)
+	testUpdateNotificationStatus(ctx, t, tester)
 }
 
 func testCreateNotification(ctx context.Context, t *testing.T, nt NotificationStorageTester) {
