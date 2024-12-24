@@ -16,7 +16,7 @@ import (
 	c "github.com/notifique/controllers"
 )
 
-type PostgresStorage struct {
+type Storage struct {
 	conn *pgxpool.Pool
 }
 
@@ -30,7 +30,7 @@ type PostgresConfigurator interface {
 
 type namedArgsBuilder[T any] func(val T) pgx.NamedArgs
 
-func (ps *PostgresStorage) GetUserNotifications(ctx context.Context, filters dto.UserNotificationFilters) (dto.Page[dto.UserNotification], error) {
+func (ps *Storage) GetUserNotifications(ctx context.Context, filters dto.UserNotificationFilters) (dto.Page[dto.UserNotification], error) {
 
 	page := dto.Page[dto.UserNotification]{}
 
@@ -143,7 +143,7 @@ func batchInsert[T any](ctx context.Context, query string, data []T, builder nam
 	return nil
 }
 
-func (ps *PostgresStorage) SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error) {
+func (ps *Storage) SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error) {
 
 	tx, err := ps.conn.Begin(ctx)
 
@@ -234,7 +234,7 @@ func (ps *PostgresStorage) SaveNotification(ctx context.Context, createdBy strin
 	return notificationId, nil
 }
 
-func (ps *PostgresStorage) makeUserConfig(ctx context.Context, userId string) (*userConfig, error) {
+func (ps *Storage) makeUserConfig(ctx context.Context, userId string) (*userConfig, error) {
 
 	tx, err := ps.conn.Begin(ctx)
 
@@ -277,7 +277,7 @@ func (ps *PostgresStorage) makeUserConfig(ctx context.Context, userId string) (*
 	return &cfg, nil
 }
 
-func (ps *PostgresStorage) GetUserConfig(ctx context.Context, userId string) (dto.UserConfig, error) {
+func (ps *Storage) GetUserConfig(ctx context.Context, userId string) (dto.UserConfig, error) {
 
 	args := pgx.NamedArgs{"userId": userId}
 
@@ -309,7 +309,7 @@ func (ps *PostgresStorage) GetUserConfig(ctx context.Context, userId string) (dt
 	return cfg.toDTO(), nil
 }
 
-func (ps *PostgresStorage) UpdateUserConfig(ctx context.Context, userId string, config dto.UserConfig) error {
+func (ps *Storage) UpdateUserConfig(ctx context.Context, userId string, config dto.UserConfig) error {
 
 	tx, err := ps.conn.Begin(ctx)
 
@@ -345,7 +345,7 @@ func (ps *PostgresStorage) UpdateUserConfig(ctx context.Context, userId string, 
 	return nil
 }
 
-func (ps *PostgresStorage) SetReadStatus(ctx context.Context, userId, notificationId string) error {
+func (ps *Storage) SetReadStatus(ctx context.Context, userId, notificationId string) error {
 
 	tx, err := ps.conn.Begin(ctx)
 
@@ -404,7 +404,7 @@ func getDistributionListSummary(ctx context.Context, listName string, rQuerier R
 	return &summary, nil
 }
 
-func (ps *PostgresStorage) CreateDistributionList(ctx context.Context, distributionList dto.DistributionList) error {
+func (ps *Storage) CreateDistributionList(ctx context.Context, distributionList dto.DistributionList) error {
 
 	list, err := getDistributionListSummary(ctx, distributionList.Name, ps.conn)
 
@@ -465,7 +465,7 @@ func (ps *PostgresStorage) CreateDistributionList(ctx context.Context, distribut
 	return nil
 }
 
-func (ps *PostgresStorage) GetDistributionLists(ctx context.Context, filters dto.PageFilter) (dto.Page[dto.DistributionListSummary], error) {
+func (ps *Storage) GetDistributionLists(ctx context.Context, filters dto.PageFilter) (dto.Page[dto.DistributionListSummary], error) {
 
 	page := dto.Page[dto.DistributionListSummary]{}
 
@@ -542,7 +542,7 @@ func (ps *PostgresStorage) GetDistributionLists(ctx context.Context, filters dto
 	return page, nil
 }
 
-func (ps *PostgresStorage) DeleteDistributionList(ctx context.Context, distlistName string) error {
+func (ps *Storage) DeleteDistributionList(ctx context.Context, distlistName string) error {
 
 	tx, err := ps.conn.Begin(ctx)
 
@@ -569,7 +569,7 @@ func (ps *PostgresStorage) DeleteDistributionList(ctx context.Context, distlistN
 	return nil
 }
 
-func (ps *PostgresStorage) GetRecipients(ctx context.Context, distlistName string, filters dto.PageFilter) (dto.Page[string], error) {
+func (ps *Storage) GetRecipients(ctx context.Context, distlistName string, filters dto.PageFilter) (dto.Page[string], error) {
 
 	page := dto.Page[string]{}
 
@@ -665,7 +665,7 @@ func (ps *PostgresStorage) GetRecipients(ctx context.Context, distlistName strin
 	return page, nil
 }
 
-func (ps *PostgresStorage) AddRecipients(ctx context.Context, distlistName string, recipients []string) (*dto.DistributionListSummary, error) {
+func (ps *Storage) AddRecipients(ctx context.Context, distlistName string, recipients []string) (*dto.DistributionListSummary, error) {
 
 	exists, err := getDistributionListSummary(ctx, distlistName, ps.conn)
 
@@ -733,7 +733,7 @@ func (ps *PostgresStorage) AddRecipients(ctx context.Context, distlistName strin
 	return summary, nil
 }
 
-func (ps *PostgresStorage) DeleteRecipients(ctx context.Context, distlistName string, recipients []string) (*dto.DistributionListSummary, error) {
+func (ps *Storage) DeleteRecipients(ctx context.Context, distlistName string, recipients []string) (*dto.DistributionListSummary, error) {
 
 	exists, err := getDistributionListSummary(ctx, distlistName, ps.conn)
 
@@ -793,7 +793,7 @@ func (ps *PostgresStorage) DeleteRecipients(ctx context.Context, distlistName st
 	return summary, nil
 }
 
-func (ps *PostgresStorage) createStatusLog(ctx context.Context, tx pgx.Tx, statusLog c.NotificationStatusLog) error {
+func (ps *Storage) createStatusLog(ctx context.Context, tx pgx.Tx, statusLog c.NotificationStatusLog) error {
 
 	args := pgx.NamedArgs{
 		"notificationId": statusLog.NotificationId,
@@ -807,7 +807,7 @@ func (ps *PostgresStorage) createStatusLog(ctx context.Context, tx pgx.Tx, statu
 	return err
 }
 
-func (ps *PostgresStorage) UpdateNotificationStatus(ctx context.Context, statusLog c.NotificationStatusLog) error {
+func (ps *Storage) UpdateNotificationStatus(ctx context.Context, statusLog c.NotificationStatusLog) error {
 
 	tx, err := ps.conn.Begin(ctx)
 
@@ -843,7 +843,7 @@ func (ps *PostgresStorage) UpdateNotificationStatus(ctx context.Context, statusL
 	return nil
 }
 
-func NewPostgresStorage(configurator PostgresConfigurator) (*PostgresStorage, error) {
+func NewPostgresStorage(configurator PostgresConfigurator) (*Storage, error) {
 
 	url, err := configurator.GetPostgresUrl()
 
@@ -857,14 +857,14 @@ func NewPostgresStorage(configurator PostgresConfigurator) (*PostgresStorage, er
 		return nil, fmt.Errorf("failed to create pool - %w", err)
 	}
 
-	return &PostgresStorage{conn: conn}, nil
+	return &Storage{conn: conn}, nil
 }
 
-func NewPostgresStorageFromPool(p *pgxpool.Pool) (*PostgresStorage, error) {
+func NewPostgresStorageFromPool(p *pgxpool.Pool) (*Storage, error) {
 
 	if p == nil {
 		return nil, fmt.Errorf("pool can't be nil")
 	}
 
-	return &PostgresStorage{conn: p}, nil
+	return &Storage{conn: p}, nil
 }

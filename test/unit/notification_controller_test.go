@@ -83,7 +83,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 		resp := make(map[string]string, 0)
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -101,7 +101,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 		resp := make(map[string]string, 0)
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -119,7 +119,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 		resp := make(map[string]string, 0)
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -137,7 +137,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 		resp := make(map[string]string, 0)
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -155,7 +155,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 		resp := make(map[string]string, 0)
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -173,7 +173,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 		resp := make(map[string]string, 0)
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -191,7 +191,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 		resp := make(map[string]string, 0)
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -209,7 +209,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 		resp := make(map[string]string, 0)
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -227,7 +227,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 		resp := make(map[string]string, 0)
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -246,7 +246,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 		resp := make(map[string]string, 0)
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)

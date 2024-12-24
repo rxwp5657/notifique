@@ -3,7 +3,7 @@ package deployments
 import (
 	"fmt"
 
-	"github.com/notifique/internal/publisher"
+	"github.com/notifique/internal/publish"
 )
 
 type RabbitMQDeployer interface {
@@ -11,8 +11,8 @@ type RabbitMQDeployer interface {
 }
 
 type RabbitMQPriorityDeployer struct {
-	Client publisher.RabbitMQClient
-	Queues publisher.PriorityQueues
+	Client publish.RabbitMQClient
+	Queues publish.PriorityQueues
 }
 
 func (d *RabbitMQPriorityDeployer) Deploy() error {
@@ -40,7 +40,7 @@ func (d *RabbitMQPriorityDeployer) Deploy() error {
 	return nil
 }
 
-func createRabbitMQQueue(client publisher.RabbitMQClient, name string) error {
+func createRabbitMQQueue(client publish.RabbitMQClient, name string) error {
 
 	_, err := client.QueueDeclare(
 		name,  // name
@@ -58,9 +58,9 @@ func createRabbitMQQueue(client publisher.RabbitMQClient, name string) error {
 	return nil
 }
 
-func NewRabbitMQPriorityDeployer(c publisher.RabbitMQPriorityConfigurator) (*RabbitMQPriorityDeployer, func(), error) {
+func NewRabbitMQPriorityDeployer(c publish.RabbitMQPriorityConfigurator) (*RabbitMQPriorityDeployer, func(), error) {
 
-	client, close, err := publisher.NewRabbitMQClient(c)
+	client, close, err := publish.NewRabbitMQClient(c)
 
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create rabbitmq client - %w", err)

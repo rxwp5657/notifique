@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/notifique/dto"
-	storage "github.com/notifique/internal/storage/postgres"
+	ps "github.com/notifique/internal/storage/postgres"
 	"github.com/notifique/test/containers"
 )
 
@@ -81,7 +81,7 @@ WHERE
 `
 
 type PostgresStorageTester struct {
-	*storage.PostgresStorage
+	*ps.Storage
 	conn *pgxpool.Pool
 }
 
@@ -330,15 +330,15 @@ func NewPostgresIntegrationTester(ctx context.Context) (*PostgresStorageTester, 
 		return nil, nil, fmt.Errorf("failed to create pool - %w", err)
 	}
 
-	storage, err := storage.NewPostgresStorageFromPool(conn)
+	storage, err := ps.NewPostgresStorageFromPool(conn)
 
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create storage - %w", err)
 	}
 
 	tester := PostgresStorageTester{
-		PostgresStorage: storage,
-		conn:            conn,
+		Storage: storage,
+		conn:    conn,
 	}
 
 	closer := func() {

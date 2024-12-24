@@ -11,6 +11,8 @@ type ContainerTester interface {
 }
 
 func Clear(ctx context.Context, t *testing.T, dlt ContainerTester) {
+	t.Helper()
+
 	err := dlt.ClearDB(ctx)
 
 	if err != nil {

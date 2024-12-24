@@ -62,6 +62,8 @@ func TestDistributionListStorageDynamo(t *testing.T) {
 }
 
 func setupTestDL(ctx context.Context, t *testing.T, dlt DistributionListTester) dto.DistributionList {
+	t.Helper()
+
 	dl := dto.DistributionList{
 		Name:       "Test",
 		Recipients: []string{"1", "2", "3"},

@@ -7,7 +7,7 @@ import (
 
 	"github.com/docker/go-connections/nat"
 	"github.com/notifique/internal/deployments"
-	"github.com/notifique/internal/publisher"
+	"github.com/notifique/internal/publish"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/localstack"
 )
@@ -19,16 +19,16 @@ type SQSContainer struct {
 
 type SQSPriorityContainer struct {
 	Container SQSContainer
-	Queues    publisher.PriorityQueues
+	Queues    publish.PriorityQueues
 }
 
-func (sc *SQSPriorityContainer) GetSQSClientConfig() publisher.SQSClientConfig {
-	return publisher.SQSClientConfig{
+func (sc *SQSPriorityContainer) GetSQSClientConfig() publish.SQSClientConfig {
+	return publish.SQSClientConfig{
 		BaseEndpoint: &sc.Container.URI,
 	}
 }
 
-func (sc *SQSPriorityContainer) GetPriorityQueues() publisher.PriorityQueues {
+func (sc *SQSPriorityContainer) GetPriorityQueues() publish.PriorityQueues {
 	return sc.Queues
 }
 

@@ -89,7 +89,7 @@ func testCreateDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistrib
 		resp := make(map[string]string, 0)
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		errTemplate := "Distribution list %s already exists"
@@ -112,7 +112,7 @@ func testCreateDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistrib
 		resp := make(map[string]string, 0)
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -141,7 +141,7 @@ func testCreateDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistrib
 		resp := make(map[string]string, 0)
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -159,7 +159,7 @@ func testCreateDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistrib
 		resp := make(map[string]string, 0)
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		expectedMsg := "DistributionList.Name' Error:Field validation for 'Name' failed on the 'distributionListName' tag"
@@ -178,7 +178,7 @@ func testCreateDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistrib
 		resp := make(map[string]string, 0)
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		expectedMsg := fmt.Sprintf("Distribution list %s already exists", dl.Name)
@@ -199,7 +199,7 @@ func testCreateDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistrib
 		resp := make(map[string]string, 0)
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		expectedMsg := "DistributionList.Recipients' Error:Field validation for 'Recipients' failed on the 'max' tag"
@@ -221,7 +221,7 @@ func testCreateDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistrib
 		resp := make(map[string]string, 0)
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		expectedMsg := "DistributionList.Recipients' Error:Field validation for 'Recipients' failed on the 'unique' tag"
@@ -275,7 +275,7 @@ func testAddRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionList
 		resp := dto.DistributionListSummary{}
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		assert.Equal(t, resp.Name, dl.Name)
@@ -295,7 +295,7 @@ func testAddRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionList
 		resp := map[string]string{}
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		expectedMsg := fmt.Sprintf("Distribution list %s not found", dl.Name)
@@ -311,7 +311,7 @@ func testAddRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionList
 		resp := map[string]string{}
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		expectedMsg := "Error:Field validation for 'Recipients' failed on the 'min' tag"
@@ -326,7 +326,7 @@ func testAddRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionList
 		resp := map[string]string{}
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		expectedMsg := "Error:Field validation for 'Recipients' failed on the 'max' tag"
@@ -341,7 +341,7 @@ func testAddRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionList
 		resp := map[string]string{}
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		expectedMsg := "Error:Field validation for 'Recipients[0]' failed on the 'min' tag"
@@ -356,7 +356,7 @@ func testAddRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionList
 		resp := map[string]string{}
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		expectedMsg := "Error:Field validation for 'Recipients' failed on the 'unique' tag"
@@ -410,7 +410,7 @@ func testDeleteRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionL
 		resp := dto.DistributionListSummary{}
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		assert.Equal(t, resp.Name, dl.Name)
@@ -430,7 +430,7 @@ func testDeleteRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionL
 		resp := map[string]string{}
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		expectedMsg := fmt.Sprintf("Distribution list %s not found", dl.Name)
@@ -446,7 +446,7 @@ func testDeleteRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionL
 		resp := map[string]string{}
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		expectedMsg := "Error:Field validation for 'Recipients' failed on the 'min' tag"
@@ -462,7 +462,7 @@ func testDeleteRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionL
 		resp := map[string]string{}
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		expectedMsg := "Error:Field validation for 'Recipients' failed on the 'max' tag"
@@ -477,7 +477,7 @@ func testDeleteRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionL
 		resp := map[string]string{}
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		expectedMsg := "Error:Field validation for 'Recipients[0]' failed on the 'min' tag"
@@ -492,7 +492,7 @@ func testDeleteRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionL
 		resp := map[string]string{}
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		expectedMsg := "Error:Field validation for 'Recipients' failed on the 'unique' tag"
@@ -562,7 +562,7 @@ func testGetDistributionLists(t *testing.T, e *gin.Engine, mock mk.MockDistribut
 		resp := dto.Page[dto.DistributionListSummary]{}
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		assert.Equal(t, w.Code, http.StatusOK)
@@ -606,7 +606,7 @@ func testGetDistributionListRescipients(t *testing.T, e *gin.Engine, mock mk.Moc
 		resp := dto.Page[string]{}
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -625,7 +625,7 @@ func testGetDistributionListRescipients(t *testing.T, e *gin.Engine, mock mk.Moc
 		resp := map[string]string{}
 
 		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-			t.FailNow()
+			t.Fatal(err)
 		}
 
 		expectedMsg := fmt.Sprintf("Distribution list %s not found", dlName)

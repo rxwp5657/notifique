@@ -13,7 +13,7 @@ import (
 )
 
 type DynamoStorageTester struct {
-	ds.DynamoDBStorage
+	ds.Storage
 	client    ds.DynamoDBAPI
 	container *containers.DynamoContainer
 }
@@ -262,9 +262,9 @@ func NewDynamoStorageTester(ctx context.Context) (*DynamoStorageTester, closer, 
 	}
 
 	t := DynamoStorageTester{
-		DynamoDBStorage: *s,
-		client:          client,
-		container:       container,
+		Storage:   *s,
+		client:    client,
+		container: container,
 	}
 
 	return &t, closer, nil
