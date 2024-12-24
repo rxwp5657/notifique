@@ -116,9 +116,6 @@ func createUserNotificationTable(client *dynamodb.Client) error {
 		}, {
 			AttributeName: aws.String(sdb.UserNotificationsSortKey),
 			AttributeType: types.ScalarAttributeTypeS,
-		}, {
-			AttributeName: aws.String(sdb.UserNotificationsCreatedAtIdxSortKey),
-			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
 			AttributeName: aws.String(sdb.UserNotificactionsHashKey),
@@ -126,19 +123,6 @@ func createUserNotificationTable(client *dynamodb.Client) error {
 		}, {
 			AttributeName: aws.String(sdb.UserNotificationsSortKey),
 			KeyType:       types.KeyTypeRange,
-		}},
-		LocalSecondaryIndexes: []types.LocalSecondaryIndex{{
-			IndexName: aws.String(sdb.UserNotificationsCreatedAtIdx),
-			KeySchema: []types.KeySchemaElement{{
-				AttributeName: aws.String(sdb.UserNotificactionsHashKey),
-				KeyType:       types.KeyTypeHash,
-			}, {
-				AttributeName: aws.String(sdb.UserNotificationsCreatedAtIdxSortKey),
-				KeyType:       types.KeyTypeRange,
-			}},
-			Projection: &types.Projection{
-				ProjectionType: types.ProjectionTypeAll,
-			},
 		}},
 		TableName: aws.String(tableName),
 		ProvisionedThroughput: &types.ProvisionedThroughput{

@@ -27,8 +27,8 @@ type UserNotification struct {
 }
 
 type userNotificationKey struct {
-	UserId    string `dynamodbav:"userId" json:"userId"`
-	CreatedAt string `dynamodbav:"createdAt" json:"createdAt"`
+	Id     string `dynamodbav:"id" json:"id"`
+	UserId string `dynamodbav:"userId" json:"userId"`
 }
 
 func (n *UserNotification) GetKey() (DynamoKey, error) {
@@ -52,29 +52,11 @@ func (n *UserNotification) GetKey() (DynamoKey, error) {
 	return key, nil
 }
 
-func (n *UserNotification) GetSecondaryIdxKey() (DynamoKey, error) {
-	key := make(map[string]types.AttributeValue)
-
-	id, err := attributevalue.Marshal(n.UserId)
-
-	if err != nil {
-		return key, fmt.Errorf("failed to marshall userId - %w", err)
-	}
-
-	createdAt, err := attributevalue.Marshal(n.CreatedAt)
-
-	if err != nil {
-		return key, fmt.Errorf("failed to marshall createdAt - %w", err)
-	}
-
-	key["userId"] = id
-	key["createdAt"] = createdAt
-
-	return key, nil
-}
-
 func (n *userNotificationKey) GetKey() (DynamoKey, error) {
-	un := UserNotification{UserId: n.UserId, Id: n.UserId}
+	un := UserNotification{
+		UserId: n.UserId,
+		Id:     n.Id,
+	}
 
 	return un.GetKey()
 }

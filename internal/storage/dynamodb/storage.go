@@ -312,7 +312,6 @@ func (s *DynamoDBStorage) GetUserNotifications(ctx context.Context, filters dto.
 		ScanIndexForward:          aws.Bool(false),
 		Limit:                     pageParams.Limit,
 		ExclusiveStartKey:         pageParams.ExclusiveStartKey,
-		IndexName:                 aws.String(UserNotificationsCreatedAtIdx),
 	}
 
 	response, err := s.client.Query(ctx, &queryInput)

@@ -51,7 +51,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 
 		w := httptest.NewRecorder()
 
-		req, _ := http.NewRequest("POST", notificationsUrl, reader)
+		req, _ := http.NewRequest(http.MethodPost, notificationsUrl, reader)
 		req.Header.Add("userId", userId)
 
 		e.ServeHTTP(w, req)

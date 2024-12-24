@@ -70,7 +70,7 @@ func testRetrieveUserNotifications(ctx context.Context, t *testing.T, ust UserSt
 	userId := "1234"
 	alternateTopic := "Alternate"
 
-	testNotifications, err := test.CreateTestUserNotifications(5, userId)
+	testNotifications, err := test.MakeTestUserNotifications(5, userId)
 
 	if err != nil {
 		t.Fatal(err)
@@ -149,7 +149,7 @@ func testRetrieveUserNotifications(ctx context.Context, t *testing.T, ust UserSt
 func testSetReadStatus(ctx context.Context, t *testing.T, ust UserStorageTester) {
 	userId := "1234"
 
-	testNotifications, err := test.CreateTestUserNotifications(1, userId)
+	testNotifications, err := test.MakeTestUserNotifications(1, userId)
 	testNotification := testNotifications[0]
 
 	if err != nil {
@@ -203,11 +203,7 @@ func testUserConfig(ctx context.Context, t *testing.T, ust UserStorageTester) {
 
 	t.Run("Can retrieve the user config", func(t *testing.T) {
 
-		expectedConfig := dto.UserConfig{
-			EmailConfig: dto.ChannelConfig{OptIn: true, SnoozeUntil: nil},
-			SMSConfig:   dto.ChannelConfig{OptIn: true, SnoozeUntil: nil},
-			InAppConfig: dto.ChannelConfig{OptIn: true, SnoozeUntil: nil},
-		}
+		expectedConfig := test.MakeTestUserConfig(userId)
 
 		cfg, err := ust.GetUserConfig(ctx, userId)
 
@@ -220,11 +216,9 @@ func testUserConfig(ctx context.Context, t *testing.T, ust UserStorageTester) {
 	t.Run("Can Update the user config", func(t *testing.T) {
 		snoozeUntil := time.Now().AddDate(0, 0, 10).Format(time.RFC3339)
 
-		userConfig := dto.UserConfig{
-			EmailConfig: dto.ChannelConfig{OptIn: false, SnoozeUntil: nil},
-			SMSConfig:   dto.ChannelConfig{OptIn: true, SnoozeUntil: &snoozeUntil},
-			InAppConfig: dto.ChannelConfig{OptIn: true, SnoozeUntil: nil},
-		}
+		userConfig := test.MakeTestUserConfig(userId)
+		userConfig.EmailConfig = dto.ChannelConfig{OptIn: false, SnoozeUntil: nil}
+		userConfig.SMSConfig = dto.ChannelConfig{OptIn: true, SnoozeUntil: &snoozeUntil}
 
 		err := ust.UpdateUserConfig(ctx, userId, userConfig)
 

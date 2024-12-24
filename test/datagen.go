@@ -85,7 +85,7 @@ func MakeStrWithSize(size int) string {
 	return str
 }
 
-func CreateTestUserNotifications(numNotifications int, userId string) ([]dto.UserNotification, error) {
+func MakeTestUserNotifications(numNotifications int, userId string) ([]dto.UserNotification, error) {
 	testNotifications := make([]dto.UserNotification, 0, numNotifications)
 
 	for i := range numNotifications {
@@ -111,4 +111,14 @@ func CreateTestUserNotifications(numNotifications int, userId string) ([]dto.Use
 	})
 
 	return testNotifications, nil
+}
+
+func MakeTestUserConfig(userId string) dto.UserConfig {
+	cfg := dto.UserConfig{
+		EmailConfig: dto.ChannelConfig{OptIn: true, SnoozeUntil: nil},
+		SMSConfig:   dto.ChannelConfig{OptIn: true, SnoozeUntil: nil},
+		InAppConfig: dto.ChannelConfig{OptIn: true, SnoozeUntil: nil},
+	}
+
+	return cfg
 }
