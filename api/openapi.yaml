@@ -39,6 +39,31 @@ paths:
                     type: integer
 
   /notifications:
+    get:
+      tags:
+        - notifications
+      summary: Retrieve a page of notifications
+      parameters:
+        - $ref: "#/components/parameters/nextTokenParam"
+        - $ref: "#/components/parameters/maxResultsParam"
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: A page of notifications has been retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseModel"
+                properties:
+                  data:
+                    items:
+                      $ref: "#/components/schemas/NotificationModel"
     post:
       tags:
         - notifications
@@ -212,6 +237,90 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/NotificationTemplateModel"
+
+  /notifications/templates/{name}:
+
+    get:
+      tags:
+        - notifications
+      summary: Get notification template details
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/NotificationTemplateName"
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Template details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationTemplateDetailsModel"
+        "404":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Template not found
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error"
+
+    delete:
+      tags:
+        - notifications
+      summary: Delete a notification template
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/NotificationTemplateName"
+      responses:
+        "204":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Template deleted successfully
+        "404":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Template not found
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error
 
   /users/me/notifications:
     get:
@@ -977,7 +1086,7 @@ components:
     NotificationTemplateModel:
       type: object
       required:
-        - id
+        - name
         - createdAt
         - createdBy
       properties:
@@ -996,10 +1105,11 @@ components:
           type: string
           maxLength: 256
           nullable: true
-        variables:
-          type: array
-          items:
-            $ref: "#/components/schemas/TemplateVariable"
+
+    NotificationTemplateDetailsModel:
+      allOf:
+        - $ref: "#/components/schemas/NotificationTemplateBase"
+        - $ref: "#/components/schemas/NotificationTemplateModel"
 
     TemplateVariable:
       type: object
