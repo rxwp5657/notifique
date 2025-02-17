@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	di "github.com/notifique/dependency_injection"
+	di "github.com/notifique/internal/di"
 )
 
 func main() {

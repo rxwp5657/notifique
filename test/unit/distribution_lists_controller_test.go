@@ -13,11 +13,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	di "github.com/notifique/dependency_injection"
-	"github.com/notifique/dto"
-	"github.com/notifique/internal"
-	"github.com/notifique/test"
-	mk "github.com/notifique/test/mocks"
+	di "github.com/notifique/internal/di"
+	"github.com/notifique/internal/server"
+	"github.com/notifique/internal/server/dto"
+	"github.com/notifique/internal/testutils"
+	mk "github.com/notifique/internal/testutils/mocks"
 )
 
 const distributionListUrl = "/distribution-lists"
@@ -34,15 +34,15 @@ func TestDistributionListController(t *testing.T) {
 		t.Fatalf("failed to create mocked backend - %v", err)
 	}
 
-	testCreateDistributionList(t, testApp.Engine, *testApp.Storage.MockDistributionListStorage)
-	testAddRecipients(t, testApp.Engine, *testApp.Storage.MockDistributionListStorage)
-	testDeleteRecipients(t, testApp.Engine, *testApp.Storage.MockDistributionListStorage)
-	testDeleteDistributionList(t, testApp.Engine, *testApp.Storage.MockDistributionListStorage)
-	testGetDistributionLists(t, testApp.Engine, *testApp.Storage.MockDistributionListStorage)
-	testGetDistributionListRescipients(t, testApp.Engine, *testApp.Storage.MockDistributionListStorage)
+	testCreateDistributionList(t, testApp.Engine, *testApp.Registry.MockDistributionRegistry)
+	testAddRecipients(t, testApp.Engine, *testApp.Registry.MockDistributionRegistry)
+	testDeleteRecipients(t, testApp.Engine, *testApp.Registry.MockDistributionRegistry)
+	testDeleteDistributionList(t, testApp.Engine, *testApp.Registry.MockDistributionRegistry)
+	testGetDistributionLists(t, testApp.Engine, *testApp.Registry.MockDistributionRegistry)
+	testGetDistributionListRescipients(t, testApp.Engine, *testApp.Registry.MockDistributionRegistry)
 }
 
-func testCreateDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistributionListStorage) {
+func testCreateDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistributionRegistry) {
 
 	dl := dto.DistributionList{
 		Name:       "Test",
@@ -80,7 +80,7 @@ func testCreateDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistrib
 		mock.
 			EXPECT().
 			CreateDistributionList(gomock.Any(), gomock.Any()).
-			Return(internal.DistributionListAlreadyExists{
+			Return(server.DistributionListAlreadyExists{
 				Name: dl.Name,
 			})
 
@@ -171,7 +171,7 @@ func testCreateDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistrib
 	t.Run("Should fail if the distribution list name already exists", func(t *testing.T) {
 		mock.EXPECT().
 			CreateDistributionList(gomock.Any(), gomock.Any()).
-			Return(internal.DistributionListAlreadyExists{Name: dl.Name})
+			Return(server.DistributionListAlreadyExists{Name: dl.Name})
 
 		w := createDistributionList(dl)
 
@@ -191,7 +191,7 @@ func testCreateDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistrib
 
 		dl := dto.DistributionList{
 			Name:       "Test",
-			Recipients: test.MakeRecipients(257),
+			Recipients: testutils.MakeRecipients(257),
 		}
 
 		w := createDistributionList(dl)
@@ -231,7 +231,7 @@ func testCreateDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistrib
 	})
 }
 
-func testAddRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionListStorage) {
+func testAddRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionRegistry) {
 
 	dl := dto.DistributionList{
 		Name:       "Test",
@@ -286,7 +286,7 @@ func testAddRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionList
 		mock.
 			EXPECT().
 			AddRecipients(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(nil, internal.DistributionListNotFound{
+			Return(nil, server.DistributionListNotFound{
 				Name: dl.Name,
 			})
 
@@ -321,7 +321,7 @@ func testAddRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionList
 	})
 
 	t.Run("Should fail when exceeding the number of recipients", func(t *testing.T) {
-		w := addRecipients(dl.Name, test.MakeRecipients(257))
+		w := addRecipients(dl.Name, testutils.MakeRecipients(257))
 
 		resp := map[string]string{}
 
@@ -366,7 +366,7 @@ func testAddRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionList
 	})
 }
 
-func testDeleteRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionListStorage) {
+func testDeleteRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionRegistry) {
 
 	dl := dto.DistributionList{
 		Name:       "Test",
@@ -421,7 +421,7 @@ func testDeleteRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionL
 		mock.
 			EXPECT().
 			DeleteRecipients(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(nil, internal.DistributionListNotFound{
+			Return(nil, server.DistributionListNotFound{
 				Name: dl.Name,
 			})
 
@@ -457,7 +457,7 @@ func testDeleteRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionL
 
 	t.Run("Should fail when exceeding the number of recipients", func(t *testing.T) {
 
-		w := deleteRecipients(dl.Name, test.MakeRecipients(257))
+		w := deleteRecipients(dl.Name, testutils.MakeRecipients(257))
 
 		resp := map[string]string{}
 
@@ -502,7 +502,7 @@ func testDeleteRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionL
 	})
 }
 
-func testDeleteDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistributionListStorage) {
+func testDeleteDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistributionRegistry) {
 	testDL := "Test"
 
 	deleteDistributionList := func(dlName string) *httptest.ResponseRecorder {
@@ -530,9 +530,9 @@ func testDeleteDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistrib
 	})
 }
 
-func testGetDistributionLists(t *testing.T, e *gin.Engine, mock mk.MockDistributionListStorage) {
+func testGetDistributionLists(t *testing.T, e *gin.Engine, mock mk.MockDistributionRegistry) {
 	numLists := 3
-	summaries := test.MakeSummaries(test.MakeDistributionLists(numLists))
+	summaries := testutils.MakeSummaries(testutils.MakeDistributionLists(numLists))
 	page := dto.Page[dto.DistributionListSummary]{
 		NextToken:   nil,
 		PrevToken:   nil,
@@ -570,10 +570,10 @@ func testGetDistributionLists(t *testing.T, e *gin.Engine, mock mk.MockDistribut
 	})
 }
 
-func testGetDistributionListRescipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionListStorage) {
+func testGetDistributionListRescipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionRegistry) {
 
 	dlName := "Test"
-	recipients := test.MakeRecipients(10)
+	recipients := testutils.MakeRecipients(10)
 
 	recipientsPage := dto.Page[string]{
 		NextToken:   nil,
@@ -616,7 +616,7 @@ func testGetDistributionListRescipients(t *testing.T, e *gin.Engine, mock mk.Moc
 	t.Run("Should return 404 if the distribution list doesn't exists", func(t *testing.T) {
 		mock.EXPECT().
 			GetRecipients(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(dto.Page[string]{}, internal.DistributionListNotFound{
+			Return(dto.Page[string]{}, server.DistributionListNotFound{
 				Name: dlName,
 			})
 

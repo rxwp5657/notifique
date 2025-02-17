@@ -5,7 +5,7 @@ import (
 
 	cfg "github.com/notifique/internal/config"
 	ddb "github.com/notifique/internal/deployments"
-	storage "github.com/notifique/internal/storage/dynamodb"
+	registry "github.com/notifique/internal/registry/dynamodb"
 )
 
 func main() {
@@ -16,7 +16,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	client, err := storage.NewDynamoDBClient(configurator)
+	client, err := registry.NewDynamoDBClient(configurator)
 
 	if err != nil {
 		log.Fatalf("failed to create dynamo client - %v", err)

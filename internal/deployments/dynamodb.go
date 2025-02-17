@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	sdb "github.com/notifique/internal/storage/dynamodb"
+	r "github.com/notifique/internal/registry/dynamodb"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -61,15 +61,15 @@ func createTable(client *dynamodb.Client, tableName string, input *dynamodb.Crea
 
 func createNotificationTable(client *dynamodb.Client) error {
 
-	tableName := sdb.NotificationsTable
+	tableName := r.NotificationsTable
 
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String(sdb.NotificationHashKey),
+			AttributeName: aws.String(r.NotificationHashKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String(sdb.NotificationHashKey),
+			AttributeName: aws.String(r.NotificationHashKey),
 			KeyType:       types.KeyTypeHash,
 		}},
 		TableName: aws.String(tableName),
@@ -84,15 +84,15 @@ func createNotificationTable(client *dynamodb.Client) error {
 
 func createUserConfigTable(client *dynamodb.Client) error {
 
-	tableName := sdb.UserConfigTable
+	tableName := r.UserConfigTable
 
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String(sdb.UserConfigHashKey),
+			AttributeName: aws.String(r.UserConfigHashKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String(sdb.UserConfigHashKey),
+			AttributeName: aws.String(r.UserConfigHashKey),
 			KeyType:       types.KeyTypeHash,
 		}},
 		TableName: aws.String(tableName),
@@ -107,21 +107,21 @@ func createUserConfigTable(client *dynamodb.Client) error {
 
 func createUserNotificationTable(client *dynamodb.Client) error {
 
-	tableName := sdb.UserNotificationsTable
+	tableName := r.UserNotificationsTable
 
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String(sdb.UserNotificactionsHashKey),
+			AttributeName: aws.String(r.UserNotificactionsHashKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}, {
-			AttributeName: aws.String(sdb.UserNotificationsSortKey),
+			AttributeName: aws.String(r.UserNotificationsSortKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String(sdb.UserNotificactionsHashKey),
+			AttributeName: aws.String(r.UserNotificactionsHashKey),
 			KeyType:       types.KeyTypeHash,
 		}, {
-			AttributeName: aws.String(sdb.UserNotificationsSortKey),
+			AttributeName: aws.String(r.UserNotificationsSortKey),
 			KeyType:       types.KeyTypeRange,
 		}},
 		TableName: aws.String(tableName),
@@ -136,21 +136,21 @@ func createUserNotificationTable(client *dynamodb.Client) error {
 
 func createDLRecipientsTable(client *dynamodb.Client) error {
 
-	tableName := sdb.DistListRecipientsTable
+	tableName := r.DistListRecipientsTable
 
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String(sdb.DistListRecipientHashKey),
+			AttributeName: aws.String(r.DistListRecipientHashKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}, {
-			AttributeName: aws.String(sdb.DistListRecipientSortKey),
+			AttributeName: aws.String(r.DistListRecipientSortKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String(sdb.DistListRecipientHashKey),
+			AttributeName: aws.String(r.DistListRecipientHashKey),
 			KeyType:       types.KeyTypeHash,
 		}, {
-			AttributeName: aws.String(sdb.DistListRecipientSortKey),
+			AttributeName: aws.String(r.DistListRecipientSortKey),
 			KeyType:       types.KeyTypeRange,
 		}},
 		TableName: aws.String(tableName),
@@ -165,15 +165,15 @@ func createDLRecipientsTable(client *dynamodb.Client) error {
 
 func createDLSummaryTable(client *dynamodb.Client) error {
 
-	tableName := sdb.DistListSummaryTable
+	tableName := r.DistListSummaryTable
 
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String(sdb.DistListSummaryHashKey),
+			AttributeName: aws.String(r.DistListSummaryHashKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String(sdb.DistListSummaryHashKey),
+			AttributeName: aws.String(r.DistListSummaryHashKey),
 			KeyType:       types.KeyTypeHash,
 		}},
 		TableName: aws.String(tableName),
@@ -187,21 +187,21 @@ func createDLSummaryTable(client *dynamodb.Client) error {
 }
 
 func createNotificationStatusLogTable(client *dynamodb.Client) error {
-	tableName := sdb.NotificationStatusLogTable
+	tableName := r.NotificationStatusLogTable
 
 	tableInput := dynamodb.CreateTableInput{
 		AttributeDefinitions: []types.AttributeDefinition{{
-			AttributeName: aws.String(sdb.NotificationStatusLogHashKey),
+			AttributeName: aws.String(r.NotificationStatusLogHashKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}, {
-			AttributeName: aws.String(sdb.NotificationStatusLogSortKey),
+			AttributeName: aws.String(r.NotificationStatusLogSortKey),
 			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
-			AttributeName: aws.String(sdb.NotificationStatusLogHashKey),
+			AttributeName: aws.String(r.NotificationStatusLogHashKey),
 			KeyType:       types.KeyTypeHash,
 		}, {
-			AttributeName: aws.String(sdb.NotificationStatusLogSortKey),
+			AttributeName: aws.String(r.NotificationStatusLogSortKey),
 			KeyType:       types.KeyTypeRange,
 		}},
 		TableName: aws.String(tableName),

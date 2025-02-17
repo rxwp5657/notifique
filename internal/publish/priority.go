@@ -3,10 +3,9 @@ package publish
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
-	c "github.com/notifique/controllers"
+	c "github.com/notifique/internal/server/controllers"
 )
 
 type Priority string
@@ -33,7 +32,7 @@ type PriorityQueues struct {
 
 type PriorityPublisher struct {
 	publisher Publisher
-	storage   c.NotificationStorage
+	registry  c.NotificationRegistry
 	queues    PriorityQueues
 }
 
@@ -62,47 +61,39 @@ func (p PriorityPublisher) Publish(ctx context.Context, n c.Notification) error 
 		return fmt.Errorf("failed to marshall message body - %w", err)
 	}
 
-	err = p.publisher.Publish(ctx, *queueUri, message)
+	publishErr := p.publisher.Publish(ctx, *queueUri, message)
 
-	if err != nil {
-		errMsg := err.Error()
+	status := c.Queued
 
-		statusLog := c.NotificationStatusLog{
-			NotificationId: n.Id,
-			Status:         c.Published,
-			ErrorMsg:       &errMsg,
-		}
+	var errorMsg *string
 
-		statuslogErr := p.storage.UpdateNotificationStatus(ctx, statusLog)
-
-		if statuslogErr != nil {
-			errs := errors.Join(err, statuslogErr)
-			return fmt.Errorf("failed to publish and create notification status log %w - ", errs)
-		}
-
-		return fmt.Errorf("failed to publish notification - %w", err)
+	if publishErr != nil {
+		status = c.Failed
+		errStr := publishErr.Error()
+		errorMsg = &errStr
 	}
 
 	statusLog := c.NotificationStatusLog{
 		NotificationId: n.Id,
-		Status:         c.Published,
-		ErrorMsg:       nil,
+		Status:         status,
+		ErrorMsg:       errorMsg,
 	}
 
-	err = p.storage.UpdateNotificationStatus(ctx, statusLog)
-
-	if err != nil {
-		return fmt.Errorf("failed to create notification status log - %w", err)
+	if logErr := p.registry.UpdateNotificationStatus(ctx, statusLog); logErr != nil {
+		if publishErr != nil {
+			return fmt.Errorf("publish failed (%v) and status update failed: %w", publishErr, logErr)
+		}
+		return fmt.Errorf("failed to update notification status: %w", logErr)
 	}
 
-	return nil
+	return publishErr
 }
 
-func NewPriorityPublisher(p Publisher, c PriorityQueueConfigurator, s c.NotificationStorage) *PriorityPublisher {
+func NewPriorityPublisher(p Publisher, c PriorityQueueConfigurator, s c.NotificationRegistry) *PriorityPublisher {
 
 	return &PriorityPublisher{
 		publisher: p,
-		storage:   s,
+		registry:  s,
 		queues:    c.GetPriorityQueues(),
 	}
 }

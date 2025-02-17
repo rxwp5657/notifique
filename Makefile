@@ -24,6 +24,24 @@ test: vet
 	go test ./test/unit/... ./test/integration/...
 .PHONY:test
 
+gen-mocks: vet
+	go run go.uber.org/mock/mockgen \
+		-source=./internal/server/controllers/users.go \
+		-destination=./test/mocks/users.go
+
+	go run go.uber.org/mock/mockgen \
+		-source=./internal/server/controllers/distribution_lists.go \
+		-destination=./test/mocks/distribution_lists.go
+
+	go run go.uber.org/mock/mockgen \
+		-source=./internal/server/controllers/notifications.go \
+		-destination=./test/mocks/notifications.go
+.PHONY:gen-mocks
+
+dependency-injection: vet
+	cd ./internal/di && go run github.com/google/wire/cmd/wire
+.PHONY:dependency-injection
+
 deploy-dynamodb: vet
 	go run ./cmd/deployments/dynamodb/main.go
 .PHONY:deploy-dynamodb

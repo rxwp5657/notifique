@@ -15,11 +15,10 @@ CREATE TYPE notification_channel AS ENUM (
 
 CREATE TYPE notification_status AS ENUM (
     'CREATED',
-    'PUBLISHED',
-    'PUBLISHED_FAILED',
-    'PROCESSING',
-    'PROCESSING_FAILED',
-    'SENT'
+    'QUEUED',
+    'SENDING',
+    'SENT',
+    'FAILED'
 );
 
 CREATE TABLE IF NOT EXISTS distribution_lists (

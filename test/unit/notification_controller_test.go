@@ -10,9 +10,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	di "github.com/notifique/dependency_injection"
-	"github.com/notifique/dto"
-	"github.com/notifique/test"
+	di "github.com/notifique/internal/di"
+	"github.com/notifique/internal/server/dto"
+	"github.com/notifique/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )
@@ -41,7 +41,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 		Publish(gomock.Any(), gomock.Any()).
 		Return(nil)
 
-	storageMock := mock.Storage.MockNotificationStorage
+	registryMock := mock.Registry.MockNotificationRegistry
 
 	userId := "1234"
 
@@ -60,12 +60,12 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 	}
 
 	t.Run("Can create new notifications", func(t *testing.T) {
-		storageMock.
+		registryMock.
 			EXPECT().
 			SaveNotification(gomock.Any(), gomock.Any(), gomock.Any()).
 			Return(uuid.NewString(), nil)
 
-		req := test.MakeTestNotificationRequest()
+		req := testutils.MakeTestNotificationRequest()
 
 		w := createNotification(req)
 
@@ -73,7 +73,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 	})
 
 	t.Run("Should fail if the channel is not supported", func(t *testing.T) {
-		req := test.MakeTestNotificationRequest()
+		req := testutils.MakeTestNotificationRequest()
 		req.Channels = append(req.Channels, "INVALID")
 
 		w := createNotification(req)
@@ -91,8 +91,8 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 	})
 
 	t.Run("Should fail if the title exceeds the limits", func(t *testing.T) {
-		req := test.MakeTestNotificationRequest()
-		req.Title = test.MakeStrWithSize(121)
+		req := testutils.MakeTestNotificationRequest()
+		req.Title = testutils.MakeStrWithSize(121)
 
 		w := createNotification(req)
 
@@ -109,7 +109,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 	})
 
 	t.Run("Should fail if the title is empty", func(t *testing.T) {
-		req := test.MakeTestNotificationRequest()
+		req := testutils.MakeTestNotificationRequest()
 		req.Title = ""
 
 		w := createNotification(req)
@@ -127,7 +127,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 	})
 
 	t.Run("Should fail if the contents are empty", func(t *testing.T) {
-		req := test.MakeTestNotificationRequest()
+		req := testutils.MakeTestNotificationRequest()
 		req.Contents = ""
 
 		w := createNotification(req)
@@ -145,8 +145,8 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 	})
 
 	t.Run("Should fail if it the contents exceeds the limits", func(t *testing.T) {
-		req := test.MakeTestNotificationRequest()
-		req.Contents = test.MakeStrWithSize(1025)
+		req := testutils.MakeTestNotificationRequest()
+		req.Contents = testutils.MakeStrWithSize(1025)
 
 		w := createNotification(req)
 
@@ -163,8 +163,8 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 	})
 
 	t.Run("Should fail if the topic exceeds the limits", func(t *testing.T) {
-		req := test.MakeTestNotificationRequest()
-		req.Topic = test.MakeStrWithSize(121)
+		req := testutils.MakeTestNotificationRequest()
+		req.Topic = testutils.MakeStrWithSize(121)
 
 		w := createNotification(req)
 
@@ -181,7 +181,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 	})
 
 	t.Run("Should fail if the topic is empty", func(t *testing.T) {
-		req := test.MakeTestNotificationRequest()
+		req := testutils.MakeTestNotificationRequest()
 		req.Topic = ""
 
 		w := createNotification(req)
@@ -199,7 +199,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 	})
 
 	t.Run("Should fail if there are duplicated recipients", func(t *testing.T) {
-		req := test.MakeTestNotificationRequest()
+		req := testutils.MakeTestNotificationRequest()
 		req.Recipients = append(req.Recipients, req.Recipients...)
 
 		w := createNotification(req)
@@ -217,7 +217,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 	})
 
 	t.Run("Should fail if the priority is not supported", func(t *testing.T) {
-		req := test.MakeTestNotificationRequest()
+		req := testutils.MakeTestNotificationRequest()
 		req.Priority = "Test"
 
 		w := createNotification(req)
@@ -236,7 +236,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 
 	t.Run("Should fail if the image url is not an url", func(t *testing.T) {
 		url := "not an url"
-		req := test.MakeTestNotificationRequest()
+		req := testutils.MakeTestNotificationRequest()
 		req.Image = &url
 
 		w := createNotification(req)

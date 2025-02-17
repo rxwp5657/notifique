@@ -8,7 +8,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/notifique/internal/publish"
-	storage "github.com/notifique/internal/storage/dynamodb"
+	registry "github.com/notifique/internal/registry/dynamodb"
 )
 
 const (
@@ -39,7 +39,7 @@ func (cfg EnvConfig) GetPostgresUrl() (string, error) {
 	return url, nil
 }
 
-func (cfg EnvConfig) GetDynamoClientConfig() (dcfg storage.DynamoClientConfig) {
+func (cfg EnvConfig) GetDynamoClientConfig() (dcfg registry.DynamoClientConfig) {
 
 	if be, ok := os.LookupEnv(dynamoBaseEndpoint); ok {
 		dcfg.BaseEndpoint = &be
