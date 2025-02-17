@@ -10,13 +10,13 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/notifique/dto"
-	"github.com/notifique/test"
+	"github.com/notifique/internal/server/dto"
+	"github.com/notifique/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
-	di "github.com/notifique/dependency_injection"
-	mk "github.com/notifique/test/mocks"
+	di "github.com/notifique/internal/di"
+	mk "github.com/notifique/internal/testutils/mocks"
 )
 
 const userNotificationsUrl string = "/users/me/notifications"
@@ -32,14 +32,14 @@ func TestUserController(t *testing.T) {
 		t.Fatalf("failed to create mocked backend - %v", err)
 	}
 
-	testGetUserNotifications(t, testApp.Engine, *testApp.Storage.MockUserStorage)
-	testGetUserConfig(t, testApp.Engine, *testApp.Storage.MockUserStorage)
-	testUpdateUserConfig(t, testApp.Engine, *testApp.Storage.MockUserStorage)
+	testGetUserNotifications(t, testApp.Engine, *testApp.Registry.MockUserRegistry)
+	testGetUserConfig(t, testApp.Engine, *testApp.Registry.MockUserRegistry)
+	testUpdateUserConfig(t, testApp.Engine, *testApp.Registry.MockUserRegistry)
 }
 
-func testGetUserNotifications(t *testing.T, e *gin.Engine, mock mk.MockUserStorage) {
+func testGetUserNotifications(t *testing.T, e *gin.Engine, mock mk.MockUserRegistry) {
 
-	testNotifications, err := test.MakeTestUserNotifications(3, testUserId)
+	testNotifications, err := testutils.MakeTestUserNotifications(3, testUserId)
 
 	if err != nil {
 		t.Fatal(err)
@@ -51,7 +51,7 @@ func testGetUserNotifications(t *testing.T, e *gin.Engine, mock mk.MockUserStora
 
 		req, _ := http.NewRequest(http.MethodGet, userNotificationsUrl, nil)
 		req.Header.Add("userId", testUserId)
-		test.AddUserFilters(req, &filters)
+		testutils.AddUserFilters(req, &filters)
 
 		e.ServeHTTP(w, req)
 
@@ -106,9 +106,9 @@ func testGetUserNotifications(t *testing.T, e *gin.Engine, mock mk.MockUserStora
 	})
 }
 
-func testGetUserConfig(t *testing.T, e *gin.Engine, mock mk.MockUserStorage) {
+func testGetUserConfig(t *testing.T, e *gin.Engine, mock mk.MockUserRegistry) {
 
-	cfg := test.MakeTestUserConfig(testUserId)
+	cfg := testutils.MakeTestUserConfig(testUserId)
 
 	getUserConfig := func(user string) *httptest.ResponseRecorder {
 
@@ -141,7 +141,7 @@ func testGetUserConfig(t *testing.T, e *gin.Engine, mock mk.MockUserStorage) {
 	})
 }
 
-func testUpdateUserConfig(t *testing.T, e *gin.Engine, mock mk.MockUserStorage) {
+func testUpdateUserConfig(t *testing.T, e *gin.Engine, mock mk.MockUserRegistry) {
 
 	updateUserConfig := func(cfg dto.UserConfig) *httptest.ResponseRecorder {
 
@@ -159,7 +159,7 @@ func testUpdateUserConfig(t *testing.T, e *gin.Engine, mock mk.MockUserStorage) 
 	}
 
 	t.Run("Should be able to update the user config", func(t *testing.T) {
-		userConfig := test.MakeTestUserConfig(testUserId)
+		userConfig := testutils.MakeTestUserConfig(testUserId)
 		userConfig.EmailConfig = dto.ChannelConfig{OptIn: false, SnoozeUntil: nil}
 		userConfig.SMSConfig = dto.ChannelConfig{OptIn: true, SnoozeUntil: nil}
 
@@ -175,7 +175,7 @@ func testUpdateUserConfig(t *testing.T, e *gin.Engine, mock mk.MockUserStorage) 
 	t.Run("Should fail if the snooze is on the past", func(t *testing.T) {
 		snoozeUntil := time.Now().AddDate(0, 0, -10).Format(time.RFC3339)
 
-		userConfig := test.MakeTestUserConfig(testUserId)
+		userConfig := testutils.MakeTestUserConfig(testUserId)
 		userConfig.EmailConfig = dto.ChannelConfig{
 			OptIn:       false,
 			SnoozeUntil: &snoozeUntil,

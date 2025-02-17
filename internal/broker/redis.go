@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/notifique/dto"
+	"github.com/notifique/internal/server/dto"
 
 	redis "github.com/redis/go-redis/v9"
 )

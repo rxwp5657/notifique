@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	c "github.com/notifique/controllers"
-	di "github.com/notifique/dependency_injection"
-	dto "github.com/notifique/dto"
+	di "github.com/notifique/internal/di"
+	c "github.com/notifique/internal/server/controllers"
+	dto "github.com/notifique/internal/server/dto"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,7 +19,7 @@ func TestRabbitMQPriorityPublisher(t *testing.T) {
 
 	defer close()
 
-	testPriorityPublisher(t, testApp.Storage, testApp.Publisher)
+	testPriorityPublisher(t, testApp.Registry, testApp.Publisher)
 }
 
 func TestSQSPriorityPublisher(t *testing.T) {
@@ -31,10 +31,10 @@ func TestSQSPriorityPublisher(t *testing.T) {
 
 	defer close()
 
-	testPriorityPublisher(t, testApp.Storage, testApp.Publisher)
+	testPriorityPublisher(t, testApp.Registry, testApp.Publisher)
 }
 
-func testPriorityPublisher(t *testing.T, s c.NotificationStorage, p c.NotificationPublisher) {
+func testPriorityPublisher(t *testing.T, s c.NotificationRegistry, p c.NotificationPublisher) {
 
 	userId := "1234"
 
