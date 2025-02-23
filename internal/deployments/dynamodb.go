@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 )
 
-func tableExists(client *dynamodb.Client, tableName string) (bool, error) {
+func tableExists(client dynamodb.Client, tableName string) (bool, error) {
 
 	_, err := client.DescribeTable(context.TODO(), &dynamodb.DescribeTableInput{
 		TableName: aws.String(tableName),
@@ -32,19 +32,19 @@ func tableExists(client *dynamodb.Client, tableName string) (bool, error) {
 	}
 }
 
-func createTable(client *dynamodb.Client, tableName string, input *dynamodb.CreateTableInput) error {
+func createTable(client dynamodb.Client, tableName string, input dynamodb.CreateTableInput) error {
 
 	if exists, err := tableExists(client, tableName); exists || err != nil {
 		return err
 	}
 
-	_, err := client.CreateTable(context.TODO(), input)
+	_, err := client.CreateTable(context.TODO(), &input)
 
 	if err != nil {
 		return err
 	}
 
-	waiter := dynamodb.NewTableExistsWaiter(client)
+	waiter := dynamodb.NewTableExistsWaiter(&client)
 
 	descTableInput := dynamodb.DescribeTableInput{
 		TableName: aws.String(tableName),
@@ -53,13 +53,13 @@ func createTable(client *dynamodb.Client, tableName string, input *dynamodb.Crea
 	err = waiter.Wait(context.TODO(), &descTableInput, 5*time.Minute)
 
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create table %s - %w", tableName, err)
 	}
 
 	return nil
 }
 
-func createNotificationTable(client *dynamodb.Client) error {
+func createNotificationTable(client dynamodb.Client) error {
 
 	tableName := r.NotificationsTable
 
@@ -79,10 +79,10 @@ func createNotificationTable(client *dynamodb.Client) error {
 		},
 	}
 
-	return createTable(client, tableName, &tableInput)
+	return createTable(client, tableName, tableInput)
 }
 
-func createUserConfigTable(client *dynamodb.Client) error {
+func createUserConfigTable(client dynamodb.Client) error {
 
 	tableName := r.UserConfigTable
 
@@ -102,10 +102,10 @@ func createUserConfigTable(client *dynamodb.Client) error {
 		},
 	}
 
-	return createTable(client, tableName, &tableInput)
+	return createTable(client, tableName, tableInput)
 }
 
-func createUserNotificationTable(client *dynamodb.Client) error {
+func createUserNotificationTable(client dynamodb.Client) error {
 
 	tableName := r.UserNotificationsTable
 
@@ -131,10 +131,10 @@ func createUserNotificationTable(client *dynamodb.Client) error {
 		},
 	}
 
-	return createTable(client, tableName, &tableInput)
+	return createTable(client, tableName, tableInput)
 }
 
-func createDLRecipientsTable(client *dynamodb.Client) error {
+func createDLRecipientsTable(client dynamodb.Client) error {
 
 	tableName := r.DistListRecipientsTable
 
@@ -160,10 +160,10 @@ func createDLRecipientsTable(client *dynamodb.Client) error {
 		},
 	}
 
-	return createTable(client, tableName, &tableInput)
+	return createTable(client, tableName, tableInput)
 }
 
-func createDLSummaryTable(client *dynamodb.Client) error {
+func createDLSummaryTable(client dynamodb.Client) error {
 
 	tableName := r.DistListSummaryTable
 
@@ -183,10 +183,10 @@ func createDLSummaryTable(client *dynamodb.Client) error {
 		},
 	}
 
-	return createTable(client, tableName, &tableInput)
+	return createTable(client, tableName, tableInput)
 }
 
-func createNotificationStatusLogTable(client *dynamodb.Client) error {
+func createNotificationStatusLogTable(client dynamodb.Client) error {
 	tableName := r.NotificationStatusLogTable
 
 	tableInput := dynamodb.CreateTableInput{
@@ -211,7 +211,30 @@ func createNotificationStatusLogTable(client *dynamodb.Client) error {
 		},
 	}
 
-	return createTable(client, tableName, &tableInput)
+	return createTable(client, tableName, tableInput)
+}
+
+func createNotificationTemplateTable(client dynamodb.Client) error {
+
+	tableName := r.NotificationsTemplateTable
+
+	tableInput := dynamodb.CreateTableInput{
+		AttributeDefinitions: []types.AttributeDefinition{{
+			AttributeName: aws.String(r.NotificationTemplateHashKey),
+			AttributeType: types.ScalarAttributeTypeS,
+		}},
+		KeySchema: []types.KeySchemaElement{{
+			AttributeName: aws.String(r.NotificationTemplateHashKey),
+			KeyType:       types.KeyTypeHash,
+		}},
+		TableName: aws.String(tableName),
+		ProvisionedThroughput: &types.ProvisionedThroughput{
+			ReadCapacityUnits:  aws.Int64(10),
+			WriteCapacityUnits: aws.Int64(10),
+		},
+	}
+
+	return createTable(client, tableName, tableInput)
 }
 
 func CreateTables(client *dynamodb.Client) error {
@@ -220,28 +243,20 @@ func CreateTables(client *dynamodb.Client) error {
 		return fmt.Errorf("client is nil")
 	}
 
-	if err := createNotificationTable(client); err != nil {
-		return fmt.Errorf("notifications table - %w", err)
+	tables := []func(dynamodb.Client) error{
+		createNotificationTable,
+		createUserConfigTable,
+		createUserNotificationTable,
+		createDLRecipientsTable,
+		createDLSummaryTable,
+		createNotificationStatusLogTable,
+		createNotificationTemplateTable,
 	}
 
-	if err := createUserConfigTable(client); err != nil {
-		return fmt.Errorf("user config table - %w", err)
-	}
-
-	if err := createUserNotificationTable(client); err != nil {
-		return fmt.Errorf("user notifications table - %w", err)
-	}
-
-	if err := createDLRecipientsTable(client); err != nil {
-		return fmt.Errorf("distribution lists table - %w", err)
-	}
-
-	if err := createDLSummaryTable(client); err != nil {
-		return fmt.Errorf("distribution lists table - %w", err)
-	}
-
-	if err := createNotificationStatusLogTable(client); err != nil {
-		return fmt.Errorf("notification status log table - %w", err)
+	for _, fn := range tables {
+		if err := fn(*client); err != nil {
+			return err
+		}
 	}
 
 	return nil

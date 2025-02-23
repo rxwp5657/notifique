@@ -21,6 +21,13 @@ CREATE TYPE notification_status AS ENUM (
     'FAILED'
 );
 
+CREATE TYPE template_variable AS ENUM (
+    'STRING',
+    'NUMBER',
+    'DATE',
+    'TIME'
+);
+
 CREATE TABLE IF NOT EXISTS distribution_lists (
     "name" VARCHAR PRIMARY KEY,
     num_recipients INT NOT NULL DEFAULT 0
@@ -61,7 +68,7 @@ ON notifications(id, created_at);
 
 CREATE TABLE IF NOT EXISTS notification_status_log(
     notification_id uuid NOT NULL,
-    status_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status_date TIMESTAMPTZ NOT NULL DEFAULT (NOW() at time zone 'utc'),
     "status" notification_status NOT NULL,
     error_message VARCHAR,
     CONSTRAINT notification_id_fk
@@ -114,6 +121,29 @@ CREATE TABLE IF NOT EXISTS user_config (
     in_app_snooze_until TIMESTAMPTZ,
     push_opt_in BOOLEAN NOT NULL DEFAULT TRUE,
     push_snooze_until TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS notification_templates (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "name" VARCHAR NOT NULL,
+    title_template VARCHAR NOT NULL,
+    contents_template VARCHAR NOT NULL,
+    "description" VARCHAR NOT NULL,
+    created_by VARCHAR NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() at time zone 'utc')
+);
+
+CREATE TABLE IF NOT EXISTS notification_template_variables (
+    template_id uuid NOT NULL,
+    "name" VARCHAR NOT NULL,
+    "type" template_variable NOT NULL,
+    "required" BOOLEAN NOT NULL,
+    "validation" VARCHAR,
+    CONSTRAINT template_variable_pk
+        PRIMARY KEY(template_id, "name"),
+    CONSTRAINT template_id_fk
+        FOREIGN KEY (template_id)
+        REFERENCES notification_templates(id)
 );
 
 COMMIT;

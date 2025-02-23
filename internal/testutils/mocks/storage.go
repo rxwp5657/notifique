@@ -4,14 +4,16 @@ type MockedRegistry struct {
 	*MockDistributionRegistry
 	*MockUserRegistry
 	*MockNotificationRegistry
+	*MockNotificationTemplateRegistry
 }
 
-func NewMockedRegistry(dls *MockDistributionRegistry, us *MockUserRegistry,
-	ns *MockNotificationRegistry) *MockedRegistry {
+func NewMockedRegistry(dlr *MockDistributionRegistry, ur *MockUserRegistry,
+	nr *MockNotificationRegistry, ntr *MockNotificationTemplateRegistry) *MockedRegistry {
 
 	return &MockedRegistry{
-		dls,
-		us,
-		ns,
+		dlr,
+		ur,
+		nr,
+		ntr,
 	}
 }

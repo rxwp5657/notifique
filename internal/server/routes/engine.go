@@ -14,6 +14,7 @@ type Registry interface {
 	controllers.NotificationRegistry
 	controllers.UserRegistry
 	controllers.DistributionRegistry
+	controllers.NotificationTemplateRegistry
 }
 
 type VersionConfigurator interface {
@@ -39,6 +40,7 @@ func NewEngine(registry Registry, pub controllers.NotificationPublisher, bk cont
 	SetupNotificationRoutes(r, version, registry, pub)
 	SetupDistributionListRoutes(r, version, registry)
 	SetupUsersRoutes(r, version, registry, bk)
+	SetupNotificationTemplateRoutes(r, version, registry)
 
 	return r, nil
 }

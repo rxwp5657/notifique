@@ -6,6 +6,7 @@ import (
 	r "regexp"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/notifique/internal/server/dto"
 )
 
 var FutureValidator validator.Func = func(fl validator.FieldLevel) bool {
@@ -34,4 +35,24 @@ var DLNameValidator validator.Func = func(fl validator.FieldLevel) bool {
 	}
 
 	return match
+}
+
+var UniqueTemplateVarValidator validator.Func = func(fl validator.FieldLevel) bool {
+	templateVariables, ok := fl.Field().Interface().([]dto.TemplateVariable)
+
+	if !ok {
+		return false
+	}
+
+	variableNames := map[string]struct{}{}
+
+	for _, v := range templateVariables {
+		if _, ok := variableNames[v.Name]; ok {
+			return false
+		}
+
+		variableNames[v.Name] = struct{}{}
+	}
+
+	return true
 }

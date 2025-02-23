@@ -173,18 +173,19 @@ func (ps *Registry) CreateDistributionList(ctx context.Context, distributionList
 		return fmt.Errorf("failed to create distribution list - %w", err)
 	}
 
-	recipientBuilder := func(recipient string) pgx.NamedArgs {
-		return pgx.NamedArgs{
+	recipientsArgs := make([]pgx.NamedArgs, 0, len(distributionList.Recipients))
+
+	for _, recipient := range distributionList.Recipients {
+		recipientsArgs = append(recipientsArgs, pgx.NamedArgs{
 			"name":      distributionList.Name,
 			"recipient": recipient,
-		}
+		})
 	}
 
 	err = batchInsert(
 		ctx,
 		InsertDistributionListRecipient,
-		distributionList.Recipients,
-		recipientBuilder,
+		recipientsArgs,
 		tx,
 	)
 
@@ -422,18 +423,19 @@ func (ps *Registry) AddRecipients(ctx context.Context, distlistName string, reci
 		return nil, fmt.Errorf("failed to start transaction - %w", err)
 	}
 
-	recipientBuilder := func(recipient string) pgx.NamedArgs {
-		return pgx.NamedArgs{
+	recipientsArgs := make([]pgx.NamedArgs, 0, len(recipients))
+
+	for _, recipient := range recipients {
+		recipientsArgs = append(recipientsArgs, pgx.NamedArgs{
 			"name":      distlistName,
 			"recipient": recipient,
-		}
+		})
 	}
 
 	err = batchInsert(
 		ctx,
 		InsertDistributionListRecipient,
-		recipients,
-		recipientBuilder,
+		recipientsArgs,
 		tx,
 	)
 

@@ -119,3 +119,24 @@ func MakeTestUserConfig(userId string) dto.UserConfig {
 
 	return cfg
 }
+
+func MakeTestNotificationTemplateRequest() dto.NotificationTemplateReq {
+	return dto.NotificationTemplateReq{
+		Name:             "signed-in-notification",
+		TitleTemplate:    "Hi {user}!",
+		ContentsTemplate: "Welcome to {app_name}!",
+		Description:      "User has signed-in",
+		Variables: []dto.TemplateVariable{
+			{
+				Name:     "{user}",
+				Type:     "STRING",
+				Required: true,
+			},
+			{
+				Name:     "{app_name}",
+				Type:     "STRING",
+				Required: true,
+			},
+		},
+	}
+}

@@ -157,37 +157,40 @@ func (ps *Registry) SaveNotification(ctx context.Context, createdBy string, noti
 
 	notificationId := notificationIdUUID.String()
 
-	recipientsBuilder := func(recipient string) pgx.NamedArgs {
-		return pgx.NamedArgs{
+	recipientsArgs := make([]pgx.NamedArgs, 0, len(notification.Recipients))
+
+	for _, recipient := range notification.Recipients {
+		recipientsArgs = append(recipientsArgs, pgx.NamedArgs{
 			"notificationId": notificationId,
 			"recipient":      recipient,
-		}
+		})
 	}
 
 	err = batchInsert(
 		ctx,
 		InsertNotificationRecipients,
-		notification.Recipients,
-		recipientsBuilder,
+		recipientsArgs,
 		tx,
 	)
 
 	if err != nil {
+		tx.Rollback(ctx)
 		return "", err
 	}
 
-	channelsBuilder := func(channel string) pgx.NamedArgs {
-		return pgx.NamedArgs{
+	channelsArgs := make([]pgx.NamedArgs, 0, len(notification.Channels))
+
+	for _, channel := range notification.Channels {
+		channelsArgs = append(channelsArgs, pgx.NamedArgs{
 			"notificationId": notificationId,
 			"channel":        channel,
-		}
+		})
 	}
 
 	err = batchInsert(
 		ctx,
 		InsertChannels,
-		notification.Channels,
-		channelsBuilder,
+		channelsArgs,
 		tx,
 	)
 

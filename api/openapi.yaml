@@ -192,6 +192,10 @@ paths:
             X-RateLimit-Reset:
               $ref: '#/components/schemas/RateLimitReset'
           description: Template created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationTemplateCreatedRespModel"
         "400":
           headers:
             X-RateLimit-Limit:
@@ -200,7 +204,7 @@ paths:
               $ref: '#/components/schemas/RateLimitRemaining'
             X-RateLimit-Reset:
               $ref: '#/components/schemas/RateLimitReset'
-          description: Invalid template format or name already exists
+          description: Invalid template format
         "500":
           headers:
             X-RateLimit-Limit:
@@ -1045,9 +1049,8 @@ components:
     
     NotificationTemplateName:
       type: string
-      minLength: 3
+      minLength: 1
       maxLength: 120
-      pattern: "^[a-zA-Z0-9_-]+$"
 
     NotificationTemplateBase:
       type: object
@@ -1055,7 +1058,6 @@ components:
         - name
         - titleTemplate
         - contentTemplate
-        - topic
       properties:
         name:
           $ref: "#/components/schemas/NotificationTemplateName"
@@ -1090,6 +1092,9 @@ components:
         - createdAt
         - createdBy
       properties:
+        id:
+          type: string
+          format: uuid
         name:
           $ref: "#/components/schemas/NotificationTemplateName"
         createdAt:
@@ -1106,6 +1111,22 @@ components:
           maxLength: 256
           nullable: true
 
+    NotificationTemplateCreatedRespModel:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          $ref: "#/components/schemas/NotificationTemplateName"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - createdAt
+
     NotificationTemplateDetailsModel:
       allOf:
         - $ref: "#/components/schemas/NotificationTemplateBase"
@@ -1120,6 +1141,7 @@ components:
         name:
           type: string
           description: Variable name without braces
+          maxLength: 120
         type:
           type: string
           enum: [string, date, time, number]
