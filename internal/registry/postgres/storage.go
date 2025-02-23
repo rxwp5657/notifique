@@ -22,22 +22,20 @@ type PostgresConfigurator interface {
 
 type namedArgsBuilder[T any] func(val T) pgx.NamedArgs
 
-func batchInsert[T any](ctx context.Context, query string, data []T, builder namedArgsBuilder[T], tx pgx.Tx) error {
+func batchInsert(ctx context.Context, query string, args []pgx.NamedArgs, tx pgx.Tx) error {
 
 	batch := &pgx.Batch{}
 
-	for _, e := range data {
-		args := builder(e)
-		batch.Queue(query, args)
+	for _, arg := range args {
+		batch.Queue(query, arg)
 	}
 
 	results := tx.SendBatch(ctx, batch)
 	defer results.Close()
 
-	for _, e := range data {
+	for _, e := range args {
 		_, err := results.Exec()
 		if err != nil {
-			tx.Rollback(ctx)
 			return fmt.Errorf("failed to insert entry %v - %w", e, err)
 		}
 	}

@@ -191,6 +191,11 @@ var MockedNotificationRegistrySet = wire.NewSet(
 	wire.Bind(new(controllers.NotificationRegistry), new(*mk.MockNotificationRegistry)),
 )
 
+var MockedNotificationTemplateRegistrySet = wire.NewSet(
+	mk.NewMockNotificationTemplateRegistry,
+	wire.Bind(new(controllers.NotificationTemplateRegistry), new(*mk.MockNotificationTemplateRegistry)),
+)
+
 var MockedUserNotificationBroker = wire.NewSet(
 	mk.NewMockUserNotificationBroker,
 	wire.Bind(new(controllers.UserNotificationBroker), new(*mk.MockUserNotificationBroker)),
@@ -200,6 +205,7 @@ var MockedRegistrySet = wire.NewSet(
 	MockedDistributionRegistrySet,
 	MockedUserRegistrySet,
 	MockedNotificationRegistrySet,
+	MockedNotificationTemplateRegistrySet,
 	mk.NewMockedRegistry,
 	wire.Bind(new(routes.Registry), new(*mk.MockedRegistry)),
 )

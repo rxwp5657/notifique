@@ -415,7 +415,8 @@ func InjectMockedBackend(ctx context.Context, mockController *gomock.Controller)
 	mockDistributionRegistry := mock_controllers.NewMockDistributionRegistry(mockController)
 	mockUserRegistry := mock_controllers.NewMockUserRegistry(mockController)
 	mockNotificationRegistry := mock_controllers.NewMockNotificationRegistry(mockController)
-	mockedRegistry := mock_controllers.NewMockedRegistry(mockDistributionRegistry, mockUserRegistry, mockNotificationRegistry)
+	mockNotificationTemplateRegistry := mock_controllers.NewMockNotificationTemplateRegistry(mockController)
+	mockedRegistry := mock_controllers.NewMockedRegistry(mockDistributionRegistry, mockUserRegistry, mockNotificationRegistry, mockNotificationTemplateRegistry)
 	mockNotificationPublisher := mock_controllers.NewMockNotificationPublisher(mockController)
 	mockUserNotificationBroker := mock_controllers.NewMockUserNotificationBroker(mockController)
 	testVersionConfiguratorFunc := config_test.NewTestVersionConfigurator()
@@ -562,12 +563,15 @@ var MockedUserRegistrySet = wire.NewSet(mock_controllers.NewMockUserRegistry, wi
 
 var MockedNotificationRegistrySet = wire.NewSet(mock_controllers.NewMockNotificationRegistry, wire.Bind(new(controllers.NotificationRegistry), new(*mock_controllers.MockNotificationRegistry)))
 
+var MockedNotificationTemplateRegistrySet = wire.NewSet(mock_controllers.NewMockNotificationTemplateRegistry, wire.Bind(new(controllers.NotificationTemplateRegistry), new(*mock_controllers.MockNotificationTemplateRegistry)))
+
 var MockedUserNotificationBroker = wire.NewSet(mock_controllers.NewMockUserNotificationBroker, wire.Bind(new(controllers.UserNotificationBroker), new(*mock_controllers.MockUserNotificationBroker)))
 
 var MockedRegistrySet = wire.NewSet(
 	MockedDistributionRegistrySet,
 	MockedUserRegistrySet,
-	MockedNotificationRegistrySet, mock_controllers.NewMockedRegistry, wire.Bind(new(routes.Registry), new(*mock_controllers.MockedRegistry)),
+	MockedNotificationRegistrySet,
+	MockedNotificationTemplateRegistrySet, mock_controllers.NewMockedRegistry, wire.Bind(new(routes.Registry), new(*mock_controllers.MockedRegistry)),
 )
 
 var TestVersionConfiguratorSet = wire.NewSet(config_test.NewTestVersionConfigurator, wire.Bind(new(routes.VersionConfigurator), new(config_test.TestVersionConfiguratorFunc)))

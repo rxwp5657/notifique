@@ -76,7 +76,7 @@ func NewPostgresContainer(ctx context.Context) (*PostgresContainer, func(), erro
 	err = p.RunMigrations(uri)
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to run migrations - %w", err)
+		return nil, nil, err
 	}
 
 	close := func() {

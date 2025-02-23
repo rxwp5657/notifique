@@ -20,55 +20,27 @@ type dynamoregistryTester struct {
 
 func (t *dynamoregistryTester) ClearDB(ctx context.Context) error {
 
-	_, err := t.client.DeleteTable(ctx, &dynamodb.DeleteTableInput{
-		TableName: aws.String(ds.DistListRecipientsTable),
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to delete distribution list recipients table - %w", err)
+	tables := []string{
+		ds.DistListRecipientsTable,
+		ds.DistListSummaryTable,
+		ds.NotificationsTable,
+		ds.NotificationStatusLogTable,
+		ds.UserConfigTable,
+		ds.UserNotificationsTable,
+		ds.NotificationsTemplateTable,
 	}
 
-	_, err = t.client.DeleteTable(ctx, &dynamodb.DeleteTableInput{
-		TableName: aws.String(ds.DistListSummaryTable),
-	})
+	for _, table := range tables {
+		_, err := t.client.DeleteTable(ctx, &dynamodb.DeleteTableInput{
+			TableName: aws.String(table),
+		})
 
-	if err != nil {
-		return fmt.Errorf("failed to delete distribution list summary table - %w", err)
+		if err != nil {
+			return fmt.Errorf("failed to delete %s table - %w", table, err)
+		}
 	}
 
-	_, err = t.client.DeleteTable(ctx, &dynamodb.DeleteTableInput{
-		TableName: aws.String(ds.NotificationsTable),
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to delete notifications table - %w", err)
-	}
-
-	_, err = t.client.DeleteTable(ctx, &dynamodb.DeleteTableInput{
-		TableName: aws.String(ds.NotificationStatusLogTable),
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to delete notification status log table - %w", err)
-	}
-
-	_, err = t.client.DeleteTable(ctx, &dynamodb.DeleteTableInput{
-		TableName: aws.String(ds.UserConfigTable),
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to delete user config table - %w", err)
-	}
-
-	_, err = t.client.DeleteTable(ctx, &dynamodb.DeleteTableInput{
-		TableName: aws.String(ds.UserNotificationsTable),
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to delete user notification table - %w", err)
-	}
-
-	err = t.container.CreateTables(ctx)
+	err := t.container.CreateTables(ctx)
 
 	if err != nil {
 		return err
@@ -239,6 +211,51 @@ func (t *dynamoregistryTester) InsertUserNotifications(ctx context.Context,
 	}
 
 	return err
+}
+
+func (t *dynamoregistryTester) GetNotificationTemplate(ctx context.Context, id string) (dto.NotificationTemplateReq, error) {
+
+	templateReq := dto.NotificationTemplateReq{}
+
+	nt := ds.NotificationTemplate{Id: id}
+
+	key, err := nt.GetKey()
+
+	if err != nil {
+		return templateReq, err
+	}
+
+	resp, err := t.client.GetItem(ctx, &dynamodb.GetItemInput{
+		Key:       key,
+		TableName: aws.String(ds.NotificationsTemplateTable),
+	})
+
+	if err != nil {
+		return templateReq, fmt.Errorf("failed to retrieve template - %w", err)
+	}
+
+	template := ds.NotificationTemplate{}
+	err = attributevalue.UnmarshalMap(resp.Item, &template)
+
+	if err != nil {
+		return templateReq, fmt.Errorf("failed to unmarshall template - %w", err)
+	}
+
+	templateReq.Name = template.Name
+	templateReq.Description = template.Description
+	templateReq.TitleTemplate = template.TitleTemplate
+	templateReq.ContentsTemplate = template.ContentsTemplate
+
+	for _, v := range template.Variables {
+		templateReq.Variables = append(templateReq.Variables, dto.TemplateVariable{
+			Name:       v.Name,
+			Type:       v.Type,
+			Required:   v.Required,
+			Validation: v.Validation,
+		})
+	}
+
+	return templateReq, nil
 }
 
 func NewDynamoRegistryTester(ctx context.Context) (*dynamoregistryTester, closer, error) {

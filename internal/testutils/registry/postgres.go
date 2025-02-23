@@ -80,6 +80,30 @@ WHERE
 	id = ANY($1);
 `
 
+const getNotificationTemplate = `
+SELECT
+	"name",
+	"description",
+	title_template,
+	contents_template
+FROM
+	notification_templates
+WHERE
+	id = $1;
+`
+
+const getNotificationTemplateVariables = `
+SELECT
+    "name",
+    "type",
+    "required",
+    "validation"
+FROM
+	notification_template_variables
+WHERE
+	template_id = $1;
+`
+
 type postgresresgistryTester struct {
 	*ps.Registry
 	conn *pgxpool.Pool
@@ -97,6 +121,8 @@ func (t *postgresresgistryTester) ClearDB(ctx context.Context) error {
 		TRUNCATE notification_channels CASCADE;
 		TRUNCATE user_notifications;
 		TRUNCATE user_config;
+		TRUNCATE notification_templates CASCADE;
+		TRUNCATE notification_template_variables CASCADE;
 	`)
 
 	return err
@@ -309,6 +335,49 @@ func (t *postgresresgistryTester) GetNotificationStatus(ctx context.Context, not
 	}
 
 	return status, nil
+}
+
+func (t *postgresresgistryTester) GetNotificationTemplate(ctx context.Context, templateId string) (dto.NotificationTemplateReq, error) {
+	templateReq := dto.NotificationTemplateReq{}
+
+	err := t.conn.QueryRow(ctx, getNotificationTemplate, templateId).
+		Scan(
+			&templateReq.Name,
+			&templateReq.Description,
+			&templateReq.TitleTemplate,
+			&templateReq.ContentsTemplate,
+		)
+
+	if err != nil {
+		return templateReq, fmt.Errorf("failed to retrieve notification template info - %w", err)
+	}
+
+	rows, err := t.conn.Query(ctx, getNotificationTemplateVariables, templateId)
+
+	if err != nil {
+		return templateReq, fmt.Errorf("failed to query template variables - %w", err)
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		row := dto.TemplateVariable{}
+
+		err = rows.Scan(
+			&row.Name,
+			&row.Type,
+			&row.Required,
+			&row.Validation,
+		)
+
+		if err != nil {
+			return templateReq, fmt.Errorf("failed to scan template variable - %w", err)
+		}
+
+		templateReq.Variables = append(templateReq.Variables, row)
+	}
+
+	return templateReq, nil
 }
 
 func NewPostgresIntegrationTester(ctx context.Context) (*postgresresgistryTester, closer, error) {

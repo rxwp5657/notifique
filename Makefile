@@ -27,15 +27,20 @@ test: vet
 gen-mocks: vet
 	go run go.uber.org/mock/mockgen \
 		-source=./internal/server/controllers/users.go \
-		-destination=./test/mocks/users.go
+		-destination=./internal/testutils/mocks/users.go
 
 	go run go.uber.org/mock/mockgen \
 		-source=./internal/server/controllers/distribution_lists.go \
-		-destination=./test/mocks/distribution_lists.go
+		-destination=./internal/testutils/mocks/distribution_lists.go
 
 	go run go.uber.org/mock/mockgen \
 		-source=./internal/server/controllers/notifications.go \
-		-destination=./test/mocks/notifications.go
+		-destination=./internal/testutils/mocks/notifications.go
+
+	go run go.uber.org/mock/mockgen \
+		-source=./internal/server/controllers/templates.go \
+		-destination=./internal/testutils/mocks/templates.go
+
 .PHONY:gen-mocks
 
 dependency-injection: vet
