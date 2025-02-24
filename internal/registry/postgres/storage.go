@@ -20,8 +20,6 @@ type PostgresConfigurator interface {
 	GetPostgresUrl() (string, error)
 }
 
-type namedArgsBuilder[T any] func(val T) pgx.NamedArgs
-
 func batchInsert(ctx context.Context, query string, args []pgx.NamedArgs, tx pgx.Tx) error {
 
 	batch := &pgx.Batch{}

@@ -14,6 +14,7 @@ import (
 
 type NotificationTemplateRegistry interface {
 	SaveTemplate(ctx context.Context, createdBy string, ntr dto.NotificationTemplateReq) (dto.NotificationTemplateCreatedResp, error)
+	GetNotifications(ctx context.Context, filters dto.NotificationTemplateFilters) (dto.Page[dto.NotificationTemplateInfoResp], error)
 }
 
 type NotificationTemplateController struct {
@@ -59,4 +60,22 @@ func (ntc *NotificationTemplateController) CreateNotificationTemplate(c *gin.Con
 	}
 
 	c.JSON(http.StatusCreated, resp)
+}
+
+func (ntc *NotificationTemplateController) GetNotifications(c *gin.Context) {
+	var filters dto.NotificationTemplateFilters
+
+	if err := c.ShouldBind(&filters); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	notifications, err := ntc.Registry.GetNotifications(c.Request.Context(), filters)
+
+	if err != nil {
+		slog.Error(err.Error())
+		c.Status(http.StatusInternalServerError)
+	}
+
+	c.JSON(http.StatusOK, notifications)
 }

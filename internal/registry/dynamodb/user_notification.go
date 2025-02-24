@@ -83,8 +83,13 @@ func (s *Registry) GetUserNotifications(ctx context.Context, filters dto.UserNot
 
 	page := dto.Page[dto.UserNotification]{}
 
-	keyExp := expression.Key(UserNotificactionsHashKey).Equal(expression.Value(filters.UserId))
-	builder := expression.NewBuilder().WithKeyCondition(keyExp)
+	keyExp := expression.
+		Key(UserNotificactionsHashKey).
+		Equal(expression.Value(filters.UserId))
+
+	builder := expression.
+		NewBuilder().
+		WithKeyCondition(keyExp)
 
 	topicsFilter := makeInFilter("topic", filters.Topics)
 
@@ -132,7 +137,7 @@ func (s *Registry) GetUserNotifications(ctx context.Context, filters dto.UserNot
 
 	if len(response.LastEvaluatedKey) != 0 {
 		key := userNotificationKey{}
-		encoded, err := marshallNextToken(&key, response.LastEvaluatedKey)
+		encoded, err := marshalNextToken(&key, response.LastEvaluatedKey)
 
 		if err != nil {
 			return page, err

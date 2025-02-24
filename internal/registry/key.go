@@ -1,4 +1,4 @@
-package postgresresgistry
+package registry
 
 import (
 	b64 "encoding/base64"
@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-func marshallKey[T any](key T) (string, error) {
+func MarshalKey[T any](key T) (string, error) {
 	jsonMarshal, err := json.Marshal(key)
 
 	if err != nil {
@@ -18,7 +18,7 @@ func marshallKey[T any](key T) (string, error) {
 	return base64Encoded, nil
 }
 
-func unmarsallKey[T any](marshalled string, key *T) error {
+func UnmarshalKey[T any](marshalled string, key *T) error {
 	base64Decoded, err := b64.StdEncoding.DecodeString(marshalled)
 
 	if err != nil {

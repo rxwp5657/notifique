@@ -2,8 +2,6 @@ package dynamoregistry
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -13,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
+	"github.com/notifique/internal/registry"
 	"github.com/notifique/internal/server"
 	"github.com/notifique/internal/server/dto"
 )
@@ -74,36 +73,14 @@ type DynamoKey map[string]types.AttributeValue
 type DynamoObj map[string]types.AttributeValue
 type BatchWriteRequest map[string][]types.WriteRequest
 
-func marshallNextToken[T any](key *T, lastEvaluatedKey DynamoKey) (string, error) {
+func marshalNextToken[T any](key *T, lastEvaluatedKey DynamoKey) (string, error) {
 	err := attributevalue.UnmarshalMap(lastEvaluatedKey, &key)
 
 	if err != nil {
 		return "", fmt.Errorf("failed to unmarshall last evaluated key - %w", err)
 	}
 
-	jsonMarshalled, err := json.Marshal(key)
-
-	if err != nil {
-		return "", fmt.Errorf("failed to json marshall last evaluated key - %w", err)
-	}
-
-	return base64.StdEncoding.EncodeToString([]byte(jsonMarshalled)), nil
-}
-
-func unmarshallNextToken[T any](nextToken string, key *T) error {
-	decoded, err := base64.StdEncoding.DecodeString(nextToken)
-
-	if err != nil {
-		return fmt.Errorf("failed to decode base64 nextToken - %w", err)
-	}
-
-	err = json.Unmarshal(decoded, &key)
-
-	if err != nil {
-		return fmt.Errorf("failed to json unmarshall nextToken - %w", err)
-	}
-
-	return nil
+	return registry.MarshalKey(key)
 }
 
 func MakeBatchWriteRequest[T any](table string, data []T) (BatchWriteRequest, error) {
@@ -165,7 +142,7 @@ func makePageFilters[T DynamoPrimaryKey](key T, filters dto.PageFilter) (DynamoP
 	}
 
 	if filters.NextToken != nil {
-		err := unmarshallNextToken(*filters.NextToken, &key)
+		err := registry.UnmarshalKey(*filters.NextToken, &key)
 
 		if err != nil {
 			return params, fmt.Errorf("failed to unmarshall token - %w", err)

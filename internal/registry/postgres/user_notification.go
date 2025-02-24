@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/notifique/internal/registry"
 	"github.com/notifique/internal/server"
 	"github.com/notifique/internal/server/dto"
 )
@@ -87,8 +88,7 @@ func (ps *Registry) GetUserNotifications(ctx context.Context, filters dto.UserNo
 	whereFilters := make([]string, 0)
 
 	if filters.MaxResults != nil {
-		limit := *filters.MaxResults
-		args["limit"] = limit
+		args["limit"] = *filters.MaxResults
 	}
 
 	if filters.NextToken != nil {
@@ -96,7 +96,7 @@ func (ps *Registry) GetUserNotifications(ctx context.Context, filters dto.UserNo
 		whereFilters = append(whereFilters, nextTokenFilter)
 
 		var unmarsalledKey userNotificationKey
-		err := unmarsallKey(*filters.NextToken, &unmarsalledKey)
+		err := registry.UnmarshalKey(*filters.NextToken, &unmarsalledKey)
 
 		if err != nil {
 			return page, err
@@ -153,7 +153,7 @@ func (ps *Registry) GetUserNotifications(ctx context.Context, filters dto.UserNo
 			UserId: filters.UserId,
 		}
 
-		key, err := marshallKey(lastNotificationKey)
+		key, err := registry.MarshalKey(lastNotificationKey)
 
 		if err != nil {
 			return page, err

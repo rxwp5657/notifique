@@ -3,14 +3,19 @@ package postgresresgistry
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/notifique/internal/registry"
+	"github.com/notifique/internal/server"
 	"github.com/notifique/internal/server/dto"
 )
 
 const insertNotificationTemplate = `
 INSERT INTO notification_templates (
+	id,
 	name,
 	title_template,
 	contents_template,
@@ -18,14 +23,14 @@ INSERT INTO notification_templates (
 	created_by,
 	created_at
 ) VALUES (
+	@id,
 	@name,
 	@titleTemplate,
 	@contentsTemplate,
 	@description,
 	@createdBy,
 	@createdAt
-) RETURNING
-	id;
+);
 `
 
 const insertNotificationTemplateVariables = `
@@ -44,6 +49,31 @@ INSERT INTO notification_template_variables (
 );
 `
 
+const getNotificationTemplates = `
+SELECT 
+	id,
+	"name",
+	description
+FROM
+	notification_templates
+%s
+ORDER BY
+	id ASC
+LIMIT
+	@limit;
+`
+
+type notificationTemplateInfo struct {
+	Id          string `db:"id"`
+	Name        string `db:"name"`
+	Description string `db:"description"`
+}
+
+type notificationTemplateKey struct {
+	Id   string
+	Name *string
+}
+
 func (r *Registry) SaveTemplate(ctx context.Context, createdBy string, ntr dto.NotificationTemplateReq) (dto.NotificationTemplateCreatedResp, error) {
 
 	resp := dto.NotificationTemplateCreatedResp{}
@@ -54,9 +84,17 @@ func (r *Registry) SaveTemplate(ctx context.Context, createdBy string, ntr dto.N
 		return resp, fmt.Errorf("failed to start transaction - %w", err)
 	}
 
+	id, err := uuid.NewV7()
+
+	if err != nil {
+		return resp, fmt.Errorf("failed to create id - %w", err)
+	}
+
+	templateId := id.String()
 	createdAt := time.Now().Format(time.RFC3339)
 
 	args := pgx.NamedArgs{
+		"id":               templateId,
 		"name":             ntr.Name,
 		"titleTemplate":    ntr.TitleTemplate,
 		"description":      ntr.Description,
@@ -65,9 +103,7 @@ func (r *Registry) SaveTemplate(ctx context.Context, createdBy string, ntr dto.N
 		"createdAt":        createdAt,
 	}
 
-	templateId := ""
-
-	err = tx.QueryRow(ctx, insertNotificationTemplate, args).Scan(&templateId)
+	_, err = tx.Exec(ctx, insertNotificationTemplate, args)
 
 	if err != nil {
 		tx.Rollback(ctx)
@@ -109,4 +145,93 @@ func (r *Registry) SaveTemplate(ctx context.Context, createdBy string, ntr dto.N
 	resp.CreatedAt = createdAt
 
 	return resp, nil
+}
+
+func (r *Registry) GetNotifications(ctx context.Context, filters dto.NotificationTemplateFilters) (dto.Page[dto.NotificationTemplateInfoResp], error) {
+
+	page := dto.Page[dto.NotificationTemplateInfoResp]{}
+
+	args := pgx.NamedArgs{"limit": server.PageSize}
+
+	whereFilters := make([]string, 0)
+
+	if filters.MaxResults != nil {
+		args["limit"] = *filters.MaxResults
+	}
+
+	if filters.NextToken != nil {
+		nextTokenFilter := "(id) > (@id)"
+		whereFilters = append(whereFilters, nextTokenFilter)
+
+		var unmarsalledKey notificationTemplateKey
+		err := registry.UnmarshalKey(*filters.NextToken, &unmarsalledKey)
+
+		if err != nil {
+			return page, err
+		}
+
+		if unmarsalledKey.Name != filters.TemplateName {
+			return page, fmt.Errorf("invalid next token %s", *filters.NextToken)
+		}
+
+		args["id"] = unmarsalledKey.Id
+	}
+
+	if filters.TemplateName != nil {
+		whereFilters = append(whereFilters, `"name" LIKE @name`)
+		args["name"] = fmt.Sprintf("%s%%", *filters.TemplateName)
+	}
+
+	whereStmt := strings.Join(whereFilters, "AND")
+
+	if len(whereStmt) != 0 {
+		whereStmt = fmt.Sprintf("WHERE %s", whereStmt)
+	}
+
+	query := fmt.Sprintf(getNotificationTemplates, whereStmt)
+
+	rows, err := r.conn.Query(ctx, query, args)
+
+	if err != nil {
+		return page, fmt.Errorf("failed to query rows - %w", err)
+	}
+
+	defer rows.Close()
+
+	templates, err := pgx.CollectRows(rows, pgx.RowToStructByName[notificationTemplateInfo])
+
+	if err != nil {
+		return page, fmt.Errorf("failed to collect rows - %w", err)
+	}
+
+	for _, t := range templates {
+		page.Data = append(page.Data, dto.NotificationTemplateInfoResp{
+			Id:          t.Id,
+			Name:        t.Name,
+			Description: t.Description,
+		})
+	}
+
+	numTemplates := len(templates)
+
+	if numTemplates == args["limit"] {
+		lastTemplate := templates[numTemplates-1]
+		lastTemplateKey := notificationTemplateKey{
+			Id:   lastTemplate.Id,
+			Name: filters.TemplateName,
+		}
+
+		key, err := registry.MarshalKey(lastTemplateKey)
+
+		if err != nil {
+			return page, err
+		}
+
+		page.NextToken = &key
+	}
+
+	page.PrevToken = filters.NextToken
+	page.ResultCount = numTemplates
+
+	return page, nil
 }

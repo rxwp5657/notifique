@@ -47,3 +47,18 @@ func AddUserFilters(req *http.Request, filters *dto.UserNotificationFilters) {
 
 	req.URL.RawQuery = q.Encode()
 }
+
+func AddNotificationTemplateFilters(req *http.Request, filters *dto.NotificationTemplateFilters) {
+
+	if req == nil || filters == nil {
+		return
+	}
+
+	q := makePageURLQuery(req, filters.PageFilter)
+
+	if filters.TemplateName != nil {
+		q.Add("templateName", *filters.TemplateName)
+	}
+
+	req.URL.RawQuery = q.Encode()
+}
