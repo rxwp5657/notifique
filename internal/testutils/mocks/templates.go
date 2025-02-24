@@ -41,6 +41,21 @@ func (m *MockNotificationTemplateRegistry) EXPECT() *MockNotificationTemplateReg
 	return m.recorder
 }
 
+// GetNotifications mocks base method.
+func (m *MockNotificationTemplateRegistry) GetNotifications(ctx context.Context, filters dto.NotificationTemplateFilters) (dto.Page[dto.NotificationTemplateInfoResp], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNotifications", ctx, filters)
+	ret0, _ := ret[0].(dto.Page[dto.NotificationTemplateInfoResp])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNotifications indicates an expected call of GetNotifications.
+func (mr *MockNotificationTemplateRegistryMockRecorder) GetNotifications(ctx, filters any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNotifications", reflect.TypeOf((*MockNotificationTemplateRegistry)(nil).GetNotifications), ctx, filters)
+}
+
 // SaveTemplate mocks base method.
 func (m *MockNotificationTemplateRegistry) SaveTemplate(ctx context.Context, createdBy string, ntr dto.NotificationTemplateReq) (dto.NotificationTemplateCreatedResp, error) {
 	m.ctrl.T.Helper()

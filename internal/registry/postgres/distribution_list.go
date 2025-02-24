@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/notifique/internal/registry"
 	"github.com/notifique/internal/server"
 	"github.com/notifique/internal/server/dto"
 )
@@ -220,7 +221,7 @@ func (ps *Registry) GetDistributionLists(ctx context.Context, filters dto.PageFi
 		nextTokenFilter = `WHERE ("name") > (@name)`
 
 		var unmarsalledKey distributionListKey
-		err := unmarsallKey(*filters.NextToken, &unmarsalledKey)
+		err := registry.UnmarshalKey(*filters.NextToken, &unmarsalledKey)
 
 		if err != nil {
 			return page, err
@@ -253,7 +254,7 @@ func (ps *Registry) GetDistributionLists(ctx context.Context, filters dto.PageFi
 			Name: lastSummary.Name,
 		}
 
-		key, err := marshallKey(lastSummaryKey)
+		key, err := registry.MarshalKey(lastSummaryKey)
 
 		if err != nil {
 			return page, err
@@ -336,7 +337,7 @@ func (ps *Registry) GetRecipients(ctx context.Context, distlistName string, filt
 		whereFilters = append(whereFilters, filter)
 
 		var unmarsalledKey distributionList
-		err := unmarsallKey(*filters.NextToken, &unmarsalledKey)
+		err := registry.UnmarshalKey(*filters.NextToken, &unmarsalledKey)
 
 		if err != nil {
 			return page, err
@@ -381,7 +382,7 @@ func (ps *Registry) GetRecipients(ctx context.Context, distlistName string, filt
 			Recipient: lastRecipient.Recipient,
 		}
 
-		key, err := marshallKey(dl)
+		key, err := registry.MarshalKey(dl)
 
 		if err != nil {
 			return page, err

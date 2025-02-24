@@ -3,6 +3,8 @@ package integration_test
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strconv"
 	"testing"
 
 	"github.com/google/uuid"
@@ -32,6 +34,7 @@ func TestNotificationsTemplatePostgres(t *testing.T) {
 	defer close()
 
 	testSaveNotificationTemplate(ctx, t, tester)
+	testGetNotificationTemplates(ctx, t, tester)
 }
 
 func TestNotificationsTemplateDynamo(t *testing.T) {
@@ -46,6 +49,7 @@ func TestNotificationsTemplateDynamo(t *testing.T) {
 	defer close()
 
 	testSaveNotificationTemplate(ctx, t, tester)
+	testGetNotificationTemplates(ctx, t, tester)
 }
 
 func testSaveNotificationTemplate(ctx context.Context, t *testing.T, ntr TestNotificationTemplateRegistry) {
@@ -73,5 +77,99 @@ func testSaveNotificationTemplate(ctx context.Context, t *testing.T, ntr TestNot
 		assert.Equal(t, req, template)
 
 		fmt.Println(template)
+	})
+}
+
+func testGetNotificationTemplates(ctx context.Context, t *testing.T, ntr TestNotificationTemplateRegistry) {
+
+	defer ntr.ClearDB(ctx)
+
+	testUser := "1234"
+	numTemplates := 3
+	testTemplates := testutils.MakeTestNotificationTemplateRequests(numTemplates)
+	templateInfos := make([]dto.NotificationTemplateInfoResp, 0, len(testTemplates))
+
+	for _, req := range testTemplates {
+		template, err := ntr.SaveTemplate(ctx, testUser, req)
+
+		if err != nil {
+			t.Fatalf("fail to insert notification template")
+		}
+
+		templateInfos = append(templateInfos, dto.NotificationTemplateInfoResp{
+			Id:          template.Id,
+			Name:        template.Name,
+			Description: req.Description,
+		})
+	}
+
+	sort.Slice(templateInfos, func(i, j int) bool {
+		return templateInfos[i].Name < templateInfos[j].Name
+	})
+
+	t.Run("Can retrieve a page of notification templates", func(t *testing.T) {
+		filters := dto.NotificationTemplateFilters{}
+
+		page, err := ntr.GetNotifications(ctx, filters)
+
+		if err != nil {
+			t.Fatalf("failed to retrieve page - %v", err)
+		}
+
+		assert.Nil(t, page.NextToken)
+		assert.Nil(t, page.PrevToken)
+		assert.Equal(t, page.ResultCount, len(templateInfos))
+		assert.ElementsMatch(t, templateInfos, page.Data)
+	})
+
+	t.Run("Can get all pages of notification templates", func(t *testing.T) {
+		maxResults := 1
+
+		filters := dto.NotificationTemplateFilters{
+			PageFilter: dto.PageFilter{MaxResults: &maxResults},
+		}
+
+		templates := make([]dto.NotificationTemplateInfoResp, 0, len(templateInfos))
+
+		for {
+			page, err := ntr.GetNotifications(ctx, filters)
+
+			if err != nil {
+				t.Fatal(fmt.Errorf("failed to retrieve notification templates page - %w", err))
+			}
+
+			if page.ResultCount == 0 {
+				break
+			}
+
+			templates = append(templates, page.Data...)
+			filters.NextToken = page.NextToken
+		}
+
+		assert.ElementsMatch(t, templateInfos, templates)
+	})
+
+	t.Run("Can filter by template name", func(t *testing.T) {
+		templateName := fmt.Sprintf(
+			testutils.GenericNotificationTemplateName,
+			strconv.Itoa(0))
+
+		filters := dto.NotificationTemplateFilters{
+			TemplateName: &templateName,
+		}
+
+		page, err := ntr.GetNotifications(ctx, filters)
+
+		if err != nil {
+			t.Fatalf("failed to retrieve page - %v", err)
+		}
+
+		expectedInfos := make([]dto.NotificationTemplateInfoResp, 1, 1)
+		copy(expectedInfos, templateInfos[:1])
+
+		assert.Nil(t, page.NextToken)
+		assert.Nil(t, page.PrevToken)
+		assert.Equal(t, 1, page.ResultCount)
+		assert.Equal(t, expectedInfos, page.Data)
 	})
 }

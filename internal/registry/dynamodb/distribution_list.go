@@ -241,7 +241,7 @@ func (s *Registry) GetDistributionLists(ctx context.Context, filters dto.PageFil
 
 	if len(response.LastEvaluatedKey) != 0 {
 		key := DistListSummaryKey{}
-		encoded, err := marshallNextToken(&key, response.LastEvaluatedKey)
+		encoded, err := marshalNextToken(&key, response.LastEvaluatedKey)
 
 		if err != nil {
 			return page, err
@@ -420,7 +420,7 @@ func (s *Registry) GetRecipients(ctx context.Context, distlistName string, filte
 
 	if len(response.LastEvaluatedKey) != 0 {
 		key := DistListRecipient{}
-		encoded, err := marshallNextToken(&key, response.LastEvaluatedKey)
+		encoded, err := marshalNextToken(&key, response.LastEvaluatedKey)
 
 		if err != nil {
 			return page, err

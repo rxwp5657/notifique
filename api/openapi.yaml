@@ -222,6 +222,12 @@ paths:
       parameters:
         - $ref: "#/components/parameters/nextTokenParam"
         - $ref: "#/components/parameters/maxResultsParam"
+        - in: query
+          name: templateName
+          required: false
+          schema:
+            $ref: "#/components/schemas/NotificationTemplateName"
+          description: filter templates based on name
       responses:
         "200":
           headers:
@@ -1088,24 +1094,15 @@ components:
     NotificationTemplateModel:
       type: object
       required:
+        - id
         - name
-        - createdAt
-        - createdBy
+        - description
       properties:
         id:
           type: string
           format: uuid
         name:
           $ref: "#/components/schemas/NotificationTemplateName"
-        createdAt:
-          type: string
-          format: date-time
-        createdBy:
-          type: string
-        updatedAt:
-          type: string
-          format: date-time
-          nullable: true
         description:
           type: string
           maxLength: 256

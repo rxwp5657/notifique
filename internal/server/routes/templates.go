@@ -15,6 +15,7 @@ func SetupNotificationTemplateRoutes(r *gin.Engine, version string, ntr c.Notifi
 	g := r.Group(version)
 	{
 		g.POST("/notifications/templates", controller.CreateNotificationTemplate)
+		g.GET("/notifications/templates", controller.GetNotifications)
 	}
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {

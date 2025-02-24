@@ -222,10 +222,36 @@ func createNotificationTemplateTable(client dynamodb.Client) error {
 		AttributeDefinitions: []types.AttributeDefinition{{
 			AttributeName: aws.String(r.NotificationTemplateHashKey),
 			AttributeType: types.ScalarAttributeTypeS,
+		}, {
+			AttributeName: aws.String(r.NotificationsTemplateNameGSIHashKey),
+			AttributeType: types.ScalarAttributeTypeS,
+		}, {
+			AttributeName: aws.String(r.NotificationsTemplateNameGSISortKey),
+			AttributeType: types.ScalarAttributeTypeS,
 		}},
 		KeySchema: []types.KeySchemaElement{{
 			AttributeName: aws.String(r.NotificationTemplateHashKey),
 			KeyType:       types.KeyTypeHash,
+		}},
+		GlobalSecondaryIndexes: []types.GlobalSecondaryIndex{{
+			IndexName: aws.String(r.NotificationsTemplateNameGSI),
+			KeySchema: []types.KeySchemaElement{{
+				AttributeName: aws.String(r.NotificationsTemplateNameGSIHashKey),
+				KeyType:       types.KeyTypeHash,
+			}, {
+				AttributeName: aws.String(r.NotificationsTemplateNameGSISortKey),
+				KeyType:       types.KeyTypeRange,
+			}},
+			Projection: &types.Projection{
+				NonKeyAttributes: []string{
+					"description",
+				},
+				ProjectionType: types.ProjectionTypeInclude,
+			},
+			ProvisionedThroughput: &types.ProvisionedThroughput{
+				ReadCapacityUnits:  aws.Int64(10),
+				WriteCapacityUnits: aws.Int64(10),
+			},
 		}},
 		TableName: aws.String(tableName),
 		ProvisionedThroughput: &types.ProvisionedThroughput{

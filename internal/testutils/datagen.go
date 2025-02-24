@@ -11,6 +11,10 @@ import (
 	"github.com/notifique/internal/server/dto"
 )
 
+const (
+	GenericNotificationTemplateName = "Template name %s"
+)
+
 func MakeRecipients(numRecipients int) []string {
 
 	recipients := make([]string, 0, numRecipients)
@@ -139,4 +143,43 @@ func MakeTestNotificationTemplateRequest() dto.NotificationTemplateReq {
 			},
 		},
 	}
+}
+
+func MakeTestNotificationTemplateRequests(numrequests int) []dto.NotificationTemplateReq {
+
+	requests := make([]dto.NotificationTemplateReq, 0, numrequests)
+
+	for i := range numrequests {
+		req := MakeTestNotificationTemplateRequest()
+		req.Name = fmt.Sprintf(GenericNotificationTemplateName, strconv.Itoa(i))
+		requests = append(requests, req)
+	}
+
+	return requests
+}
+
+func MakeTestNotificationTemplateFilter() dto.NotificationTemplateFilters {
+	return dto.NotificationTemplateFilters{
+		PageFilter: dto.PageFilter{
+			NextToken:  nil,
+			MaxResults: nil,
+		},
+		TemplateName: nil,
+	}
+}
+
+func MakeTestNotificationTemplateInfoResp(numresps int) []dto.NotificationTemplateInfoResp {
+
+	resps := make([]dto.NotificationTemplateInfoResp, 0, numresps)
+
+	for i := range numresps {
+		resp := dto.NotificationTemplateInfoResp{
+			Id:          uuid.NewString(),
+			Name:        fmt.Sprintf(GenericNotificationTemplateName, strconv.Itoa(i)),
+			Description: fmt.Sprintf("Test Description %s", strconv.Itoa(i)),
+		}
+		resps = append(resps, resp)
+	}
+
+	return resps
 }

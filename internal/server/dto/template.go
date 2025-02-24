@@ -20,3 +20,14 @@ type NotificationTemplateCreatedResp struct {
 	Name      string `json:"name"`
 	CreatedAt string `json:"createdAt"`
 }
+
+type NotificationTemplateFilters struct {
+	PageFilter
+	TemplateName *string `form:"templateName" binding:"omitempty"`
+}
+
+type NotificationTemplateInfoResp struct {
+	Id          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}

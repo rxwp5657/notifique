@@ -33,6 +33,7 @@ func TestNotificationTemplateController(t *testing.T) {
 	}
 
 	testCreateNotificationTemplate(t, testApp.Engine, *testApp)
+	testGetNotificationTemplates(t, testApp.Engine, *testApp)
 }
 
 func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedBackend) {
@@ -232,6 +233,80 @@ func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 					t.Fatal(err)
 				}
 				assert.Equal(t, expectedResp, *tt.expectedResp)
+			}
+		})
+	}
+}
+
+func testGetNotificationTemplates(t *testing.T, e *gin.Engine, mock di.MockedBackend) {
+
+	userId := "1234"
+	registryMock := mock.Registry.MockNotificationTemplateRegistry
+
+	getNotificationTemplates := func(filters *dto.NotificationTemplateFilters) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodGet, notificationsTemplateUrl, nil)
+		testutils.AddNotificationTemplateFilters(req, filters)
+		req.Header.Add("userId", userId)
+		e.ServeHTTP(w, req)
+		return w
+	}
+
+	pageSize := 3
+
+	testPage := dto.Page[dto.NotificationTemplateInfoResp]{
+		ResultCount: pageSize,
+		Data:        testutils.MakeTestNotificationTemplateInfoResp(pageSize),
+	}
+
+	nilFilters := func(req dto.NotificationTemplateFilters) *dto.NotificationTemplateFilters {
+		return nil
+	}
+
+	tests := []struct {
+		name           string
+		setupMock      func()
+		modifyFilters  func(req dto.NotificationTemplateFilters) *dto.NotificationTemplateFilters
+		expectedStatus int
+		expectedError  *string
+		expectedResp   *dto.Page[dto.NotificationTemplateInfoResp]
+	}{{
+		name:           "Can retrieve a page of notification templates",
+		expectedStatus: http.StatusOK,
+		expectedResp:   &testPage,
+		modifyFilters:  nilFilters,
+		setupMock: func() {
+			registryMock.
+				EXPECT().
+				GetNotifications(gomock.Any(), gomock.Any()).
+				Return(testPage, nil)
+		},
+	}}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupMock != nil {
+				tt.setupMock()
+			}
+
+			testFilters := testutils.MakeTestNotificationTemplateFilter()
+			filters := tt.modifyFilters(testFilters)
+			w := getNotificationTemplates(filters)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.expectedError != nil {
+				resp := make(map[string]string)
+				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+					t.Fatal(err)
+				}
+				assert.Contains(t, resp["error"], *tt.expectedError)
+			} else if tt.expectedResp != nil {
+				resp := dto.Page[dto.NotificationTemplateInfoResp]{}
+				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+					t.Fatal(err)
+				}
+				assert.Equal(t, resp, *tt.expectedResp)
 			}
 		})
 	}
