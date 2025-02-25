@@ -248,18 +248,19 @@ paths:
                     items:
                       $ref: "#/components/schemas/NotificationTemplateModel"
 
-  /notifications/templates/{name}:
-
+  /notifications/templates/{id}:
     get:
       tags:
         - notifications
       summary: Get notification template details
       parameters:
-        - name: name
+        - name: id
           in: path
           required: true
           schema:
-            $ref: "#/components/schemas/NotificationTemplateName"
+            type: string
+            format: uuid
+            nullable: false
       responses:
         "200":
           headers:
@@ -302,7 +303,9 @@ paths:
           in: path
           required: true
           schema:
-            $ref: "#/components/schemas/NotificationTemplateName"
+            type: string
+            format: uuid
+            nullable: false
       responses:
         "204":
           headers:

@@ -14,6 +14,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	di "github.com/notifique/internal/di"
+	"github.com/notifique/internal/registry"
 	"github.com/notifique/internal/server"
 	"github.com/notifique/internal/server/dto"
 	"github.com/notifique/internal/testutils"
@@ -286,8 +287,9 @@ func testAddRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionRegi
 		mock.
 			EXPECT().
 			AddRecipients(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(nil, server.DistributionListNotFound{
-				Name: dl.Name,
+			Return(nil, server.EntityNotFound{
+				Id:   dl.Name,
+				Type: registry.DistributionListType,
 			})
 
 		w := addRecipients(dl.Name, newRecipients)
@@ -298,7 +300,10 @@ func testAddRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionRegi
 			t.Fatal(err)
 		}
 
-		expectedMsg := fmt.Sprintf("Distribution list %s not found", dl.Name)
+		expectedMsg := fmt.Sprintf("Entity %v of type %v not found",
+			dl.Name,
+			registry.DistributionListType,
+		)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Equal(t, expectedMsg, resp["error"])
@@ -421,8 +426,9 @@ func testDeleteRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionR
 		mock.
 			EXPECT().
 			DeleteRecipients(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(nil, server.DistributionListNotFound{
-				Name: dl.Name,
+			Return(nil, server.EntityNotFound{
+				Id:   dl.Name,
+				Type: registry.DistributionListType,
 			})
 
 		w := deleteRecipients(dl.Name, recipientsToDelete)
@@ -433,7 +439,10 @@ func testDeleteRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionR
 			t.Fatal(err)
 		}
 
-		expectedMsg := fmt.Sprintf("Distribution list %s not found", dl.Name)
+		expectedMsg := fmt.Sprintf("Entity %v of type %v not found",
+			dl.Name,
+			registry.DistributionListType,
+		)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Equal(t, expectedMsg, resp["error"])
@@ -616,8 +625,9 @@ func testGetDistributionListRescipients(t *testing.T, e *gin.Engine, mock mk.Moc
 	t.Run("Should return 404 if the distribution list doesn't exists", func(t *testing.T) {
 		mock.EXPECT().
 			GetRecipients(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(dto.Page[string]{}, server.DistributionListNotFound{
-				Name: dlName,
+			Return(dto.Page[string]{}, server.EntityNotFound{
+				Id:   dlName,
+				Type: registry.DistributionListType,
 			})
 
 		w := getRecipients(dlName)
@@ -628,7 +638,10 @@ func testGetDistributionListRescipients(t *testing.T, e *gin.Engine, mock mk.Moc
 			t.Fatal(err)
 		}
 
-		expectedMsg := fmt.Sprintf("Distribution list %s not found", dlName)
+		expectedMsg := fmt.Sprintf("Entity %v of type %v not found",
+			dlName,
+			registry.DistributionListType,
+		)
 
 		assert.Equal(t, http.StatusNotFound, w.Code)
 		assert.Contains(t, resp["error"], expectedMsg)

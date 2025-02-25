@@ -2,6 +2,7 @@ package postgresresgistry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -49,7 +50,7 @@ INSERT INTO notification_template_variables (
 );
 `
 
-const getNotificationTemplates = `
+const getNotificationTemplateInfo = `
 SELECT 
 	id,
 	"name",
@@ -61,6 +62,35 @@ ORDER BY
 	id ASC
 LIMIT
 	@limit;
+`
+
+const getNotificationTemplateDetails = `
+SELECT
+	id,
+	"name",
+	title_template,
+	contents_template,
+	"description",
+	created_by,
+	created_at,
+	updated_by,
+	updated_at
+FROM
+	notification_templates
+WHERE
+	id = $1;
+`
+
+const getTemplateVariables = `
+SELECT
+	"name",
+	"type",
+	"required",
+	"validation"
+FROM
+	notification_template_variables
+WHERE
+	template_id = $1;
 `
 
 type notificationTemplateInfo struct {
@@ -147,7 +177,7 @@ func (r *Registry) SaveTemplate(ctx context.Context, createdBy string, ntr dto.N
 	return resp, nil
 }
 
-func (r *Registry) GetNotifications(ctx context.Context, filters dto.NotificationTemplateFilters) (dto.Page[dto.NotificationTemplateInfoResp], error) {
+func (r *Registry) GetTemplates(ctx context.Context, filters dto.NotificationTemplateFilters) (dto.Page[dto.NotificationTemplateInfoResp], error) {
 
 	page := dto.Page[dto.NotificationTemplateInfoResp]{}
 
@@ -188,7 +218,7 @@ func (r *Registry) GetNotifications(ctx context.Context, filters dto.Notificatio
 		whereStmt = fmt.Sprintf("WHERE %s", whereStmt)
 	}
 
-	query := fmt.Sprintf(getNotificationTemplates, whereStmt)
+	query := fmt.Sprintf(getNotificationTemplateInfo, whereStmt)
 
 	rows, err := r.conn.Query(ctx, query, args)
 
@@ -234,4 +264,69 @@ func (r *Registry) GetNotifications(ctx context.Context, filters dto.Notificatio
 	page.ResultCount = numTemplates
 
 	return page, nil
+}
+
+func (r *Registry) GetTemplateDetails(ctx context.Context, templateId string) (dto.NotificationTemplateDetails, error) {
+
+	details := dto.NotificationTemplateDetails{}
+
+	var createdAt time.Time
+	var updatedAt *time.Time
+
+	err := r.conn.QueryRow(ctx, getNotificationTemplateDetails, templateId).
+		Scan(
+			&details.Id,
+			&details.Name,
+			&details.TitleTemplate,
+			&details.ContentsTemplate,
+			&details.Description,
+			&details.CreatedBy,
+			&createdAt,
+			&details.UpdatedBy,
+			&updatedAt,
+		)
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return details, server.EntityNotFound{
+			Id:   templateId,
+			Type: registry.NotificationTemplateType,
+		}
+	}
+
+	if err != nil {
+		return details, fmt.Errorf("failed to retrieve template details - %w", err)
+	}
+
+	details.CreatedAt = createdAt.Format(time.RFC3339)
+
+	if updatedAt != nil {
+		updatedAtStr := updatedAt.Format(time.RFC3339)
+		details.UpdatedAt = &updatedAtStr
+	}
+
+	rows, err := r.conn.Query(ctx, getTemplateVariables, templateId)
+
+	if err != nil {
+		return details, fmt.Errorf("failed to query template variables - %w", err)
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var variable dto.TemplateVariable
+		err := rows.Scan(
+			&variable.Name,
+			&variable.Type,
+			&variable.Required,
+			&variable.Validation,
+		)
+
+		if err != nil {
+			return details, fmt.Errorf("failed to scan template variable - %w", err)
+		}
+
+		details.Variables = append(details.Variables, variable)
+	}
+
+	return details, nil
 }

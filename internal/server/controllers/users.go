@@ -78,7 +78,7 @@ func (nc UserController) SetReadStatus(c *gin.Context) {
 	err := nc.Registry.SetReadStatus(c, userId, n.NotificationId)
 
 	if err != nil {
-		if errors.As(err, &server.NotificationNotFound{}) {
+		if errors.As(err, &server.EntityNotFound{}) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		} else {

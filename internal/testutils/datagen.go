@@ -183,3 +183,7 @@ func MakeTestNotificationTemplateInfoResp(numresps int) []dto.NotificationTempla
 
 	return resps
 }
+
+func StrPtr(s string) *string {
+	return &s
+}

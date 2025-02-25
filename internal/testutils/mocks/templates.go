@@ -41,19 +41,34 @@ func (m *MockNotificationTemplateRegistry) EXPECT() *MockNotificationTemplateReg
 	return m.recorder
 }
 
-// GetNotifications mocks base method.
-func (m *MockNotificationTemplateRegistry) GetNotifications(ctx context.Context, filters dto.NotificationTemplateFilters) (dto.Page[dto.NotificationTemplateInfoResp], error) {
+// GetTemplateDetails mocks base method.
+func (m *MockNotificationTemplateRegistry) GetTemplateDetails(ctx context.Context, id string) (dto.NotificationTemplateDetails, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetNotifications", ctx, filters)
+	ret := m.ctrl.Call(m, "GetTemplateDetails", ctx, id)
+	ret0, _ := ret[0].(dto.NotificationTemplateDetails)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetTemplateDetails indicates an expected call of GetTemplateDetails.
+func (mr *MockNotificationTemplateRegistryMockRecorder) GetTemplateDetails(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTemplateDetails", reflect.TypeOf((*MockNotificationTemplateRegistry)(nil).GetTemplateDetails), ctx, id)
+}
+
+// GetTemplates mocks base method.
+func (m *MockNotificationTemplateRegistry) GetTemplates(ctx context.Context, filters dto.NotificationTemplateFilters) (dto.Page[dto.NotificationTemplateInfoResp], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTemplates", ctx, filters)
 	ret0, _ := ret[0].(dto.Page[dto.NotificationTemplateInfoResp])
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// GetNotifications indicates an expected call of GetNotifications.
-func (mr *MockNotificationTemplateRegistryMockRecorder) GetNotifications(ctx, filters any) *gomock.Call {
+// GetTemplates indicates an expected call of GetTemplates.
+func (mr *MockNotificationTemplateRegistryMockRecorder) GetTemplates(ctx, filters any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNotifications", reflect.TypeOf((*MockNotificationTemplateRegistry)(nil).GetNotifications), ctx, filters)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTemplates", reflect.TypeOf((*MockNotificationTemplateRegistry)(nil).GetTemplates), ctx, filters)
 }
 
 // SaveTemplate mocks base method.

@@ -31,3 +31,20 @@ type NotificationTemplateInfoResp struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 }
+
+type NotificationTemplateUriParams struct {
+	Id string `uri:"id" binding:"uuid"`
+}
+
+type NotificationTemplateDetails struct {
+	Id               string             `json:"id"`
+	Name             string             `json:"name"`
+	Description      string             `json:"description"`
+	TitleTemplate    string             `json:"titleTemplate"`
+	ContentsTemplate string             `json:"contentsTemplate"`
+	CreatedAt        string             `json:"createdAt"`
+	CreatedBy        string             `json:"createdBy"`
+	UpdatedAt        *string            `json:"updatedAt"`
+	UpdatedBy        *string            `json:"updatedBy"`
+	Variables        []TemplateVariable `json:"variables"`
+}

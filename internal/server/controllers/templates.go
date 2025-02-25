@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -9,12 +10,14 @@ import (
 
 	"github.com/microcosm-cc/bluemonday"
 
+	"github.com/notifique/internal/server"
 	"github.com/notifique/internal/server/dto"
 )
 
 type NotificationTemplateRegistry interface {
 	SaveTemplate(ctx context.Context, createdBy string, ntr dto.NotificationTemplateReq) (dto.NotificationTemplateCreatedResp, error)
-	GetNotifications(ctx context.Context, filters dto.NotificationTemplateFilters) (dto.Page[dto.NotificationTemplateInfoResp], error)
+	GetTemplates(ctx context.Context, filters dto.NotificationTemplateFilters) (dto.Page[dto.NotificationTemplateInfoResp], error)
+	GetTemplateDetails(ctx context.Context, id string) (dto.NotificationTemplateDetails, error)
 }
 
 type NotificationTemplateController struct {
@@ -70,7 +73,7 @@ func (ntc *NotificationTemplateController) GetNotifications(c *gin.Context) {
 		return
 	}
 
-	notifications, err := ntc.Registry.GetNotifications(c.Request.Context(), filters)
+	notifications, err := ntc.Registry.GetTemplates(c.Request.Context(), filters)
 
 	if err != nil {
 		slog.Error(err.Error())
@@ -78,4 +81,27 @@ func (ntc *NotificationTemplateController) GetNotifications(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, notifications)
+}
+
+func (ntc *NotificationTemplateController) GetNotification(c *gin.Context) {
+	var params dto.NotificationTemplateUriParams
+
+	if err := c.ShouldBindUri(&params); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	notification, err := ntc.Registry.GetTemplateDetails(c.Request.Context(), params.Id)
+
+	if err != nil {
+		if errors.As(err, &server.EntityNotFound{}) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		} else {
+			slog.Error(err.Error())
+			c.Status(http.StatusInternalServerError)
+		}
+	}
+
+	c.JSON(http.StatusOK, notification)
 }

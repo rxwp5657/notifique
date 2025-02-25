@@ -5,6 +5,9 @@ import (
 	"regexp"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
+	"github.com/notifique/internal/server"
 	"github.com/notifique/internal/server/controllers"
 )
 
@@ -41,6 +44,13 @@ func NewEngine(registry Registry, pub controllers.NotificationPublisher, bk cont
 	SetupDistributionListRoutes(r, version, registry)
 	SetupUsersRoutes(r, version, registry, bk)
 	SetupNotificationTemplateRoutes(r, version, registry)
+
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		v.RegisterValidation("distributionListName", server.DLNameValidator)
+		v.RegisterValidation("unique_var_name", server.UniqueTemplateVarValidator)
+		v.RegisterValidation("future", server.FutureValidator)
+		v.RegisterValidation("uuod", server.UUIDValidator)
+	}
 
 	return r, nil
 }

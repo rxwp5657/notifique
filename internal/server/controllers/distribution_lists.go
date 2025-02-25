@@ -85,7 +85,7 @@ func (dc DistributionListController) GetRecipients(c *gin.Context) {
 	recipients, err := dc.Registry.GetRecipients(c, uriParams.Name, filter)
 
 	if err != nil {
-		if errors.As(err, &server.DistributionListNotFound{}) {
+		if errors.As(err, &server.EntityNotFound{}) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		} else {
@@ -144,7 +144,7 @@ func (dc DistributionListController) handleRecipients(c *gin.Context, handler re
 	summary, err := handler(c, uriParams.Name, recipients.Recipients)
 
 	if err != nil {
-		if errors.As(err, &server.DistributionListNotFound{}) {
+		if errors.As(err, &server.EntityNotFound{}) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		} else {

@@ -319,8 +319,9 @@ func (ps *Registry) GetRecipients(ctx context.Context, distlistName string, filt
 	}
 
 	if summary == nil {
-		return page, server.DistributionListNotFound{
-			Name: distlistName,
+		return page, server.EntityNotFound{
+			Id:   distlistName,
+			Type: registry.DistributionListType,
 		}
 	}
 
@@ -413,8 +414,9 @@ func (ps *Registry) AddRecipients(ctx context.Context, distlistName string, reci
 	}
 
 	if exists == nil {
-		return nil, server.DistributionListNotFound{
-			Name: distlistName,
+		return nil, server.EntityNotFound{
+			Id:   distlistName,
+			Type: registry.DistributionListType,
 		}
 	}
 
@@ -482,8 +484,9 @@ func (ps *Registry) DeleteRecipients(ctx context.Context, distlistName string, r
 	}
 
 	if exists == nil {
-		return nil, server.DistributionListNotFound{
-			Name: distlistName,
+		return nil, server.EntityNotFound{
+			Id:   distlistName,
+			Type: registry.DistributionListType,
 		}
 	}
 
