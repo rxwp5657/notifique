@@ -2,12 +2,8 @@ package routes
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
-	"github.com/go-playground/validator/v10"
 
 	c "github.com/notifique/internal/server/controllers"
-
-	"github.com/notifique/internal/server"
 )
 
 func SetupUsersRoutes(r *gin.Engine, version string, us c.UserRegistry, bk c.UserNotificationBroker) {
@@ -25,9 +21,5 @@ func SetupUsersRoutes(r *gin.Engine, version string, us c.UserRegistry, bk c.Use
 
 		g.GET("/users/me/notifications/config", controller.GetUserConfig)
 		g.PUT("/users/me/notifications/config", controller.UpdateUserConfig)
-	}
-
-	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		v.RegisterValidation("future", server.FutureValidator)
 	}
 }

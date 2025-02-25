@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/notifique/internal/registry"
 	"github.com/notifique/internal/server"
 	"github.com/notifique/internal/server/dto"
 )
@@ -374,7 +375,10 @@ func (s *Registry) GetRecipients(ctx context.Context, distlistName string, filte
 	}
 
 	if !exists {
-		return page, server.DistributionListNotFound{Name: distlistName}
+		return page, server.EntityNotFound{
+			Id:   distlistName,
+			Type: registry.DistributionListType,
+		}
 	}
 
 	keyExp := expression.Key(DistListRecipientHashKey).Equal(expression.Value(distlistName))
@@ -557,7 +561,10 @@ func (s *Registry) AddRecipients(ctx context.Context, listName string, recipient
 	}
 
 	if !exists {
-		return nil, server.DistributionListNotFound{Name: listName}
+		return nil, server.EntityNotFound{
+			Id:   listName,
+			Type: registry.DistributionListType,
+		}
 	}
 
 	recipientsInDL, err := s.getRecipientsInDL(ctx, listName, recipients)
@@ -620,7 +627,10 @@ func (s *Registry) DeleteRecipients(ctx context.Context, listName string, recipi
 	}
 
 	if !exists {
-		return nil, server.DistributionListNotFound{Name: listName}
+		return nil, server.EntityNotFound{
+			Id:   listName,
+			Type: registry.DistributionListType,
+		}
 	}
 
 	toRemove, err := s.getRecipientsInDL(ctx, listName, recipients)

@@ -11,6 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/google/uuid"
 
+	"github.com/notifique/internal/registry"
+	"github.com/notifique/internal/server"
 	"github.com/notifique/internal/server/dto"
 )
 
@@ -47,10 +49,6 @@ type NotificationTemplate struct {
 	UpdatedBy        *string            `dynamodbav:"updatedBy"`
 	HashKey          string             `dynamodbav:"hashKey"`
 	Variables        []TemplateVariable `dynamodbav:"variables"`
-}
-
-type notificationTemplateKey struct {
-	Id string `dynamodbav:"id"`
 }
 
 type notificationTemplateGSINameKey struct {
@@ -96,13 +94,6 @@ func (nt NotificationTemplate) GetGSINameKey() (DynamoKey, error) {
 	key["hashKey"] = hashKey
 
 	return key, nil
-}
-
-func (ntk *notificationTemplateKey) GetKey() (DynamoKey, error) {
-
-	nt := NotificationTemplate{Id: ntk.Id}
-
-	return nt.GetKey()
 }
 
 func (ntsk *notificationTemplateGSINameKey) GetKey() (DynamoKey, error) {
@@ -170,7 +161,7 @@ func (r *Registry) SaveTemplate(ctx context.Context, createdBy string, ntr dto.N
 	return resp, nil
 }
 
-func (r *Registry) GetNotifications(ctx context.Context, filters dto.NotificationTemplateFilters) (dto.Page[dto.NotificationTemplateInfoResp], error) {
+func (r *Registry) GetTemplates(ctx context.Context, filters dto.NotificationTemplateFilters) (dto.Page[dto.NotificationTemplateInfoResp], error) {
 
 	page := dto.Page[dto.NotificationTemplateInfoResp]{}
 
@@ -253,4 +244,60 @@ func (r *Registry) GetNotifications(ctx context.Context, filters dto.Notificatio
 	page.Data = items
 
 	return page, nil
+}
+
+func (r *Registry) GetTemplateDetails(ctx context.Context, templateId string) (dto.NotificationTemplateDetails, error) {
+	details := dto.NotificationTemplateDetails{}
+
+	key, err := NotificationTemplate{Id: templateId}.GetKey()
+
+	if err != nil {
+		return details, fmt.Errorf("failed to create key - %w", err)
+	}
+
+	response, err := r.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(NotificationsTemplateTable),
+		Key:       key,
+	})
+
+	if err != nil {
+		return details, fmt.Errorf("failed to get template - %w", err)
+	}
+
+	if len(response.Item) == 0 {
+		return details, server.EntityNotFound{
+			Id:   templateId,
+			Type: registry.NotificationTemplateType,
+		}
+	}
+
+	template := NotificationTemplate{}
+	err = attributevalue.UnmarshalMap(response.Item, &template)
+
+	if err != nil {
+		return details, fmt.Errorf("failed to unmarshal template - %w", err)
+	}
+
+	variables := make([]dto.TemplateVariable, 0, len(template.Variables))
+	for _, v := range template.Variables {
+		variables = append(variables, dto.TemplateVariable{
+			Name:       v.Name,
+			Type:       v.Type,
+			Required:   v.Required,
+			Validation: v.Validation,
+		})
+	}
+
+	details.Id = template.Id
+	details.Name = template.Name
+	details.Description = template.Description
+	details.TitleTemplate = template.TitleTemplate
+	details.ContentsTemplate = template.ContentsTemplate
+	details.Variables = variables
+	details.CreatedAt = template.CreatedAt
+	details.CreatedBy = template.CreatedBy
+	details.UpdatedAt = template.UpdatedAt
+	details.UpdatedBy = template.UpdatedBy
+
+	return details, nil
 }

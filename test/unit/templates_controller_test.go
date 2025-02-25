@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -15,6 +16,8 @@ import (
 	"go.uber.org/mock/gomock"
 
 	di "github.com/notifique/internal/di"
+	"github.com/notifique/internal/registry"
+	"github.com/notifique/internal/server"
 	"github.com/notifique/internal/server/dto"
 	"github.com/notifique/internal/testutils"
 )
@@ -34,6 +37,7 @@ func TestNotificationTemplateController(t *testing.T) {
 
 	testCreateNotificationTemplate(t, testApp.Engine, *testApp)
 	testGetNotificationTemplates(t, testApp.Engine, *testApp)
+	testGetNotificationTemplateDetails(t, testApp.Engine, *testApp)
 }
 
 func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedBackend) {
@@ -59,10 +63,6 @@ func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 
 	echoRequest := func(req dto.NotificationTemplateReq) dto.NotificationTemplateReq {
 		return req
-	}
-
-	strPtr := func(s string) *string {
-		return &s
 	}
 
 	tests := []struct {
@@ -91,7 +91,7 @@ func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 				return req
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  strPtr(`Key: 'NotificationTemplateReq.Name' Error:Field validation for 'Name' failed on the 'required' tag`),
+			expectedError:  testutils.StrPtr(`Key: 'NotificationTemplateReq.Name' Error:Field validation for 'Name' failed on the 'required' tag`),
 		},
 		{
 			name: "Should fail if the template name exceeds its max size",
@@ -100,7 +100,7 @@ func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 				return req
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  strPtr(`Key: 'NotificationTemplateReq.Name' Error:Field validation for 'Name' failed on the 'max' tag`),
+			expectedError:  testutils.StrPtr(`Key: 'NotificationTemplateReq.Name' Error:Field validation for 'Name' failed on the 'max' tag`),
 		},
 		{
 			name: "Should fail if the title template is empty",
@@ -109,7 +109,7 @@ func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 				return req
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  strPtr(`Key: 'NotificationTemplateReq.TitleTemplate' Error:Field validation for 'TitleTemplate' failed on the 'required' tag`),
+			expectedError:  testutils.StrPtr(`Key: 'NotificationTemplateReq.TitleTemplate' Error:Field validation for 'TitleTemplate' failed on the 'required' tag`),
 		},
 		{
 			name: "Should fail if the title exceeds its max size",
@@ -118,7 +118,7 @@ func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 				return req
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  strPtr(`Key: 'NotificationTemplateReq.TitleTemplate' Error:Field validation for 'TitleTemplate' failed on the 'max' tag`),
+			expectedError:  testutils.StrPtr(`Key: 'NotificationTemplateReq.TitleTemplate' Error:Field validation for 'TitleTemplate' failed on the 'max' tag`),
 		},
 		{
 			name: "Should fail if the contents template is empty",
@@ -127,7 +127,7 @@ func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 				return req
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  strPtr(`Key: 'NotificationTemplateReq.ContentsTemplate' Error:Field validation for 'ContentsTemplate' failed on the 'required' tag`),
+			expectedError:  testutils.StrPtr(`Key: 'NotificationTemplateReq.ContentsTemplate' Error:Field validation for 'ContentsTemplate' failed on the 'required' tag`),
 		},
 		{
 			name: "Should fail if the contents template exceeds its max size",
@@ -136,7 +136,7 @@ func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 				return req
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  strPtr(`Key: 'NotificationTemplateReq.ContentsTemplate' Error:Field validation for 'ContentsTemplate' failed on the 'max' tag`),
+			expectedError:  testutils.StrPtr(`Key: 'NotificationTemplateReq.ContentsTemplate' Error:Field validation for 'ContentsTemplate' failed on the 'max' tag`),
 		},
 		{
 			name: "Should fail if the template description is empty",
@@ -145,7 +145,7 @@ func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 				return req
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  strPtr(`Key: 'NotificationTemplateReq.Description' Error:Field validation for 'Description' failed on the 'required' tag`),
+			expectedError:  testutils.StrPtr(`Key: 'NotificationTemplateReq.Description' Error:Field validation for 'Description' failed on the 'required' tag`),
 		},
 		{
 			name: "Should fail if the template description exceeds its max size",
@@ -154,7 +154,7 @@ func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 				return req
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  strPtr(`Key: 'NotificationTemplateReq.Description' Error:Field validation for 'Description' failed on the 'max' tag`),
+			expectedError:  testutils.StrPtr(`Key: 'NotificationTemplateReq.Description' Error:Field validation for 'Description' failed on the 'max' tag`),
 		},
 		{
 			name: "Should fail if the variable name is empty",
@@ -163,7 +163,7 @@ func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 				return req
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  strPtr(`Key: 'NotificationTemplateReq.Variables[0].Name' Error:Field validation for 'Name' failed on the 'required' tag`),
+			expectedError:  testutils.StrPtr(`Key: 'NotificationTemplateReq.Variables[0].Name' Error:Field validation for 'Name' failed on the 'required' tag`),
 		},
 		{
 			name: "Should fail if the variable name exceeds its max size",
@@ -172,7 +172,7 @@ func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 				return req
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  strPtr(`Key: 'NotificationTemplateReq.Variables[0].Name' Error:Field validation for 'Name' failed on the 'max' tag`),
+			expectedError:  testutils.StrPtr(`Key: 'NotificationTemplateReq.Variables[0].Name' Error:Field validation for 'Name' failed on the 'max' tag`),
 		},
 		{
 			name: "Should fail if the variable type is empty",
@@ -181,7 +181,7 @@ func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 				return req
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  strPtr(`Key: 'NotificationTemplateReq.Variables[0].Type' Error:Field validation for 'Type' failed on the 'required' tag`),
+			expectedError:  testutils.StrPtr(`Key: 'NotificationTemplateReq.Variables[0].Type' Error:Field validation for 'Type' failed on the 'required' tag`),
 		},
 		{
 			name: "Should fail if the variable type is not a valid value",
@@ -190,7 +190,7 @@ func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 				return req
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  strPtr(`Key: 'NotificationTemplateReq.Variables[0].Type' Error:Field validation for 'Type' failed on the 'oneof' tag`),
+			expectedError:  testutils.StrPtr(`Key: 'NotificationTemplateReq.Variables[0].Type' Error:Field validation for 'Type' failed on the 'oneof' tag`),
 		},
 		{
 			name: "Should fail if the notification template has variables with the same name",
@@ -205,7 +205,7 @@ func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 				return req
 			},
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  strPtr(`Key: 'NotificationTemplateReq.Variables' Error:Field validation for 'Variables' failed on the 'unique_var_name' tag`),
+			expectedError:  testutils.StrPtr(`Key: 'NotificationTemplateReq.Variables' Error:Field validation for 'Variables' failed on the 'unique_var_name' tag`),
 		},
 	}
 
@@ -278,7 +278,7 @@ func testGetNotificationTemplates(t *testing.T, e *gin.Engine, mock di.MockedBac
 		setupMock: func() {
 			registryMock.
 				EXPECT().
-				GetNotifications(gomock.Any(), gomock.Any()).
+				GetTemplates(gomock.Any(), gomock.Any()).
 				Return(testPage, nil)
 		},
 	}}
@@ -307,6 +307,116 @@ func testGetNotificationTemplates(t *testing.T, e *gin.Engine, mock di.MockedBac
 					t.Fatal(err)
 				}
 				assert.Equal(t, resp, *tt.expectedResp)
+			}
+		})
+	}
+}
+
+func testGetNotificationTemplateDetails(t *testing.T, e *gin.Engine, mock di.MockedBackend) {
+
+	userId := "1234"
+
+	getTemplateDetails := func(params dto.NotificationTemplateUriParams) *httptest.ResponseRecorder {
+		url := fmt.Sprintf("%s/%s", notificationsTemplateUrl, params.Id)
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodGet, url, nil)
+		req.Header.Add("userId", userId)
+		e.ServeHTTP(w, req)
+		return w
+	}
+
+	testReq := testutils.MakeTestNotificationTemplateRequest()
+
+	testDetails := dto.NotificationTemplateDetails{
+		Id:               uuid.NewString(),
+		Name:             testReq.Name,
+		Description:      testReq.Description,
+		TitleTemplate:    testReq.TitleTemplate,
+		ContentsTemplate: testReq.ContentsTemplate,
+		Variables:        testReq.Variables,
+		CreatedAt:        time.Now().Format(time.RFC3339),
+		CreatedBy:        testUserId,
+	}
+
+	missingTemplateId := uuid.NewString()
+
+	templateNotFound := fmt.Sprintf("Entity %v of type %v not found",
+		missingTemplateId,
+		registry.NotificationTemplateType,
+	)
+
+	tests := []struct {
+		name           string
+		setupMock      func()
+		modifyParams   func(params dto.NotificationTemplateUriParams) dto.NotificationTemplateUriParams
+		expectedStatus int
+		expectedError  *string
+		expectedResp   *dto.NotificationTemplateDetails
+	}{
+		{
+			name:           "Can retrieve template details",
+			expectedStatus: http.StatusOK,
+			expectedResp:   &testDetails,
+			modifyParams:   func(p dto.NotificationTemplateUriParams) dto.NotificationTemplateUriParams { return p },
+			setupMock: func() {
+				mock.Registry.MockNotificationTemplateRegistry.
+					EXPECT().
+					GetTemplateDetails(gomock.Any(), gomock.Any()).
+					Return(testDetails, nil)
+			},
+		},
+		{
+			name: "Should fail if template id is not a valid UUID",
+			modifyParams: func(p dto.NotificationTemplateUriParams) dto.NotificationTemplateUriParams {
+				p.Id = "not-a-uuid"
+				return p
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  testutils.StrPtr(`Key: 'NotificationTemplateUriParams.Id' Error:Field validation for 'Id' failed on the 'uuid' tag`),
+		},
+		{
+			name: "Should fail if template doesn't exist",
+			setupMock: func() {
+				mock.Registry.MockNotificationTemplateRegistry.
+					EXPECT().
+					GetTemplateDetails(gomock.Any(), gomock.Any()).
+					Return(dto.NotificationTemplateDetails{}, server.EntityNotFound{
+						Id:   missingTemplateId,
+						Type: registry.NotificationTemplateType,
+					})
+			},
+			modifyParams:   func(p dto.NotificationTemplateUriParams) dto.NotificationTemplateUriParams { return p },
+			expectedStatus: http.StatusNotFound,
+			expectedError:  testutils.StrPtr(templateNotFound),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupMock != nil {
+				tt.setupMock()
+			}
+
+			params := dto.NotificationTemplateUriParams{
+				Id: uuid.NewString(),
+			}
+
+			w := getTemplateDetails(tt.modifyParams(params))
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.expectedError != nil {
+				resp := make(map[string]string)
+				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+					t.Fatal(err)
+				}
+				assert.Contains(t, resp["error"], *tt.expectedError)
+			} else if tt.expectedResp != nil {
+				resp := dto.NotificationTemplateDetails{}
+				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+					t.Fatal(err)
+				}
+				assert.Equal(t, *tt.expectedResp, resp)
 			}
 		})
 	}

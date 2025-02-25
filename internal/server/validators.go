@@ -56,3 +56,19 @@ var UniqueTemplateVarValidator validator.Func = func(fl validator.FieldLevel) bo
 
 	return true
 }
+
+var UUIDValidator validator.Func = func(fl validator.FieldLevel) bool {
+	uuid, ok := fl.Field().Interface().(string)
+
+	if !ok {
+		return false
+	}
+
+	match, err := r.MatchString("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", uuid)
+
+	if err != nil {
+		return false
+	}
+
+	return match
+}

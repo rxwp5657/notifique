@@ -130,7 +130,9 @@ CREATE TABLE IF NOT EXISTS notification_templates (
     contents_template VARCHAR NOT NULL,
     "description" VARCHAR NOT NULL,
     created_by VARCHAR NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() at time zone 'utc')
+    created_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() at time zone 'utc'),
+    updated_by VARCHAR,
+    updated_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS notification_template_variables (

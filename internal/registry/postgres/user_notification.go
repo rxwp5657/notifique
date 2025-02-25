@@ -189,8 +189,9 @@ func (ps *Registry) SetReadStatus(ctx context.Context, userId, notificationId st
 	if err != nil {
 		tx.Rollback(ctx)
 		if errors.Is(err, pgx.ErrNoRows) {
-			return server.NotificationNotFound{
-				NotificationId: notificationId,
+			return server.EntityNotFound{
+				Id:   notificationId,
+				Type: registry.NotificationType,
 			}
 		}
 
