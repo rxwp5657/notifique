@@ -104,6 +104,15 @@ WHERE
 	template_id = $1;
 `
 
+const countTemplateWithId = `
+SELECT
+	COUNT(*)
+FROM
+	notification_templates
+WHERE
+	id = $1;
+`
+
 type postgresresgistryTester struct {
 	*ps.Registry
 	conn *pgxpool.Pool
@@ -378,6 +387,19 @@ func (t *postgresresgistryTester) GetNotificationTemplate(ctx context.Context, t
 	}
 
 	return templateReq, nil
+}
+
+func (t *postgresresgistryTester) TemplateExists(ctx context.Context, id string) (bool, error) {
+
+	count := 0
+
+	err := t.conn.QueryRow(ctx, countTemplateWithId, id).Scan(&count)
+
+	if err != nil {
+		return false, fmt.Errorf("failed to query template count - %w", err)
+	}
+
+	return count > 0, nil
 }
 
 func NewPostgresIntegrationTester(ctx context.Context) (*postgresresgistryTester, closer, error) {

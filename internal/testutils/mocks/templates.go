@@ -41,6 +41,20 @@ func (m *MockNotificationTemplateRegistry) EXPECT() *MockNotificationTemplateReg
 	return m.recorder
 }
 
+// DeleteTemplate mocks base method.
+func (m *MockNotificationTemplateRegistry) DeleteTemplate(ctx context.Context, id string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteTemplate", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteTemplate indicates an expected call of DeleteTemplate.
+func (mr *MockNotificationTemplateRegistryMockRecorder) DeleteTemplate(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteTemplate", reflect.TypeOf((*MockNotificationTemplateRegistry)(nil).DeleteTemplate), ctx, id)
+}
+
 // GetTemplateDetails mocks base method.
 func (m *MockNotificationTemplateRegistry) GetTemplateDetails(ctx context.Context, id string) (dto.NotificationTemplateDetails, error) {
 	m.ctrl.T.Helper()

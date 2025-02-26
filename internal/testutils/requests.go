@@ -62,3 +62,7 @@ func AddNotificationTemplateFilters(req *http.Request, filters *dto.Notification
 
 	req.URL.RawQuery = q.Encode()
 }
+
+func Echo[T any](data T) T {
+	return data
+}

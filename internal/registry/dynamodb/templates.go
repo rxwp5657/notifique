@@ -301,3 +301,23 @@ func (r *Registry) GetTemplateDetails(ctx context.Context, templateId string) (d
 
 	return details, nil
 }
+
+func (r *Registry) DeleteTemplate(ctx context.Context, id string) error {
+
+	key, err := NotificationTemplate{Id: id}.GetKey()
+
+	if err != nil {
+		return fmt.Errorf("failed to make template key - %w", err)
+	}
+
+	_, err = r.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: aws.String(NotificationsTemplateTable),
+		Key:       key,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to delete template - %w", err)
+	}
+
+	return nil
+}

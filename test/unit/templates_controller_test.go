@@ -38,6 +38,7 @@ func TestNotificationTemplateController(t *testing.T) {
 	testCreateNotificationTemplate(t, testApp.Engine, *testApp)
 	testGetNotificationTemplates(t, testApp.Engine, *testApp)
 	testGetNotificationTemplateDetails(t, testApp.Engine, *testApp)
+	testDeleteNotificationTemplate(t, testApp.Engine, *testApp)
 }
 
 func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedBackend) {
@@ -417,6 +418,66 @@ func testGetNotificationTemplateDetails(t *testing.T, e *gin.Engine, mock di.Moc
 					t.Fatal(err)
 				}
 				assert.Equal(t, *tt.expectedResp, resp)
+			}
+		})
+	}
+}
+
+func testDeleteNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedBackend) {
+
+	userId := "1234"
+
+	deleteTemplate := func(templateId string) *httptest.ResponseRecorder {
+		url := fmt.Sprintf("%s/%s", notificationsTemplateUrl, templateId)
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodDelete, url, nil)
+		req.Header.Add("userId", userId)
+		e.ServeHTTP(w, req)
+		return w
+	}
+
+	tests := []struct {
+		name           string
+		setupMock      func()
+		modifyId       func(templateId string) string
+		expectedStatus int
+		expectedError  *string
+	}{
+		{
+			name:           "should be able to delete a template",
+			modifyId:       testutils.Echo[string],
+			expectedStatus: http.StatusNoContent,
+			setupMock: func() {
+				mock.Registry.MockNotificationTemplateRegistry.
+					EXPECT().
+					DeleteTemplate(gomock.Any(), gomock.Any()).
+					Return(nil)
+			},
+		},
+		{
+			name:           "should fail of the template id is not an uuid",
+			modifyId:       func(templateId string) string { return "not an uuid" },
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  testutils.StrPtr(`Key: 'NotificationTemplateUriParams.Id' Error:Field validation for 'Id' failed on the 'uuid' tag`),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupMock != nil {
+				tt.setupMock()
+			}
+
+			w := deleteTemplate(tt.modifyId(uuid.NewString()))
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.expectedError != nil {
+				resp := make(map[string]string)
+				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+					t.Fatal(err)
+				}
+				assert.Contains(t, *tt.expectedError, resp["error"])
 			}
 		})
 	}

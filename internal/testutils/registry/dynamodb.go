@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
+	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ds "github.com/notifique/internal/registry/dynamodb"
 	"github.com/notifique/internal/server/dto"
@@ -256,6 +257,40 @@ func (t *dynamoregistryTester) GetNotificationTemplate(ctx context.Context, id s
 	}
 
 	return templateReq, nil
+}
+
+func (t *dynamoregistryTester) TemplateExists(ctx context.Context, id string) (bool, error) {
+
+	key, err := ds.NotificationTemplate{Id: id}.GetKey()
+
+	if err != nil {
+		return false, fmt.Errorf("failed to make the template key - %w", err)
+	}
+
+	projExp := expression.
+		AddNames(expression.NamesList(expression.Name(ds.NotificationHashKey)))
+
+	expr, err := expression.
+		NewBuilder().
+		WithProjection(projExp).
+		Build()
+
+	if err != nil {
+		return false, fmt.Errorf("failed to create expression - %w", err)
+	}
+
+	resp, err := t.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName:                aws.String(ds.NotificationsTemplateTable),
+		Key:                      key,
+		ProjectionExpression:     expr.Projection(),
+		ExpressionAttributeNames: expr.Names(),
+	})
+
+	if err != nil {
+		return false, fmt.Errorf("failed to query template id - %w", err)
+	}
+
+	return len(resp.Item) > 0, nil
 }
 
 func NewDynamoRegistryTester(ctx context.Context) (*dynamoregistryTester, closer, error) {
