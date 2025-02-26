@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS notification_template_variables (
         PRIMARY KEY(template_id, "name"),
     CONSTRAINT template_id_fk
         FOREIGN KEY (template_id)
-        REFERENCES notification_templates(id)
+        REFERENCES notification_templates(id) ON DELETE CASCADE
 );
 
 COMMIT;

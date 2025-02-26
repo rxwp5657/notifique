@@ -18,6 +18,7 @@ type NotificationTemplateRegistry interface {
 	SaveTemplate(ctx context.Context, createdBy string, ntr dto.NotificationTemplateReq) (dto.NotificationTemplateCreatedResp, error)
 	GetTemplates(ctx context.Context, filters dto.NotificationTemplateFilters) (dto.Page[dto.NotificationTemplateInfoResp], error)
 	GetTemplateDetails(ctx context.Context, id string) (dto.NotificationTemplateDetails, error)
+	DeleteTemplate(ctx context.Context, id string) error
 }
 
 type NotificationTemplateController struct {
@@ -65,7 +66,7 @@ func (ntc *NotificationTemplateController) CreateNotificationTemplate(c *gin.Con
 	c.JSON(http.StatusCreated, resp)
 }
 
-func (ntc *NotificationTemplateController) GetNotifications(c *gin.Context) {
+func (ntc *NotificationTemplateController) GetTemplates(c *gin.Context) {
 	var filters dto.NotificationTemplateFilters
 
 	if err := c.ShouldBind(&filters); err != nil {
@@ -83,7 +84,7 @@ func (ntc *NotificationTemplateController) GetNotifications(c *gin.Context) {
 	c.JSON(http.StatusOK, notifications)
 }
 
-func (ntc *NotificationTemplateController) GetNotification(c *gin.Context) {
+func (ntc *NotificationTemplateController) GetTemplateDetails(c *gin.Context) {
 	var params dto.NotificationTemplateUriParams
 
 	if err := c.ShouldBindUri(&params); err != nil {
@@ -104,4 +105,23 @@ func (ntc *NotificationTemplateController) GetNotification(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, notification)
+}
+
+func (ntc *NotificationTemplateController) DeleteTemplate(c *gin.Context) {
+
+	var params dto.NotificationTemplateUriParams
+
+	if err := c.ShouldBindUri(&params); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := ntc.Registry.DeleteTemplate(c.Request.Context(), params.Id)
+
+	if err != nil {
+		slog.Error(err.Error())
+		c.Status(http.StatusInternalServerError)
+	}
+
+	c.Status(http.StatusNoContent)
 }

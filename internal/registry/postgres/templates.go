@@ -93,6 +93,13 @@ WHERE
 	template_id = $1;
 `
 
+const deleteTemplateInfo = `
+DELETE FROM
+	notification_templates
+WHERE
+	id = $1;
+`
+
 type notificationTemplateInfo struct {
 	Id          string `db:"id"`
 	Name        string `db:"name"`
@@ -329,4 +336,29 @@ func (r *Registry) GetTemplateDetails(ctx context.Context, templateId string) (d
 	}
 
 	return details, nil
+}
+
+func (r *Registry) DeleteTemplate(ctx context.Context, templateId string) error {
+
+	tx, err := r.conn.Begin(ctx)
+
+	if err != nil {
+		return fmt.Errorf("failed to start transaction - %w", err)
+	}
+
+	// Relies on ON DELETE CASCADE trigger to fully delete the template
+	_, err = tx.Exec(ctx, deleteTemplateInfo, templateId)
+
+	if err != nil {
+		tx.Rollback(ctx)
+		return fmt.Errorf("failed to delete notification template info - %w", err)
+	}
+
+	err = tx.Commit(ctx)
+
+	if err != nil {
+		return fmt.Errorf("failed to commit changes - %w", err)
+	}
+
+	return nil
 }

@@ -22,6 +22,7 @@ type TestNotificationTemplateRegistry interface {
 	controllers.NotificationTemplateRegistry
 	r.ContainerTester
 	GetNotificationTemplate(ctx context.Context, id string) (dto.NotificationTemplateReq, error)
+	TemplateExists(ctx context.Context, id string) (bool, error)
 }
 
 func TestNotificationsTemplatePostgres(t *testing.T) {
@@ -38,6 +39,7 @@ func TestNotificationsTemplatePostgres(t *testing.T) {
 	testSaveNotificationTemplate(ctx, t, tester)
 	testGetNotificationTemplates(ctx, t, tester)
 	testGetNotificationTemplateDetails(ctx, t, tester)
+	testDeleteNotificationTemplate(ctx, t, tester)
 }
 
 func TestNotificationsTemplateDynamo(t *testing.T) {
@@ -54,6 +56,7 @@ func TestNotificationsTemplateDynamo(t *testing.T) {
 	testSaveNotificationTemplate(ctx, t, tester)
 	testGetNotificationTemplates(ctx, t, tester)
 	testGetNotificationTemplateDetails(ctx, t, tester)
+	testDeleteNotificationTemplate(ctx, t, tester)
 }
 
 func testSaveNotificationTemplate(ctx context.Context, t *testing.T, ntr TestNotificationTemplateRegistry) {
@@ -221,5 +224,57 @@ func testGetNotificationTemplateDetails(ctx context.Context, t *testing.T, ntr T
 		_, err := ntr.GetTemplateDetails(ctx, "invalid-id")
 
 		assert.Error(t, err)
+	})
+}
+
+func testDeleteNotificationTemplate(ctx context.Context, t *testing.T, ntr TestNotificationTemplateRegistry) {
+
+	defer ntr.ClearDB(ctx)
+
+	testUser := "1234"
+	req := testutils.MakeTestNotificationTemplateRequest()
+
+	setupTemplate := func() dto.NotificationTemplateCreatedResp {
+		saved, err := ntr.SaveTemplate(ctx, testUser, req)
+
+		if err != nil {
+			t.Fatalf("failed to save template for test - %v", err)
+		}
+
+		return saved
+	}
+
+	t.Run("Can delete a notification template", func(t *testing.T) {
+		template := setupTemplate()
+
+		err := ntr.DeleteTemplate(ctx, template.Id)
+
+		assert.Nil(t, err)
+
+		exists, err := ntr.TemplateExists(ctx, template.Id)
+
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+
+		assert.False(t, exists)
+	})
+
+	t.Run("Can delete a notification that is already deleted", func(t *testing.T) {
+		template := setupTemplate()
+
+		err := ntr.DeleteTemplate(ctx, template.Id)
+
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+
+		err = ntr.DeleteTemplate(ctx, template.Id)
+		assert.Nil(t, err)
+	})
+
+	t.Run("Should do nothing if the template doesn't exist", func(t *testing.T) {
+		err := ntr.DeleteTemplate(ctx, uuid.NewString())
+		assert.Nil(t, err)
 	})
 }
