@@ -165,18 +165,6 @@ func (t *dynamoregistryTester) GetNotification(ctx context.Context,
 	return req, nil
 }
 
-func (t *dynamoregistryTester) GetNotificationStatus(ctx context.Context,
-	notificationId string) (string, error) {
-
-	n, err := t.getNotification(ctx, notificationId)
-
-	if err != nil {
-		return "", err
-	}
-
-	return n.Status, nil
-}
-
 func (t *dynamoregistryTester) InsertUserNotifications(ctx context.Context,
 	userId string, un []dto.UserNotification) error {
 

@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS notification_status_log(
     error_message VARCHAR,
     CONSTRAINT notification_id_fk
         FOREIGN KEY (notification_id)
-        REFERENCES notifications(id),
+        REFERENCES notifications(id) ON DELETE CASCADE,
     CONSTRAINT notification_status_log_pk
         PRIMARY KEY(notification_id, status_date)
 );
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS notification_recipients (
     recipient VARCHAR NOT NULL,
     CONSTRAINT notification_id_fk
         FOREIGN KEY (notification_id)
-        REFERENCES notifications(id)
+        REFERENCES notifications(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS notification_recipients_idx
@@ -108,7 +108,10 @@ ON notification_recipients(notification_id, recipient);
 
 CREATE TABLE IF NOT EXISTS notification_channels (
     notification_id uuid NOT NULL,
-    channel notification_channel NOT NULL
+    channel notification_channel NOT NULL,
+    CONSTRAINT notification_id_fk
+        FOREIGN KEY (notification_id)
+        REFERENCES notifications(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS user_config (

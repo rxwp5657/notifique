@@ -16,6 +16,8 @@ const (
 	Created NotificationStatus = "CREATED"
 	Queued  NotificationStatus = "QUEUED"
 	Failed  NotificationStatus = "FAILED"
+	Sending NotificationStatus = "SENDING"
+	Sent    NotificationStatus = "SENT"
 )
 
 type Notification struct {
@@ -32,6 +34,7 @@ type NotificationStatusLog struct {
 type NotificationRegistry interface {
 	SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error)
 	UpdateNotificationStatus(ctx context.Context, statusLog NotificationStatusLog) error
+	DeleteNotification(ctx context.Context, id string) error
 }
 
 type NotificationPublisher interface {
@@ -43,7 +46,7 @@ type NotificationController struct {
 	Publisher NotificationPublisher
 }
 
-func (nc NotificationController) CreateNotification(c *gin.Context) {
+func (nc *NotificationController) CreateNotification(c *gin.Context) {
 	var notification dto.NotificationReq
 
 	if err := c.ShouldBindJSON(&notification); err != nil {
@@ -77,4 +80,22 @@ func (nc NotificationController) CreateNotification(c *gin.Context) {
 				"notificationId", notificationId)
 		}
 	}()
+}
+
+func (nc *NotificationController) DeleteNotification(c *gin.Context) {
+	var params dto.NotificationUriParams
+
+	if err := c.ShouldBindUri(&params); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	err := nc.Registry.DeleteNotification(c.Request.Context(), params.NotificationId)
+
+	if err != nil {
+		slog.Error(err.Error())
+		c.Status(http.StatusInternalServerError)
+	}
+
+	c.Status(http.StatusNoContent)
 }

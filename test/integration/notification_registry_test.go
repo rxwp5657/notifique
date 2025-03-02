@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/notifique/internal/server"
 	"github.com/notifique/internal/server/controllers"
 	"github.com/notifique/internal/server/dto"
 	"github.com/notifique/internal/testutils"
@@ -17,7 +18,7 @@ type NotificationRegistryTester interface {
 	controllers.NotificationRegistry
 	r.ContainerTester
 	GetNotification(ctx context.Context, notificationId string) (dto.NotificationReq, error)
-	GetNotificationStatus(ctx context.Context, notificationId string) (string, error)
+	GetNotificationStatus(ctx context.Context, notificationId string) (*controllers.NotificationStatus, error)
 }
 
 func TestNotificationRegistryPostgres(t *testing.T) {
@@ -33,6 +34,7 @@ func TestNotificationRegistryPostgres(t *testing.T) {
 
 	testCreateNotification(ctx, t, tester)
 	testUpdateNotificationStatus(ctx, t, tester)
+	testDeleteNotification(ctx, t, tester)
 }
 
 func TestNotificationRegistryDynamo(t *testing.T) {
@@ -82,7 +84,7 @@ func testCreateNotification(ctx context.Context, t *testing.T, nt NotificationRe
 			t.Fatal(err)
 		}
 
-		assert.Equal(t, string(controllers.Created), status)
+		assert.Equal(t, controllers.Created, *status)
 	})
 }
 
@@ -116,6 +118,101 @@ func testUpdateNotificationStatus(ctx context.Context, t *testing.T, nt Notifica
 			t.Fatal(err)
 		}
 
-		assert.Equal(t, string(controllers.Queued), status)
+		assert.Equal(t, controllers.Queued, *status)
 	})
+}
+
+func testDeleteNotification(ctx context.Context, t *testing.T, nt NotificationRegistryTester) {
+
+	user := "1234"
+
+	testNotifications := map[controllers.NotificationStatus]string{
+		controllers.Created: "",
+		controllers.Queued:  "",
+		controllers.Sending: "",
+		controllers.Sent:    "",
+		controllers.Failed:  "",
+	}
+
+	for status := range testNotifications {
+		testNofiticationReq := testutils.MakeTestNotificationRequest()
+		notificationId, err := nt.SaveNotification(ctx, user, testNofiticationReq)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = nt.UpdateNotificationStatus(ctx, controllers.NotificationStatusLog{
+			NotificationId: notificationId,
+			Status:         status,
+		})
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		testNotifications[status] = notificationId
+	}
+
+	defer r.Clear(ctx, t, nt)
+
+	tests := []struct {
+		name           string
+		notificationId string
+		expectedError  error
+	}{
+		{
+			name:           "Can delete a notification in CREATED state",
+			notificationId: testNotifications[controllers.Created],
+			expectedError:  nil,
+		},
+		{
+			name:           "Can delete a notification in FAILED state",
+			notificationId: testNotifications[controllers.Failed],
+			expectedError:  nil,
+		},
+		{
+			name:           "Can delete a notification in SENT state",
+			notificationId: testNotifications[controllers.Sent],
+			expectedError:  nil,
+		},
+		{
+			name:           "Should fail deleting a notification on QUEUED state",
+			notificationId: testNotifications[controllers.Queued],
+			expectedError: server.InvalidNotificationStatus{
+				Id:     testNotifications[controllers.Queued],
+				Status: string(controllers.Queued),
+			},
+		},
+		{
+			name:           "Should fail deleting a notification on SENDING state",
+			notificationId: testNotifications[controllers.Sending],
+			expectedError: server.InvalidNotificationStatus{
+				Id:     testNotifications[controllers.Sending],
+				Status: string(controllers.Sending),
+			},
+		},
+		{
+			name:           "Should be able to delete a notification that doesn't exist",
+			notificationId: uuid.NewString(),
+			expectedError:  nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actualErr := nt.DeleteNotification(ctx, tt.notificationId)
+			assert.Equal(t, tt.expectedError, actualErr)
+
+			if tt.expectedError == nil {
+				status, err := nt.GetNotificationStatus(ctx, tt.notificationId)
+
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				assert.Nil(t, status)
+			}
+		})
+	}
 }

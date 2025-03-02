@@ -46,15 +46,6 @@ WHERE
 	id = $1;
 `
 
-const getNotificationStatus = `
-SELECT
-	"status"
-FROM
-	notifications
-WHERE
-	id = $1;
-`
-
 const getNotificationRecipients = `
 SELECT
 	recipient
@@ -330,20 +321,6 @@ func (t *postgresresgistryTester) DeleteUserNotifications(ctx context.Context, u
 	}
 
 	return nil
-}
-
-func (t *postgresresgistryTester) GetNotificationStatus(ctx context.Context, notificationId string) (string, error) {
-
-	status := ""
-
-	err := t.conn.QueryRow(ctx, getNotificationStatus, notificationId).
-		Scan(&status)
-
-	if err != nil {
-		return "", fmt.Errorf("failed to retrieve notification status - %w", err)
-	}
-
-	return status, nil
 }
 
 func (t *postgresresgistryTester) GetNotificationTemplate(ctx context.Context, templateId string) (dto.NotificationTemplateReq, error) {

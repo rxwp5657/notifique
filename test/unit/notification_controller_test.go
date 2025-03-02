@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -29,6 +30,7 @@ func TestNotificationController(t *testing.T) {
 	}
 
 	testCreateNotification(t, testApp.Engine, *testApp)
+	testDeleteNotification(t, testApp.Engine, *testApp)
 }
 
 func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) {
@@ -165,6 +167,66 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 			req := testutils.MakeTestNotificationRequest()
 			req = tt.modifyRequest(req)
 			w := createNotification(req)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.expectedError != "" {
+				resp := make(map[string]string)
+				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+					t.Fatal(err)
+				}
+				assert.Contains(t, resp["error"], tt.expectedError)
+			}
+		})
+	}
+}
+
+func testDeleteNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) {
+	userId := "1234"
+	registryMock := mock.Registry.MockNotificationRegistry
+
+	deleteNotification := func(notificationId string) *httptest.ResponseRecorder {
+		url := fmt.Sprintf("%s/%s", notificationsUrl, notificationId)
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodDelete, url, nil)
+		req.Header.Add("userId", userId)
+		e.ServeHTTP(w, req)
+		return w
+	}
+
+	tests := []struct {
+		name           string
+		notificationId string
+		setupMock      func()
+		expectedStatus int
+		expectedError  string
+	}{
+		{
+			name:           "Can delete a notification",
+			notificationId: uuid.NewString(),
+			expectedStatus: http.StatusNoContent,
+			setupMock: func() {
+				registryMock.
+					EXPECT().
+					DeleteNotification(gomock.Any(), gomock.Any()).
+					Return(nil)
+			},
+		},
+		{
+			name:           "Should fail if the id is not an uuid",
+			notificationId: "not an uuid",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Key: 'NotificationUriParams.NotificationId' Error:Field validation for 'NotificationId' failed on the 'uuid' tag",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupMock != nil {
+				tt.setupMock()
+			}
+
+			w := deleteNotification(tt.notificationId)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
