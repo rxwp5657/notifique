@@ -42,6 +42,20 @@ func (m *MockNotificationRegistry) EXPECT() *MockNotificationRegistryMockRecorde
 	return m.recorder
 }
 
+// DeleteNotification mocks base method.
+func (m *MockNotificationRegistry) DeleteNotification(ctx context.Context, id string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteNotification", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteNotification indicates an expected call of DeleteNotification.
+func (mr *MockNotificationRegistryMockRecorder) DeleteNotification(ctx, id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNotification", reflect.TypeOf((*MockNotificationRegistry)(nil).DeleteNotification), ctx, id)
+}
+
 // SaveNotification mocks base method.
 func (m *MockNotificationRegistry) SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error) {
 	m.ctrl.T.Helper()

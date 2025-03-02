@@ -11,6 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/google/uuid"
+	"github.com/notifique/internal/registry"
+	"github.com/notifique/internal/server"
 	c "github.com/notifique/internal/server/controllers"
 	"github.com/notifique/internal/server/dto"
 )
@@ -59,7 +61,7 @@ func (n Notification) GetKey() (DynamoKey, error) {
 	return key, nil
 }
 
-func (s *Registry) SaveNotification(ctx context.Context, createdBy string, notificationReq dto.NotificationReq) (string, error) {
+func (r *Registry) SaveNotification(ctx context.Context, createdBy string, notificationReq dto.NotificationReq) (string, error) {
 
 	if createdBy == "" {
 		return "", fmt.Errorf("creator id cannot be empty")
@@ -88,7 +90,7 @@ func (s *Registry) SaveNotification(ctx context.Context, createdBy string, notif
 		return "", fmt.Errorf("failed to marshall notification - %w", err)
 	}
 
-	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
+	_, err = r.client.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName: aws.String(NotificationsTable),
 		Item:      item,
 	})
@@ -103,7 +105,7 @@ func (s *Registry) SaveNotification(ctx context.Context, createdBy string, notif
 		ErrorMsg:       nil,
 	}
 
-	err = s.UpdateNotificationStatus(ctx, log)
+	err = r.UpdateNotificationStatus(ctx, log)
 
 	if err != nil {
 		return id, fmt.Errorf("failed to store notification status logs - %w", err)
@@ -112,7 +114,7 @@ func (s *Registry) SaveNotification(ctx context.Context, createdBy string, notif
 	return id, nil
 }
 
-func (s *Registry) UpdateNotificationStatus(ctx context.Context, statusLog c.NotificationStatusLog) error {
+func (r *Registry) UpdateNotificationStatus(ctx context.Context, statusLog c.NotificationStatusLog) error {
 
 	update := expression.Set(expression.Name("status"), expression.Value((statusLog.Status)))
 	condEx := expression.AttributeExists(expression.Name(NotificationHashKey))
@@ -142,7 +144,7 @@ func (s *Registry) UpdateNotificationStatus(ctx context.Context, statusLog c.Not
 		return fmt.Errorf("failed to marshal notification status log - %w", err)
 	}
 
-	_, err = s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+	_, err = r.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
 		TransactItems: []types.TransactWriteItem{{
 			Put: &types.Put{
 				TableName: aws.String(NotificationStatusLogTable),
@@ -162,6 +164,94 @@ func (s *Registry) UpdateNotificationStatus(ctx context.Context, statusLog c.Not
 
 	if err != nil {
 		return fmt.Errorf("failed to insert notification status log or update notification status - %w", err)
+	}
+
+	return nil
+}
+
+func (r *Registry) GetNotificationStatus(ctx context.Context, id string) (*c.NotificationStatus, error) {
+
+	var status *c.NotificationStatus
+
+	key, err := Notification{Id: id}.GetKey()
+
+	if err != nil {
+		return status, fmt.Errorf("failed to make notification key - %w", err)
+	}
+
+	projExp := expression.
+		ProjectionBuilder(expression.NamesList(expression.Name("status")))
+
+	expr, err := expression.
+		NewBuilder().
+		WithProjection(projExp).
+		Build()
+
+	if err != nil {
+		return status, fmt.Errorf("failed to build expression - %w", err)
+	}
+
+	resp, err := r.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName:                aws.String(NotificationsTable),
+		Key:                      key,
+		ProjectionExpression:     expr.Projection(),
+		ExpressionAttributeNames: expr.Names(),
+	})
+
+	if err != nil {
+		return status, fmt.Errorf("failed to retrieve the notification status - %w", err)
+	}
+
+	tmp := struct {
+		Status string `dynamodbav:"status"`
+	}{}
+
+	err = attributevalue.UnmarshalMap(resp.Item, &tmp)
+
+	if err != nil {
+		return status, fmt.Errorf("failed to unmarshal status - %w", err)
+	}
+
+	tmpStatus := c.NotificationStatus(tmp.Status)
+	status = &tmpStatus
+
+	return status, nil
+}
+
+func (r *Registry) DeleteNotification(ctx context.Context, id string) error {
+
+	status, err := r.GetNotificationStatus(ctx, id)
+
+	if err != nil {
+		return err
+	}
+
+	if status == nil {
+		return nil
+	}
+
+	canDelete := registry.IsDeletableStatus(*status)
+
+	if !canDelete {
+		return server.InvalidNotificationStatus{
+			Id:     id,
+			Status: string(*status),
+		}
+	}
+
+	key, err := Notification{Id: id}.GetKey()
+
+	if err != nil {
+		return fmt.Errorf("failed to make notification key - %w", err)
+	}
+
+	_, err = r.client.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+		TableName: aws.String(NotificationsTable),
+		Key:       key,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to delete notification - %w", err)
 	}
 
 	return nil

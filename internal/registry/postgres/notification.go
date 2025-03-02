@@ -7,6 +7,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/notifique/internal/registry"
+	"github.com/notifique/internal/server"
 	c "github.com/notifique/internal/server/controllers"
 	"github.com/notifique/internal/server/dto"
 )
@@ -77,7 +79,23 @@ WHERE
 	id = @notificationId;
 `
 
-func (ps *Registry) createStatusLog(ctx context.Context, tx pgx.Tx, statusLog c.NotificationStatusLog) error {
+const deleteTemplate = `
+DELETE FROM
+	notifications
+WHERE
+	id = $1;
+`
+
+const getNotificationStatusQry = `
+SELECT
+	status
+FROM
+	notifications
+WHERE
+	id = $1;
+`
+
+func (r *Registry) createStatusLog(ctx context.Context, tx pgx.Tx, statusLog c.NotificationStatusLog) error {
 
 	args := pgx.NamedArgs{
 		"notificationId": statusLog.NotificationId,
@@ -91,9 +109,9 @@ func (ps *Registry) createStatusLog(ctx context.Context, tx pgx.Tx, statusLog c.
 	return err
 }
 
-func (ps *Registry) UpdateNotificationStatus(ctx context.Context, statusLog c.NotificationStatusLog) error {
+func (r *Registry) UpdateNotificationStatus(ctx context.Context, statusLog c.NotificationStatusLog) error {
 
-	tx, err := ps.conn.Begin(ctx)
+	tx, err := r.conn.Begin(ctx)
 
 	if err != nil {
 		return fmt.Errorf("failed to start transaction - %w", err)
@@ -111,7 +129,7 @@ func (ps *Registry) UpdateNotificationStatus(ctx context.Context, statusLog c.No
 		return fmt.Errorf("failed to update notification status logs - %w", err)
 	}
 
-	err = ps.createStatusLog(ctx, tx, statusLog)
+	err = r.createStatusLog(ctx, tx, statusLog)
 
 	if err != nil {
 		tx.Rollback(ctx)
@@ -127,9 +145,9 @@ func (ps *Registry) UpdateNotificationStatus(ctx context.Context, statusLog c.No
 	return nil
 }
 
-func (ps *Registry) SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error) {
+func (r *Registry) SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error) {
 
-	tx, err := ps.conn.Begin(ctx)
+	tx, err := r.conn.Begin(ctx)
 
 	if err != nil {
 		return "", fmt.Errorf("failed to start transaction - %w", err)
@@ -205,7 +223,7 @@ func (ps *Registry) SaveNotification(ctx context.Context, createdBy string, noti
 		ErrorMsg:       nil,
 	}
 
-	err = ps.createStatusLog(ctx, tx, statusLog)
+	err = r.createStatusLog(ctx, tx, statusLog)
 
 	if err != nil {
 		tx.Rollback(ctx)
@@ -219,4 +237,63 @@ func (ps *Registry) SaveNotification(ctx context.Context, createdBy string, noti
 	}
 
 	return notificationId, nil
+}
+
+func (r *Registry) GetNotificationStatus(ctx context.Context, id string) (*c.NotificationStatus, error) {
+	var status *c.NotificationStatus
+
+	err := r.conn.QueryRow(ctx, getNotificationStatusQry, id).Scan(&status)
+
+	if err == pgx.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return status, fmt.Errorf("failed to query the notification status - %w", err)
+	}
+
+	return status, err
+}
+
+func (r *Registry) DeleteNotification(ctx context.Context, id string) error {
+
+	status, err := r.GetNotificationStatus(ctx, id)
+
+	if err != nil {
+		return err
+	}
+
+	if status == nil {
+		return nil
+	}
+
+	canDelete := registry.IsDeletableStatus(*status)
+
+	if !canDelete {
+		return server.InvalidNotificationStatus{
+			Id:     id,
+			Status: string(*status),
+		}
+	}
+
+	tx, err := r.conn.Begin(ctx)
+
+	if err != nil {
+		return fmt.Errorf("failed to start transaction - %w", err)
+	}
+
+	// Relies on ON DELETE CASCADE constraint to delete the notification
+	// channels, recipients, and logs
+	_, err = tx.Exec(ctx, deleteTemplate, id)
+
+	if err != nil {
+		tx.Rollback(ctx)
+		return fmt.Errorf("failed to delete notification - %w", err)
+	}
+
+	err = tx.Commit(ctx)
+
+	if err != nil {
+		return fmt.Errorf("failed to commit changes - %w", err)
+	}
+
+	return nil
 }

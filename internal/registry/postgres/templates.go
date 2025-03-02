@@ -346,7 +346,7 @@ func (r *Registry) DeleteTemplate(ctx context.Context, templateId string) error 
 		return fmt.Errorf("failed to start transaction - %w", err)
 	}
 
-	// Relies on ON DELETE CASCADE trigger to fully delete the template
+	// Relies on ON DELETE CASCADE constraint to delete the template variables
 	_, err = tx.Exec(ctx, deleteTemplateInfo, templateId)
 
 	if err != nil {

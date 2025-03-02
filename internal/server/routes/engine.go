@@ -49,7 +49,6 @@ func NewEngine(registry Registry, pub controllers.NotificationPublisher, bk cont
 		v.RegisterValidation("distributionListName", server.DLNameValidator)
 		v.RegisterValidation("unique_var_name", server.UniqueTemplateVarValidator)
 		v.RegisterValidation("future", server.FutureValidator)
-		v.RegisterValidation("uuod", server.UUIDValidator)
 	}
 
 	return r, nil
