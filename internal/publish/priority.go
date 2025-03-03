@@ -3,6 +3,7 @@ package publish
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	c "github.com/notifique/internal/server/controllers"
@@ -32,11 +33,19 @@ type PriorityQueues struct {
 
 type PriorityPublisher struct {
 	publisher Publisher
+	cache     c.NotificationCache
 	registry  c.NotificationRegistry
 	queues    PriorityQueues
 }
 
-func (p PriorityPublisher) Publish(ctx context.Context, n c.Notification) error {
+type PriorityPublisherCfg struct {
+	Publisher         Publisher
+	Cache             c.NotificationCache
+	Registry          c.NotificationRegistry
+	QueueConfigurator PriorityQueueConfigurator
+}
+
+func (p *PriorityPublisher) Publish(ctx context.Context, n c.Notification) error {
 
 	var queueUri *string = nil
 
@@ -61,6 +70,8 @@ func (p PriorityPublisher) Publish(ctx context.Context, n c.Notification) error 
 		return fmt.Errorf("failed to marshall message body - %w", err)
 	}
 
+	errorsArr := []error{}
+
 	publishErr := p.publisher.Publish(ctx, *queueUri, message)
 
 	status := c.Queued
@@ -68,6 +79,7 @@ func (p PriorityPublisher) Publish(ctx context.Context, n c.Notification) error 
 	var errorMsg *string
 
 	if publishErr != nil {
+		errorsArr = append(errorsArr, publishErr)
 		status = c.Failed
 		errStr := publishErr.Error()
 		errorMsg = &errStr
@@ -79,21 +91,23 @@ func (p PriorityPublisher) Publish(ctx context.Context, n c.Notification) error 
 		ErrorMsg:       errorMsg,
 	}
 
-	if logErr := p.registry.UpdateNotificationStatus(ctx, statusLog); logErr != nil {
-		if publishErr != nil {
-			return fmt.Errorf("publish failed (%v) and status update failed: %w", publishErr, logErr)
-		}
-		return fmt.Errorf("failed to update notification status: %w", logErr)
+	if cacheErr := p.cache.UpdateNotificationStatus(ctx, statusLog); cacheErr != nil {
+		errorsArr = append(errorsArr, fmt.Errorf("failed to update cache - %w", cacheErr))
 	}
 
-	return publishErr
+	if registryErr := p.registry.UpdateNotificationStatus(ctx, statusLog); registryErr != nil {
+		errorsArr = append(errorsArr, fmt.Errorf("failed to update notification status - %w", registryErr))
+	}
+
+	return errors.Join(errorsArr...)
 }
 
-func NewPriorityPublisher(p Publisher, c PriorityQueueConfigurator, s c.NotificationRegistry) *PriorityPublisher {
+func NewPriorityPublisher(cfg PriorityPublisherCfg) *PriorityPublisher {
 
 	return &PriorityPublisher{
-		publisher: p,
-		registry:  s,
-		queues:    c.GetPriorityQueues(),
+		publisher: cfg.Publisher,
+		registry:  cfg.Registry,
+		queues:    cfg.QueueConfigurator.GetPriorityQueues(),
+		cache:     cfg.Cache,
 	}
 }

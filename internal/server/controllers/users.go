@@ -33,7 +33,7 @@ type UserController struct {
 	Broker   UserNotificationBroker
 }
 
-func (nc UserController) GetUserNotifications(c *gin.Context) {
+func (nc *UserController) GetUserNotifications(c *gin.Context) {
 	var filters dto.UserNotificationFilters
 
 	if err := c.ShouldBind(&filters); err != nil {
@@ -53,7 +53,7 @@ func (nc UserController) GetUserNotifications(c *gin.Context) {
 	c.JSON(http.StatusOK, notifications)
 }
 
-func (nc UserController) GetUserConfig(c *gin.Context) {
+func (nc *UserController) GetUserConfig(c *gin.Context) {
 	userId := c.GetHeader(UserIdHeaderKey)
 	cfg, err := nc.Registry.GetUserConfig(c, userId)
 
@@ -66,7 +66,7 @@ func (nc UserController) GetUserConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, cfg)
 }
 
-func (nc UserController) SetReadStatus(c *gin.Context) {
+func (nc *UserController) SetReadStatus(c *gin.Context) {
 	var n dto.NotificationUriParams
 
 	if err := c.ShouldBindUri(&n); err != nil {
@@ -91,7 +91,7 @@ func (nc UserController) SetReadStatus(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-func (nc UserController) UpdateUserConfig(c *gin.Context) {
+func (nc *UserController) UpdateUserConfig(c *gin.Context) {
 
 	var userConfig dto.UserConfig
 
@@ -111,7 +111,7 @@ func (nc UserController) UpdateUserConfig(c *gin.Context) {
 	c.Status(http.StatusOK)
 }
 
-func (nc UserController) GetLiveUserNotifications(c *gin.Context) {
+func (nc *UserController) GetLiveUserNotifications(c *gin.Context) {
 
 	userId := c.GetHeader(UserIdHeaderKey)
 	ch, err := nc.Broker.Suscribe(c, userId)

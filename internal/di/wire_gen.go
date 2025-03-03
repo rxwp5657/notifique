@@ -39,21 +39,38 @@ func InjectPgPrioritySQS(envfile string) (*gin.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	client, err := publish.NewSQSClient(envConfig)
+	client, err := cache.NewRedisClient(envConfig)
 	if err != nil {
 		return nil, err
 	}
-	sqsPublisher := publish.NewSQSPublisher(client)
-	priorityPublisher := publish.NewPriorityPublisher(sqsPublisher, envConfig, registry)
-	redisClient, err := cache.NewRedisClient(envConfig)
+	redisCache, err := cache.NewRedisCache(client)
 	if err != nil {
 		return nil, err
 	}
-	redis, err := broker.NewRedisBroker(redisClient, envConfig)
+	sqsClient, err := publish.NewSQSClient(envConfig)
 	if err != nil {
 		return nil, err
 	}
-	engine, err := routes.NewEngine(registry, priorityPublisher, redis, envConfig)
+	sqsPublisher := publish.NewSQSPublisher(sqsClient)
+	priorityPublisherCfg := publish.PriorityPublisherCfg{
+		Publisher:         sqsPublisher,
+		Cache:             redisCache,
+		Registry:          registry,
+		QueueConfigurator: envConfig,
+	}
+	priorityPublisher := publish.NewPriorityPublisher(priorityPublisherCfg)
+	redis, err := broker.NewRedisBroker(client, envConfig)
+	if err != nil {
+		return nil, err
+	}
+	engineConfig := routes.EngineConfig{
+		Registry:            registry,
+		Cache:               redisCache,
+		Publisher:           priorityPublisher,
+		Broker:              redis,
+		VersionConfigurator: envConfig,
+	}
+	engine, err := routes.NewEngine(engineConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -69,23 +86,39 @@ func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	client, err := cache.NewRedisClient(envConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	redisCache, err := cache.NewRedisCache(client)
+	if err != nil {
+		return nil, nil, err
+	}
 	rabbitMQClient, cleanup, err := publish.NewRabbitMQClient(envConfig)
 	if err != nil {
 		return nil, nil, err
 	}
 	rabbitMQPublisher := publish.NewRabbitMQPublisher(rabbitMQClient)
-	priorityPublisher := publish.NewPriorityPublisher(rabbitMQPublisher, envConfig, registry)
-	client, err := cache.NewRedisClient(envConfig)
-	if err != nil {
-		cleanup()
-		return nil, nil, err
+	priorityPublisherCfg := publish.PriorityPublisherCfg{
+		Publisher:         rabbitMQPublisher,
+		Cache:             redisCache,
+		Registry:          registry,
+		QueueConfigurator: envConfig,
 	}
+	priorityPublisher := publish.NewPriorityPublisher(priorityPublisherCfg)
 	redis, err := broker.NewRedisBroker(client, envConfig)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
-	engine, err := routes.NewEngine(registry, priorityPublisher, redis, envConfig)
+	engineConfig := routes.EngineConfig{
+		Registry:            registry,
+		Cache:               redisCache,
+		Publisher:           priorityPublisher,
+		Broker:              redis,
+		VersionConfigurator: envConfig,
+	}
+	engine, err := routes.NewEngine(engineConfig)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
@@ -105,21 +138,38 @@ func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
 		return nil, err
 	}
 	registry := dynamoregistry.NewDynamoDBRegistry(client)
+	redisClient, err := cache.NewRedisClient(envConfig)
+	if err != nil {
+		return nil, err
+	}
+	redisCache, err := cache.NewRedisCache(redisClient)
+	if err != nil {
+		return nil, err
+	}
 	sqsClient, err := publish.NewSQSClient(envConfig)
 	if err != nil {
 		return nil, err
 	}
 	sqsPublisher := publish.NewSQSPublisher(sqsClient)
-	priorityPublisher := publish.NewPriorityPublisher(sqsPublisher, envConfig, registry)
-	redisClient, err := cache.NewRedisClient(envConfig)
-	if err != nil {
-		return nil, err
+	priorityPublisherCfg := publish.PriorityPublisherCfg{
+		Publisher:         sqsPublisher,
+		Cache:             redisCache,
+		Registry:          registry,
+		QueueConfigurator: envConfig,
 	}
+	priorityPublisher := publish.NewPriorityPublisher(priorityPublisherCfg)
 	redis, err := broker.NewRedisBroker(redisClient, envConfig)
 	if err != nil {
 		return nil, err
 	}
-	engine, err := routes.NewEngine(registry, priorityPublisher, redis, envConfig)
+	engineConfig := routes.EngineConfig{
+		Registry:            registry,
+		Cache:               redisCache,
+		Publisher:           priorityPublisher,
+		Broker:              redis,
+		VersionConfigurator: envConfig,
+	}
+	engine, err := routes.NewEngine(engineConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -136,129 +186,44 @@ func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
 		return nil, nil, err
 	}
 	registry := dynamoregistry.NewDynamoDBRegistry(client)
+	redisClient, err := cache.NewRedisClient(envConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	redisCache, err := cache.NewRedisCache(redisClient)
+	if err != nil {
+		return nil, nil, err
+	}
 	rabbitMQClient, cleanup, err := publish.NewRabbitMQClient(envConfig)
 	if err != nil {
 		return nil, nil, err
 	}
 	rabbitMQPublisher := publish.NewRabbitMQPublisher(rabbitMQClient)
-	priorityPublisher := publish.NewPriorityPublisher(rabbitMQPublisher, envConfig, registry)
-	redisClient, err := cache.NewRedisClient(envConfig)
-	if err != nil {
-		cleanup()
-		return nil, nil, err
+	priorityPublisherCfg := publish.PriorityPublisherCfg{
+		Publisher:         rabbitMQPublisher,
+		Cache:             redisCache,
+		Registry:          registry,
+		QueueConfigurator: envConfig,
 	}
+	priorityPublisher := publish.NewPriorityPublisher(priorityPublisherCfg)
 	redis, err := broker.NewRedisBroker(redisClient, envConfig)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
-	engine, err := routes.NewEngine(registry, priorityPublisher, redis, envConfig)
+	engineConfig := routes.EngineConfig{
+		Registry:            registry,
+		Cache:               redisCache,
+		Publisher:           priorityPublisher,
+		Broker:              redis,
+		VersionConfigurator: envConfig,
+	}
+	engine, err := routes.NewEngine(engineConfig)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
 	return engine, func() {
-		cleanup()
-	}, nil
-}
-
-func InjectPgMockedPubIntegrationTest(ctx context.Context, mockController *gomock.Controller) (*PostgresMockedPubIntegrationTest, func(), error) {
-	postgresContainer, cleanup, err := containers.NewPostgresContainer(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	redisContainer, cleanup2, err := containers.NewRedisContainer(ctx)
-	if err != nil {
-		cleanup()
-		return nil, nil, err
-	}
-	registry, err := postgresresgistry.NewPostgresRegistry(postgresContainer)
-	if err != nil {
-		cleanup2()
-		cleanup()
-		return nil, nil, err
-	}
-	mockNotificationPublisher := mock_controllers.NewMockNotificationPublisher(mockController)
-	client, err := cache.NewRedisClient(redisContainer)
-	if err != nil {
-		cleanup2()
-		cleanup()
-		return nil, nil, err
-	}
-	redis, err := broker.NewRedisBroker(client, redisContainer)
-	if err != nil {
-		cleanup2()
-		cleanup()
-		return nil, nil, err
-	}
-	testVersionConfiguratorFunc := config_test.NewTestVersionConfigurator()
-	engine, err := routes.NewEngine(registry, mockNotificationPublisher, redis, testVersionConfiguratorFunc)
-	if err != nil {
-		cleanup2()
-		cleanup()
-		return nil, nil, err
-	}
-	postgresMockedPubIntegrationTest := &PostgresMockedPubIntegrationTest{
-		PostgresContainer: postgresContainer,
-		RedisContainer:    redisContainer,
-		Registry:          registry,
-		Publisher:         mockNotificationPublisher,
-		Broker:            redis,
-		Engine:            engine,
-	}
-	return postgresMockedPubIntegrationTest, func() {
-		cleanup2()
-		cleanup()
-	}, nil
-}
-
-func InjectDynamoMockedPubIntegrationTest(ctx context.Context, mockController *gomock.Controller) (*DynamoMockedPubIntegrationTest, func(), error) {
-	dynamoContainer, cleanup, err := containers.NewDynamoContainer(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	redisContainer, cleanup2, err := containers.NewRedisContainer(ctx)
-	if err != nil {
-		cleanup()
-		return nil, nil, err
-	}
-	client, err := dynamoregistry.NewDynamoDBClient(dynamoContainer)
-	if err != nil {
-		cleanup2()
-		cleanup()
-		return nil, nil, err
-	}
-	registry := dynamoregistry.NewDynamoDBRegistry(client)
-	mockNotificationPublisher := mock_controllers.NewMockNotificationPublisher(mockController)
-	redisClient, err := cache.NewRedisClient(redisContainer)
-	if err != nil {
-		cleanup2()
-		cleanup()
-		return nil, nil, err
-	}
-	redis, err := broker.NewRedisBroker(redisClient, redisContainer)
-	if err != nil {
-		cleanup2()
-		cleanup()
-		return nil, nil, err
-	}
-	testVersionConfiguratorFunc := config_test.NewTestVersionConfigurator()
-	engine, err := routes.NewEngine(registry, mockNotificationPublisher, redis, testVersionConfiguratorFunc)
-	if err != nil {
-		cleanup2()
-		cleanup()
-		return nil, nil, err
-	}
-	dynamoMockedPubIntegrationTest := &DynamoMockedPubIntegrationTest{
-		DynamoContainer: dynamoContainer,
-		RedisContainer:  redisContainer,
-		Registry:        registry,
-		Publisher:       mockNotificationPublisher,
-		Broker:          redis,
-		Engine:          engine,
-	}
-	return dynamoMockedPubIntegrationTest, func() {
-		cleanup2()
 		cleanup()
 	}, nil
 }
@@ -273,27 +238,58 @@ func InjectPgSQSPriorityIntegrationTest(ctx context.Context) (*PgSQSPriorityInte
 		cleanup()
 		return nil, nil, err
 	}
+	redisContainer, cleanup3, err := containers.NewRedisContainer(ctx)
+	if err != nil {
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
 	registry, err := postgresresgistry.NewPostgresRegistry(postgresContainer)
 	if err != nil {
+		cleanup3()
 		cleanup2()
 		cleanup()
 		return nil, nil, err
 	}
 	client, err := publish.NewSQSClient(sqsPriorityContainer)
 	if err != nil {
+		cleanup3()
 		cleanup2()
 		cleanup()
 		return nil, nil, err
 	}
 	sqsPublisher := publish.NewSQSPublisher(client)
-	priorityPublisher := publish.NewPriorityPublisher(sqsPublisher, sqsPriorityContainer, registry)
+	redisClient, err := cache.NewRedisClient(redisContainer)
+	if err != nil {
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	redisCache, err := cache.NewRedisCache(redisClient)
+	if err != nil {
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	priorityPublisherCfg := publish.PriorityPublisherCfg{
+		Publisher:         sqsPublisher,
+		Cache:             redisCache,
+		Registry:          registry,
+		QueueConfigurator: sqsPriorityContainer,
+	}
+	priorityPublisher := publish.NewPriorityPublisher(priorityPublisherCfg)
 	pgSQSPriorityIntegrationTest := &PgSQSPriorityIntegrationTest{
 		PostgresContainer: postgresContainer,
 		SQSContainer:      sqsPriorityContainer,
+		RedisContainer:    redisContainer,
 		Registry:          registry,
 		Publisher:         priorityPublisher,
+		Cache:             redisCache,
 	}
 	return pgSQSPriorityIntegrationTest, func() {
+		cleanup3()
 		cleanup2()
 		cleanup()
 	}, nil
@@ -309,102 +305,60 @@ func InjectPgRabbitMQPriorityIntegrationTest(ctx context.Context) (*PgRabbitMQPr
 		cleanup()
 		return nil, nil, err
 	}
+	redisContainer, cleanup3, err := containers.NewRedisContainer(ctx)
+	if err != nil {
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
 	registry, err := postgresresgistry.NewPostgresRegistry(postgresContainer)
 	if err != nil {
-		cleanup2()
-		cleanup()
-		return nil, nil, err
-	}
-	rabbitMQClient, cleanup3, err := publish.NewRabbitMQClient(rabbitMQPriorityContainer)
-	if err != nil {
-		cleanup2()
-		cleanup()
-		return nil, nil, err
-	}
-	rabbitMQPublisher := publish.NewRabbitMQPublisher(rabbitMQClient)
-	priorityPublisher := publish.NewPriorityPublisher(rabbitMQPublisher, rabbitMQPriorityContainer, registry)
-	pgRabbitMQPriorityIntegrationTest := &PgRabbitMQPriorityIntegrationTest{
-		PostgresContainer: postgresContainer,
-		RabbitMQContainer: rabbitMQPriorityContainer,
-		Registry:          registry,
-		Publisher:         priorityPublisher,
-	}
-	return pgRabbitMQPriorityIntegrationTest, func() {
 		cleanup3()
 		cleanup2()
 		cleanup()
-	}, nil
-}
-
-func InjectDynamoSQSPriorityIntegrationTest(ctx context.Context) (*DynamoSQSPriorityIntegrationTest, func(), error) {
-	dynamoContainer, cleanup, err := containers.NewDynamoContainer(ctx)
-	if err != nil {
 		return nil, nil, err
 	}
-	sqsPriorityContainer, cleanup2, err := containers.NewSQSPriorityContainer(ctx)
+	rabbitMQClient, cleanup4, err := publish.NewRabbitMQClient(rabbitMQPriorityContainer)
 	if err != nil {
-		cleanup()
-		return nil, nil, err
-	}
-	client, err := dynamoregistry.NewDynamoDBClient(dynamoContainer)
-	if err != nil {
-		cleanup2()
-		cleanup()
-		return nil, nil, err
-	}
-	registry := dynamoregistry.NewDynamoDBRegistry(client)
-	sqsClient, err := publish.NewSQSClient(sqsPriorityContainer)
-	if err != nil {
-		cleanup2()
-		cleanup()
-		return nil, nil, err
-	}
-	sqsPublisher := publish.NewSQSPublisher(sqsClient)
-	priorityPublisher := publish.NewPriorityPublisher(sqsPublisher, sqsPriorityContainer, registry)
-	dynamoSQSPriorityIntegrationTest := &DynamoSQSPriorityIntegrationTest{
-		DynamoContainer: dynamoContainer,
-		SQSContainer:    sqsPriorityContainer,
-		Registry:        registry,
-		Publisher:       priorityPublisher,
-	}
-	return dynamoSQSPriorityIntegrationTest, func() {
-		cleanup2()
-		cleanup()
-	}, nil
-}
-
-func InjectDynamoRabbitMQPriorityIntegrationTest(ctx context.Context) (*DynamoRabbitMQPriorityIntegrationTest, func(), error) {
-	dynamoContainer, cleanup, err := containers.NewDynamoContainer(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	rabbitMQPriorityContainer, cleanup2, err := containers.NewRabbitMQPriorityContainer(ctx)
-	if err != nil {
-		cleanup()
-		return nil, nil, err
-	}
-	client, err := dynamoregistry.NewDynamoDBClient(dynamoContainer)
-	if err != nil {
-		cleanup2()
-		cleanup()
-		return nil, nil, err
-	}
-	registry := dynamoregistry.NewDynamoDBRegistry(client)
-	rabbitMQClient, cleanup3, err := publish.NewRabbitMQClient(rabbitMQPriorityContainer)
-	if err != nil {
+		cleanup3()
 		cleanup2()
 		cleanup()
 		return nil, nil, err
 	}
 	rabbitMQPublisher := publish.NewRabbitMQPublisher(rabbitMQClient)
-	priorityPublisher := publish.NewPriorityPublisher(rabbitMQPublisher, rabbitMQPriorityContainer, registry)
-	dynamoRabbitMQPriorityIntegrationTest := &DynamoRabbitMQPriorityIntegrationTest{
-		DynamoContainer:   dynamoContainer,
+	client, err := cache.NewRedisClient(redisContainer)
+	if err != nil {
+		cleanup4()
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	redisCache, err := cache.NewRedisCache(client)
+	if err != nil {
+		cleanup4()
+		cleanup3()
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	priorityPublisherCfg := publish.PriorityPublisherCfg{
+		Publisher:         rabbitMQPublisher,
+		Cache:             redisCache,
+		Registry:          registry,
+		QueueConfigurator: rabbitMQPriorityContainer,
+	}
+	priorityPublisher := publish.NewPriorityPublisher(priorityPublisherCfg)
+	pgRabbitMQPriorityIntegrationTest := &PgRabbitMQPriorityIntegrationTest{
+		PostgresContainer: postgresContainer,
 		RabbitMQContainer: rabbitMQPriorityContainer,
+		RedisContainer:    redisContainer,
 		Registry:          registry,
 		Publisher:         priorityPublisher,
+		Cache:             redisCache,
 	}
-	return dynamoRabbitMQPriorityIntegrationTest, func() {
+	return pgRabbitMQPriorityIntegrationTest, func() {
+		cleanup4()
 		cleanup3()
 		cleanup2()
 		cleanup()
@@ -419,8 +373,16 @@ func InjectMockedBackend(ctx context.Context, mockController *gomock.Controller)
 	mockedRegistry := mock_controllers.NewMockedRegistry(mockDistributionRegistry, mockUserRegistry, mockNotificationRegistry, mockNotificationTemplateRegistry)
 	mockNotificationPublisher := mock_controllers.NewMockNotificationPublisher(mockController)
 	mockUserNotificationBroker := mock_controllers.NewMockUserNotificationBroker(mockController)
+	mockNotificationCache := mock_controllers.NewMockNotificationCache(mockController)
 	testVersionConfiguratorFunc := config_test.NewTestVersionConfigurator()
-	engine, err := routes.NewEngine(mockedRegistry, mockNotificationPublisher, mockUserNotificationBroker, testVersionConfiguratorFunc)
+	engineConfig := routes.EngineConfig{
+		Registry:            mockedRegistry,
+		Cache:               mockNotificationCache,
+		Publisher:           mockNotificationPublisher,
+		Broker:              mockUserNotificationBroker,
+		VersionConfigurator: testVersionConfiguratorFunc,
+	}
+	engine, err := routes.NewEngine(engineConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -428,6 +390,7 @@ func InjectMockedBackend(ctx context.Context, mockController *gomock.Controller)
 		Registry:  mockedRegistry,
 		Publisher: mockNotificationPublisher,
 		Broker:    mockUserNotificationBroker,
+		Cache:     mockNotificationCache,
 		Engine:    engine,
 	}
 	return mockedBackend, nil
@@ -483,15 +446,19 @@ type DynamoMockedPubIntegrationTest struct {
 type PgSQSPriorityIntegrationTest struct {
 	PostgresContainer *containers.PostgresContainer
 	SQSContainer      *containers.SQSPriorityContainer
+	RedisContainer    *containers.RedisContainer
 	Registry          *postgresresgistry.Registry
 	Publisher         *publish.PriorityPublisher
+	Cache             *cache.RedisCache
 }
 
 type PgRabbitMQPriorityIntegrationTest struct {
 	PostgresContainer *containers.PostgresContainer
 	RabbitMQContainer *containers.RabbitMQPriorityContainer
+	RedisContainer    *containers.RedisContainer
 	Registry          *postgresresgistry.Registry
 	Publisher         *publish.PriorityPublisher
+	Cache             *cache.RedisCache
 }
 
 type DynamoSQSPriorityIntegrationTest struct {
@@ -512,6 +479,7 @@ type MockedBackend struct {
 	Registry  *mock_controllers.MockedRegistry
 	Publisher *mock_controllers.MockNotificationPublisher
 	Broker    *mock_controllers.MockUserNotificationBroker
+	Cache     *mock_controllers.MockNotificationCache
 	Engine    *gin.Engine
 }
 
@@ -523,27 +491,17 @@ var SQSPublisherSet = wire.NewSet(publish.NewSQSClient, publish.NewSQSPublisher,
 
 var RabbitMQPublisherSet = wire.NewSet(publish.NewRabbitMQClient, publish.NewRabbitMQPublisher, wire.Bind(new(publish.RabbitMQAPI), new(*publish.RabbitMQClient)), wire.Bind(new(publish.Publisher), new(*publish.RabbitMQPublisher)))
 
-var PostgresSQSPriroritySet = wire.NewSet(
-	PostgresSet,
-	SQSPublisherSet, publish.NewPriorityPublisher, wire.Bind(new(controllers.NotificationPublisher), new(*publish.PriorityPublisher)),
-)
+var PriorityPublisherCfgSet = wire.NewSet(wire.Struct(new(publish.PriorityPublisherCfg), "*"))
 
-var PostgresRabbitMQPriroritySet = wire.NewSet(
-	PostgresSet,
-	RabbitMQPublisherSet, publish.NewPriorityPublisher, wire.Bind(new(controllers.NotificationPublisher), new(*publish.PriorityPublisher)),
-)
+var RedisSet = wire.NewSet(cache.NewRedisClient, wire.Bind(new(cache.CacheRedisApi), new(*redis.Client)), wire.Bind(new(broker.BrokerRedisApi), new(*redis.Client)))
 
-var DynamoSQSPriroritySet = wire.NewSet(
-	DynamoSet,
-	SQSPublisherSet, publish.NewPriorityPublisher, wire.Bind(new(controllers.NotificationPublisher), new(*publish.PriorityPublisher)),
-)
+var RedisCacheSet = wire.NewSet(cache.NewRedisCache, wire.Bind(new(controllers.NotificationCache), new(*cache.RedisCache)), wire.Bind(new(routes.Cache), new(*cache.RedisCache)))
 
-var DynamoRabbitMQPriroritySet = wire.NewSet(
-	DynamoSet,
-	RabbitMQPublisherSet, publish.NewPriorityPublisher, wire.Bind(new(controllers.NotificationPublisher), new(*publish.PriorityPublisher)),
-)
+var RedisUserNotificationBrokerSet = wire.NewSet(broker.NewRedisBroker, wire.Bind(new(controllers.UserNotificationBroker), new(*broker.Redis)))
 
-var RedisUserNotificationBrokerSet = wire.NewSet(cache.NewRedisClient, broker.NewRedisBroker, wire.Bind(new(broker.RedisApi), new(*redis.Client)), wire.Bind(new(controllers.UserNotificationBroker), new(*broker.Redis)))
+var PrioritySet = wire.NewSet(
+	PriorityPublisherCfgSet, publish.NewPriorityPublisher, wire.Bind(new(controllers.NotificationPublisher), new(*publish.PriorityPublisher)),
+)
 
 var PostgresContainerSet = wire.NewSet(containers.NewPostgresContainer, wire.Bind(new(postgresresgistry.PostgresConfigurator), new(*containers.PostgresContainer)))
 
@@ -577,3 +535,7 @@ var MockedRegistrySet = wire.NewSet(
 var TestVersionConfiguratorSet = wire.NewSet(config_test.NewTestVersionConfigurator, wire.Bind(new(routes.VersionConfigurator), new(config_test.TestVersionConfiguratorFunc)))
 
 var EnvConfigSet = wire.NewSet(config.NewEnvConfig, wire.Bind(new(postgresresgistry.PostgresConfigurator), new(*config.EnvConfig)), wire.Bind(new(dynamoregistry.DynamoConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.PriorityQueueConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.SQSConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.RabbitMQConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.RabbitMQPriorityConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.SQSPriorityConfigurator), new(*config.EnvConfig)), wire.Bind(new(cache.RedisConfigurator), new(*config.EnvConfig)), wire.Bind(new(broker.BrokerConfigurator), new(*config.EnvConfig)), wire.Bind(new(routes.VersionConfigurator), new(*config.EnvConfig)))
+
+var MockedNotificationCacheSet = wire.NewSet(mock_controllers.NewMockNotificationCache, wire.Bind(new(routes.Cache), new(*mock_controllers.MockNotificationCache)))
+
+var EngineConfigSet = wire.NewSet(wire.Struct(new(routes.EngineConfig), "*"))

@@ -1,14 +1,18 @@
 package routes
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
 
 	c "github.com/notifique/internal/server/controllers"
 )
 
-func SetupDistributionListRoutes(r *gin.Engine, version string, dls c.DistributionRegistry) {
+func SetupDistributionListRoutes(r *gin.Engine, version string, controller *c.DistributionListController) error {
 
-	controller := c.DistributionListController{Registry: dls}
+	if controller == nil {
+		return errors.New("distribution lists controller is nil")
+	}
 
 	g := r.Group(version)
 	{
@@ -20,4 +24,6 @@ func SetupDistributionListRoutes(r *gin.Engine, version string, dls c.Distributi
 		g.PATCH("/distribution-lists/:name/recipients", controller.AddRecipients)
 		g.DELETE("/distribution-lists/:name/recipients", controller.DeleteRecipients)
 	}
+
+	return nil
 }

@@ -27,7 +27,7 @@ type DistributionListController struct {
 
 type recipientsHandler func(context.Context, string, []string) (*dto.DistributionListSummary, error)
 
-func (dc DistributionListController) CreateDistributionList(c *gin.Context) {
+func (dc *DistributionListController) CreateDistributionList(c *gin.Context) {
 	var dl dto.DistributionList
 
 	if err := c.ShouldBindJSON(&dl); err != nil {
@@ -48,7 +48,7 @@ func (dc DistributionListController) CreateDistributionList(c *gin.Context) {
 	c.Status(http.StatusCreated)
 }
 
-func (dc DistributionListController) GetDistributionLists(c *gin.Context) {
+func (dc *DistributionListController) GetDistributionLists(c *gin.Context) {
 	var filters dto.PageFilter
 
 	if err := c.ShouldBind(&filters); err != nil {
@@ -67,7 +67,7 @@ func (dc DistributionListController) GetDistributionLists(c *gin.Context) {
 	c.JSON(http.StatusOK, lists)
 }
 
-func (dc DistributionListController) GetRecipients(c *gin.Context) {
+func (dc *DistributionListController) GetRecipients(c *gin.Context) {
 	var uriParams dto.DistributionListUriParams
 
 	if err := c.ShouldBindUri(&uriParams); err != nil {
@@ -98,7 +98,7 @@ func (dc DistributionListController) GetRecipients(c *gin.Context) {
 	c.JSON(http.StatusOK, recipients)
 }
 
-func (dc DistributionListController) DeleteDistributionList(c *gin.Context) {
+func (dc *DistributionListController) DeleteDistributionList(c *gin.Context) {
 
 	var uriParams dto.DistributionListUriParams
 
@@ -118,15 +118,15 @@ func (dc DistributionListController) DeleteDistributionList(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func (dc DistributionListController) AddRecipients(c *gin.Context) {
+func (dc *DistributionListController) AddRecipients(c *gin.Context) {
 	dc.handleRecipients(c, dc.Registry.AddRecipients)
 }
 
-func (dc DistributionListController) DeleteRecipients(c *gin.Context) {
+func (dc *DistributionListController) DeleteRecipients(c *gin.Context) {
 	dc.handleRecipients(c, dc.Registry.DeleteRecipients)
 }
 
-func (dc DistributionListController) handleRecipients(c *gin.Context, handler recipientsHandler) {
+func (dc *DistributionListController) handleRecipients(c *gin.Context, handler recipientsHandler) {
 	var uriParams dto.DistributionListUriParams
 
 	if err := c.ShouldBindUri(&uriParams); err != nil {

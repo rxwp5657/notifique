@@ -1,13 +1,17 @@
 package routes
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
 	c "github.com/notifique/internal/server/controllers"
 )
 
-func SetupNotificationTemplateRoutes(r *gin.Engine, version string, ntr c.NotificationTemplateRegistry) {
+func SetupNotificationTemplateRoutes(r *gin.Engine, version string, controller *c.NotificationTemplateController) error {
 
-	controller := c.NotificationTemplateController{Registry: ntr}
+	if controller == nil {
+		return errors.New("distribution lists controller is nil")
+	}
 
 	g := r.Group(version)
 	{
@@ -16,4 +20,6 @@ func SetupNotificationTemplateRoutes(r *gin.Engine, version string, ntr c.Notifi
 		g.GET("/notifications/templates/:id", controller.GetTemplateDetails)
 		g.DELETE("/notifications/templates/:id", controller.DeleteTemplate)
 	}
+
+	return nil
 }

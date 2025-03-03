@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	di "github.com/notifique/internal/di"
+	"github.com/notifique/internal/server/controllers"
 	"github.com/notifique/internal/server/dto"
 	"github.com/notifique/internal/testutils"
 	"github.com/stretchr/testify/assert"
@@ -31,10 +33,22 @@ func TestNotificationController(t *testing.T) {
 
 	testCreateNotification(t, testApp.Engine, *testApp)
 	testDeleteNotification(t, testApp.Engine, *testApp)
+	testCancelNotificationDelivery(t, testApp.Engine, *testApp)
 }
 
 func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) {
-	mock.Publisher.EXPECT().Publish(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	mock.Publisher.
+		EXPECT().
+		Publish(gomock.Any(), gomock.Any()).
+		Return(nil).
+		Times(1)
+
+	mock.Cache.
+		EXPECT().
+		UpdateNotificationStatus(gomock.Any(), gomock.Any()).
+		Return(nil).
+		Times(1)
+
 	registryMock := mock.Registry.MockNotificationRegistry
 	userId := "1234"
 
@@ -227,6 +241,197 @@ func testDeleteNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 			}
 
 			w := deleteNotification(tt.notificationId)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.expectedError != "" {
+				resp := make(map[string]string)
+				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+					t.Fatal(err)
+				}
+				assert.Contains(t, resp["error"], tt.expectedError)
+			}
+		})
+	}
+}
+
+func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedBackend) {
+	userId := "1234"
+
+	cancelDelivery := func(notificationId string) *httptest.ResponseRecorder {
+		url := fmt.Sprintf("%s/%s/cancel", notificationsUrl, notificationId)
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodPost, url, nil)
+		req.Header.Add("userId", userId)
+		e.ServeHTTP(w, req)
+		return w
+	}
+
+	notificationId := uuid.NewString()
+	createdStatus := testutils.StatusPtr(controllers.Created)
+	canceledStatus := testutils.StatusPtr(controllers.Canceled)
+
+	expectedStatusLog := controllers.NotificationStatusLog{
+		NotificationId: notificationId,
+		Status:         *canceledStatus,
+	}
+
+	tests := []struct {
+		name           string
+		notificationId string
+		setupMock      func()
+		expectedStatus int
+		expectedError  string
+	}{
+		{
+			name:           "Can cancel a notification with CREATED status (with status retrieved from the cache)",
+			notificationId: notificationId,
+			expectedStatus: 204,
+			setupMock: func() {
+				mock.Cache.
+					EXPECT().
+					GetNotificationStatus(gomock.Any(), notificationId).
+					Return(createdStatus, nil).
+					Times(1)
+
+				mock.Cache.
+					EXPECT().
+					UpdateNotificationStatus(gomock.Any(), expectedStatusLog).
+					Return(nil).
+					Times(1)
+
+				mock.Registry.MockNotificationRegistry.
+					EXPECT().
+					UpdateNotificationStatus(gomock.Any(), expectedStatusLog).
+					Return(nil).
+					Times(1)
+			},
+		},
+		{
+			name:           "Can cancel a notification with CREATED status (with status retrieved from the db)",
+			notificationId: notificationId,
+			expectedStatus: 204,
+			setupMock: func() {
+				mock.Cache.
+					EXPECT().
+					GetNotificationStatus(gomock.Any(), notificationId).
+					Return(nil, nil).
+					Times(1)
+
+				mock.Registry.MockNotificationRegistry.
+					EXPECT().
+					GetNotificationStatus(gomock.Any(), notificationId).
+					Return(createdStatus, nil).
+					Times(1)
+
+				mock.Cache.
+					EXPECT().
+					UpdateNotificationStatus(gomock.Any(), expectedStatusLog).
+					Return(nil).
+					Times(1)
+
+				mock.Registry.MockNotificationRegistry.
+					EXPECT().
+					UpdateNotificationStatus(gomock.Any(), expectedStatusLog).
+					Return(nil).
+					Times(1)
+			},
+		},
+		{
+			name:           "Should fail if the status of the notification is SENDING (status from cache)",
+			notificationId: notificationId,
+			expectedStatus: 400,
+			expectedError:  "Notification is being sent",
+			setupMock: func() {
+				sendingStatus := testutils.StatusPtr(controllers.Sending)
+				mock.Cache.
+					EXPECT().
+					GetNotificationStatus(gomock.Any(), notificationId).
+					Return(sendingStatus, nil).
+					Times(1)
+			},
+		},
+		{
+			name:           "Should fail if the status of the notification is SENT (status from cache)",
+			notificationId: notificationId,
+			expectedStatus: 400,
+			expectedError:  "Notification has been sent",
+			setupMock: func() {
+				sentStatus := testutils.StatusPtr(controllers.Sent)
+				mock.Cache.
+					EXPECT().
+					GetNotificationStatus(gomock.Any(), notificationId).
+					Return(sentStatus, nil).
+					Times(1)
+			},
+		},
+		{
+			name:           "Should fail if the status of the notification is SENDING (status from db)",
+			notificationId: notificationId,
+			expectedStatus: 400,
+			expectedError:  "Notification is being sent",
+			setupMock: func() {
+				sendingStatus := testutils.StatusPtr(controllers.Sending)
+				mock.Cache.
+					EXPECT().
+					GetNotificationStatus(gomock.Any(), notificationId).
+					Return(nil, nil).
+					Times(1)
+
+				mock.Registry.MockNotificationRegistry.
+					EXPECT().
+					GetNotificationStatus(gomock.Any(), notificationId).
+					Return(sendingStatus, nil).
+					Times(1)
+			},
+		},
+		{
+			name:           "Should fail if the status of the notification is SENT (status from db)",
+			notificationId: notificationId,
+			expectedStatus: 400,
+			expectedError:  "Notification has been sent",
+			setupMock: func() {
+				sentStatus := testutils.StatusPtr(controllers.Sent)
+				mock.Cache.
+					EXPECT().
+					GetNotificationStatus(gomock.Any(), notificationId).
+					Return(nil, nil).
+					Times(1)
+
+				mock.Registry.MockNotificationRegistry.
+					EXPECT().
+					GetNotificationStatus(gomock.Any(), notificationId).
+					Return(sentStatus, nil).
+					Times(1)
+			},
+		},
+		{
+			name:           "Should fail if we can't update the cache",
+			notificationId: notificationId,
+			expectedStatus: 500,
+			setupMock: func() {
+				mock.Cache.
+					EXPECT().
+					GetNotificationStatus(gomock.Any(), notificationId).
+					Return(createdStatus, nil).
+					Times(1)
+
+				mock.Cache.
+					EXPECT().
+					UpdateNotificationStatus(gomock.Any(), expectedStatusLog).
+					Return(errors.New("some failure")).
+					Times(1)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupMock != nil {
+				tt.setupMock()
+			}
+
+			w := cancelDelivery(tt.notificationId)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 

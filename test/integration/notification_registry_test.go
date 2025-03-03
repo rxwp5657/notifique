@@ -18,7 +18,6 @@ type NotificationRegistryTester interface {
 	controllers.NotificationRegistry
 	r.ContainerTester
 	GetNotification(ctx context.Context, notificationId string) (dto.NotificationReq, error)
-	GetNotificationStatus(ctx context.Context, notificationId string) (*controllers.NotificationStatus, error)
 }
 
 func TestNotificationRegistryPostgres(t *testing.T) {
