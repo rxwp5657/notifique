@@ -136,8 +136,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/NotificationModel"
-    
+
     delete:
+      tags:
+        - notifications
+      summary: Delete a notification record.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Notification deleted successfully
+        "400":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: 
+            The notification can't be deleted as its queued or sending.
+        "500":
+          description: Internal server error
+
+  /notifications/{id}/cancel:
+    post:
       tags:
         - notifications
       summary: Cancel a notification if its not being sent or sending.

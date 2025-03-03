@@ -18,7 +18,8 @@ CREATE TYPE notification_status AS ENUM (
     'QUEUED',
     'SENDING',
     'SENT',
-    'FAILED'
+    'FAILED',
+    'CANCELED'
 );
 
 CREATE TYPE template_variable AS ENUM (

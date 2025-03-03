@@ -10,15 +10,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
+	"github.com/notifique/internal/deployments"
 	"github.com/notifique/internal/server/controllers"
 	"github.com/notifique/internal/server/routes"
 	"github.com/redis/go-redis/v9"
-	gomock "go.uber.org/mock/gomock"
+	"go.uber.org/mock/gomock"
 
 	bk "github.com/notifique/internal/broker"
 	cache "github.com/notifique/internal/cache"
 	cfg "github.com/notifique/internal/config"
-	"github.com/notifique/internal/deployments"
 	pub "github.com/notifique/internal/publish"
 	dynamoregistry "github.com/notifique/internal/registry/dynamodb"
 	pg "github.com/notifique/internal/registry/postgres"
@@ -48,15 +48,19 @@ type DynamoMockedPubIntegrationTest struct {
 type PgSQSPriorityIntegrationTest struct {
 	PostgresContainer *c.PostgresContainer
 	SQSContainer      *c.SQSPriorityContainer
+	RedisContainer    *c.RedisContainer
 	Registry          *pg.Registry
 	Publisher         *pub.PriorityPublisher
+	Cache             *cache.RedisCache
 }
 
 type PgRabbitMQPriorityIntegrationTest struct {
 	PostgresContainer *c.PostgresContainer
 	RabbitMQContainer *c.RabbitMQPriorityContainer
+	RedisContainer    *c.RedisContainer
 	Registry          *pg.Registry
 	Publisher         *pub.PriorityPublisher
+	Cache             *cache.RedisCache
 }
 
 type DynamoSQSPriorityIntegrationTest struct {
@@ -77,6 +81,7 @@ type MockedBackend struct {
 	Registry  *mk.MockedRegistry
 	Publisher *mk.MockNotificationPublisher
 	Broker    *mk.MockUserNotificationBroker
+	Cache     *mk.MockNotificationCache
 	Engine    *gin.Engine
 }
 
@@ -108,39 +113,31 @@ var RabbitMQPublisherSet = wire.NewSet(
 	wire.Bind(new(pub.Publisher), new(*pub.RabbitMQPublisher)),
 )
 
-var PostgresSQSPriroritySet = wire.NewSet(
-	PostgresSet,
-	SQSPublisherSet,
-	pub.NewPriorityPublisher,
-	wire.Bind(new(controllers.NotificationPublisher), new(*pub.PriorityPublisher)),
+var PriorityPublisherCfgSet = wire.NewSet(
+	wire.Struct(new(pub.PriorityPublisherCfg), "*"),
 )
 
-var PostgresRabbitMQPriroritySet = wire.NewSet(
-	PostgresSet,
-	RabbitMQPublisherSet,
-	pub.NewPriorityPublisher,
-	wire.Bind(new(controllers.NotificationPublisher), new(*pub.PriorityPublisher)),
+var RedisSet = wire.NewSet(
+	cache.NewRedisClient,
+	wire.Bind(new(cache.CacheRedisApi), new(*redis.Client)),
+	wire.Bind(new(bk.BrokerRedisApi), new(*redis.Client)),
 )
 
-var DynamoSQSPriroritySet = wire.NewSet(
-	DynamoSet,
-	SQSPublisherSet,
-	pub.NewPriorityPublisher,
-	wire.Bind(new(controllers.NotificationPublisher), new(*pub.PriorityPublisher)),
-)
-
-var DynamoRabbitMQPriroritySet = wire.NewSet(
-	DynamoSet,
-	RabbitMQPublisherSet,
-	pub.NewPriorityPublisher,
-	wire.Bind(new(controllers.NotificationPublisher), new(*pub.PriorityPublisher)),
+var RedisCacheSet = wire.NewSet(
+	cache.NewRedisCache,
+	wire.Bind(new(controllers.NotificationCache), new(*cache.RedisCache)),
+	wire.Bind(new(routes.Cache), new(*cache.RedisCache)),
 )
 
 var RedisUserNotificationBrokerSet = wire.NewSet(
-	cache.NewRedisClient,
 	bk.NewRedisBroker,
-	wire.Bind(new(bk.RedisApi), new(*redis.Client)),
 	wire.Bind(new(controllers.UserNotificationBroker), new(*bk.Redis)),
+)
+
+var PrioritySet = wire.NewSet(
+	PriorityPublisherCfgSet,
+	pub.NewPriorityPublisher,
+	wire.Bind(new(controllers.NotificationPublisher), new(*pub.PriorityPublisher)),
 )
 
 var PostgresContainerSet = wire.NewSet(
@@ -229,12 +226,26 @@ var EnvConfigSet = wire.NewSet(
 	wire.Bind(new(routes.VersionConfigurator), new(*cfg.EnvConfig)),
 )
 
+var MockedNotificationCacheSet = wire.NewSet(
+	mk.NewMockNotificationCache,
+	wire.Bind(new(routes.Cache), new(*mk.MockNotificationCache)),
+)
+
+var EngineConfigSet = wire.NewSet(
+	wire.Struct(new(routes.EngineConfig), "*"),
+)
+
 func InjectPgPrioritySQS(envfile string) (*gin.Engine, error) {
 
 	wire.Build(
 		EnvConfigSet,
-		PostgresSQSPriroritySet,
+		PostgresSet,
+		SQSPublisherSet,
+		RedisSet,
+		RedisCacheSet,
+		PrioritySet,
 		RedisUserNotificationBrokerSet,
+		EngineConfigSet,
 		routes.NewEngine,
 	)
 
@@ -245,8 +256,13 @@ func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
 
 	wire.Build(
 		EnvConfigSet,
-		PostgresRabbitMQPriroritySet,
+		PostgresSet,
+		RabbitMQPublisherSet,
+		RedisSet,
+		RedisCacheSet,
+		PrioritySet,
 		RedisUserNotificationBrokerSet,
+		EngineConfigSet,
 		routes.NewEngine,
 	)
 
@@ -257,8 +273,13 @@ func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
 
 	wire.Build(
 		EnvConfigSet,
-		DynamoSQSPriroritySet,
+		DynamoSet,
+		SQSPublisherSet,
+		RedisSet,
+		RedisCacheSet,
+		PrioritySet,
 		RedisUserNotificationBrokerSet,
+		EngineConfigSet,
 		routes.NewEngine,
 	)
 
@@ -269,41 +290,14 @@ func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
 
 	wire.Build(
 		EnvConfigSet,
-		DynamoRabbitMQPriroritySet,
-		RedisUserNotificationBrokerSet,
-		routes.NewEngine,
-	)
-
-	return nil, nil, nil
-}
-
-func InjectPgMockedPubIntegrationTest(ctx context.Context, mockController *gomock.Controller) (*PostgresMockedPubIntegrationTest, func(), error) {
-
-	wire.Build(
-		TestVersionConfiguratorSet,
-		PostgresContainerSet,
-		RedisContainerSet,
-		PostgresSet,
-		MockedPublihserSet,
-		RedisUserNotificationBrokerSet,
-		routes.NewEngine,
-		wire.Struct(new(PostgresMockedPubIntegrationTest), "*"),
-	)
-
-	return nil, nil, nil
-}
-
-func InjectDynamoMockedPubIntegrationTest(ctx context.Context, mockController *gomock.Controller) (*DynamoMockedPubIntegrationTest, func(), error) {
-
-	wire.Build(
-		TestVersionConfiguratorSet,
-		DynamoContainerSet,
-		RedisContainerSet,
 		DynamoSet,
-		MockedPublihserSet,
+		RabbitMQPublisherSet,
+		RedisSet,
+		RedisCacheSet,
+		PrioritySet,
 		RedisUserNotificationBrokerSet,
+		EngineConfigSet,
 		routes.NewEngine,
-		wire.Struct(new(DynamoMockedPubIntegrationTest), "*"),
 	)
 
 	return nil, nil, nil
@@ -314,7 +308,12 @@ func InjectPgSQSPriorityIntegrationTest(ctx context.Context) (*PgSQSPriorityInte
 	wire.Build(
 		PostgresContainerSet,
 		SQSPriorityContainerSet,
-		PostgresSQSPriroritySet,
+		RedisContainerSet,
+		PostgresSet,
+		RedisSet,
+		RedisCacheSet,
+		PrioritySet,
+		SQSPublisherSet,
 		wire.Struct(new(PgSQSPriorityIntegrationTest), "*"),
 	)
 
@@ -326,32 +325,13 @@ func InjectPgRabbitMQPriorityIntegrationTest(ctx context.Context) (*PgRabbitMQPr
 	wire.Build(
 		PostgresContainerSet,
 		RabbitMQPriorityContainerSet,
-		PostgresRabbitMQPriroritySet,
+		RedisContainerSet,
+		PostgresSet,
+		RedisSet,
+		RedisCacheSet,
+		PrioritySet,
+		RabbitMQPublisherSet,
 		wire.Struct(new(PgRabbitMQPriorityIntegrationTest), "*"),
-	)
-
-	return nil, nil, nil
-}
-
-func InjectDynamoSQSPriorityIntegrationTest(ctx context.Context) (*DynamoSQSPriorityIntegrationTest, func(), error) {
-
-	wire.Build(
-		DynamoContainerSet,
-		SQSPriorityContainerSet,
-		DynamoSQSPriroritySet,
-		wire.Struct(new(DynamoSQSPriorityIntegrationTest), "*"),
-	)
-
-	return nil, nil, nil
-}
-
-func InjectDynamoRabbitMQPriorityIntegrationTest(ctx context.Context) (*DynamoRabbitMQPriorityIntegrationTest, func(), error) {
-
-	wire.Build(
-		DynamoContainerSet,
-		RabbitMQPriorityContainerSet,
-		DynamoRabbitMQPriroritySet,
-		wire.Struct(new(DynamoRabbitMQPriorityIntegrationTest), "*"),
 	)
 
 	return nil, nil, nil
@@ -364,6 +344,8 @@ func InjectMockedBackend(ctx context.Context, mockController *gomock.Controller)
 		MockedRegistrySet,
 		MockedPublihserSet,
 		MockedUserNotificationBroker,
+		MockedNotificationCacheSet,
+		EngineConfigSet,
 		routes.NewEngine,
 		wire.Struct(new(MockedBackend), "*"),
 	)

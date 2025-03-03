@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/notifique/internal/server/controllers"
 	"github.com/notifique/internal/server/dto"
 )
 
@@ -186,4 +187,8 @@ func MakeTestNotificationTemplateInfoResp(numresps int) []dto.NotificationTempla
 
 func StrPtr(s string) *string {
 	return &s
+}
+
+func StatusPtr(status controllers.NotificationStatus) *controllers.NotificationStatus {
+	return &status
 }

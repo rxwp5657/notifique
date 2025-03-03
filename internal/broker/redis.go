@@ -20,13 +20,13 @@ type userChannel struct {
 	Quit           chan bool
 }
 
-type RedisApi interface {
+type BrokerRedisApi interface {
 	Subscribe(ctx context.Context, channels ...string) *redis.PubSub
 	Publish(ctx context.Context, channel string, message interface{}) *redis.IntCmd
 }
 
 type Redis struct {
-	client          RedisApi
+	client          BrokerRedisApi
 	channels        map[string]userChannel
 	channelCapacity int
 }
@@ -108,7 +108,7 @@ func (rb *Redis) Publish(ctx context.Context, userId string, un dto.UserNotifica
 	return nil
 }
 
-func NewRedisBroker(client RedisApi, bc BrokerConfigurator) (*Redis, error) {
+func NewRedisBroker(client BrokerRedisApi, bc BrokerConfigurator) (*Redis, error) {
 
 	channelSize, err := bc.GetBrokerChannelSize()
 

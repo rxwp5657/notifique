@@ -56,6 +56,21 @@ func (mr *MockNotificationRegistryMockRecorder) DeleteNotification(ctx, id any) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNotification", reflect.TypeOf((*MockNotificationRegistry)(nil).DeleteNotification), ctx, id)
 }
 
+// GetNotificationStatus mocks base method.
+func (m *MockNotificationRegistry) GetNotificationStatus(ctx context.Context, notificationId string) (*controllers.NotificationStatus, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNotificationStatus", ctx, notificationId)
+	ret0, _ := ret[0].(*controllers.NotificationStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNotificationStatus indicates an expected call of GetNotificationStatus.
+func (mr *MockNotificationRegistryMockRecorder) GetNotificationStatus(ctx, notificationId any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNotificationStatus", reflect.TypeOf((*MockNotificationRegistry)(nil).GetNotificationStatus), ctx, notificationId)
+}
+
 // SaveNotification mocks base method.
 func (m *MockNotificationRegistry) SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error) {
 	m.ctrl.T.Helper()
@@ -121,4 +136,57 @@ func (m *MockNotificationPublisher) Publish(ctx context.Context, notification co
 func (mr *MockNotificationPublisherMockRecorder) Publish(ctx, notification any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Publish", reflect.TypeOf((*MockNotificationPublisher)(nil).Publish), ctx, notification)
+}
+
+// MockNotificationCache is a mock of NotificationCache interface.
+type MockNotificationCache struct {
+	ctrl     *gomock.Controller
+	recorder *MockNotificationCacheMockRecorder
+	isgomock struct{}
+}
+
+// MockNotificationCacheMockRecorder is the mock recorder for MockNotificationCache.
+type MockNotificationCacheMockRecorder struct {
+	mock *MockNotificationCache
+}
+
+// NewMockNotificationCache creates a new mock instance.
+func NewMockNotificationCache(ctrl *gomock.Controller) *MockNotificationCache {
+	mock := &MockNotificationCache{ctrl: ctrl}
+	mock.recorder = &MockNotificationCacheMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockNotificationCache) EXPECT() *MockNotificationCacheMockRecorder {
+	return m.recorder
+}
+
+// GetNotificationStatus mocks base method.
+func (m *MockNotificationCache) GetNotificationStatus(ctx context.Context, notificationId string) (*controllers.NotificationStatus, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNotificationStatus", ctx, notificationId)
+	ret0, _ := ret[0].(*controllers.NotificationStatus)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNotificationStatus indicates an expected call of GetNotificationStatus.
+func (mr *MockNotificationCacheMockRecorder) GetNotificationStatus(ctx, notificationId any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNotificationStatus", reflect.TypeOf((*MockNotificationCache)(nil).GetNotificationStatus), ctx, notificationId)
+}
+
+// UpdateNotificationStatus mocks base method.
+func (m *MockNotificationCache) UpdateNotificationStatus(ctx context.Context, statusLog controllers.NotificationStatusLog) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateNotificationStatus", ctx, statusLog)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateNotificationStatus indicates an expected call of UpdateNotificationStatus.
+func (mr *MockNotificationCacheMockRecorder) UpdateNotificationStatus(ctx, statusLog any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateNotificationStatus", reflect.TypeOf((*MockNotificationCache)(nil).UpdateNotificationStatus), ctx, statusLog)
 }

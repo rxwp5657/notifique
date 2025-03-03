@@ -1,16 +1,17 @@
 package routes
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
 
 	c "github.com/notifique/internal/server/controllers"
 )
 
-func SetupUsersRoutes(r *gin.Engine, version string, us c.UserRegistry, bk c.UserNotificationBroker) {
+func SetupUsersRoutes(r *gin.Engine, version string, controller *c.UserController) error {
 
-	controller := c.UserController{
-		Registry: us,
-		Broker:   bk,
+	if controller == nil {
+		return errors.New("users controller is nil")
 	}
 
 	g := r.Group(version)
@@ -22,4 +23,6 @@ func SetupUsersRoutes(r *gin.Engine, version string, us c.UserRegistry, bk c.Use
 		g.GET("/users/me/notifications/config", controller.GetUserConfig)
 		g.PUT("/users/me/notifications/config", controller.UpdateUserConfig)
 	}
+
+	return nil
 }
