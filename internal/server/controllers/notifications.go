@@ -2,11 +2,13 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/notifique/internal/server"
 	"github.com/notifique/internal/server/dto"
 )
 
@@ -36,7 +38,8 @@ type NotificationRegistry interface {
 	SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error)
 	UpdateNotificationStatus(ctx context.Context, statusLog NotificationStatusLog) error
 	DeleteNotification(ctx context.Context, id string) error
-	GetNotificationStatus(ctx context.Context, notificationId string) (*NotificationStatus, error)
+	GetNotificationStatus(ctx context.Context, notificationId string) (NotificationStatus, error)
+	GetTemplateVariables(ctx context.Context, templateId string) ([]dto.TemplateVariable, error)
 }
 
 type NotificationPublisher interface {
@@ -58,16 +61,42 @@ const SendingNotificationMsg = "Notification is being sent"
 const SentNotificationMsg = "Notification has been sent"
 
 func (nc *NotificationController) CreateNotification(c *gin.Context) {
-	var notification dto.NotificationReq
+	var notificationReq dto.NotificationReq
 
-	if err := c.ShouldBindJSON(&notification); err != nil {
+	if err := c.ShouldBindJSON(&notificationReq); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	userId := c.GetHeader(UserIdHeaderKey)
 
-	notificationId, err := nc.Registry.SaveNotification(c, userId, notification)
+	if notificationReq.TemplateContents != nil {
+		templateId := notificationReq.TemplateContents.Id
+
+		templateVars, err := nc.Registry.GetTemplateVariables(
+			c.Request.Context(),
+			templateId,
+		)
+
+		if err != nil && errors.As(err, &server.EntityNotFound{}) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		} else if err != nil {
+			slog.Error(err.Error())
+			c.Status(http.StatusInternalServerError)
+			return
+		}
+
+		suppliedVars := notificationReq.TemplateContents.Variables
+		err = server.ValidateTemplateVars(templateVars, suppliedVars)
+
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	notificationId, err := nc.Registry.SaveNotification(c, userId, notificationReq)
 
 	if err != nil {
 		slog.Error(err.Error())
@@ -90,7 +119,7 @@ func (nc *NotificationController) CreateNotification(c *gin.Context) {
 		ctx := context.Background()
 
 		notificationWithId := Notification{
-			NotificationReq: notification,
+			NotificationReq: notificationReq,
 			Id:              notificationId,
 		}
 
@@ -115,6 +144,7 @@ func (nc *NotificationController) DeleteNotification(c *gin.Context) {
 	if err != nil {
 		slog.Error(err.Error())
 		c.Status(http.StatusInternalServerError)
+		return
 	}
 
 	c.Status(http.StatusNoContent)
@@ -142,12 +172,18 @@ func (nc *NotificationController) CancelDelivery(c *gin.Context) {
 	}
 
 	if status == nil {
-		status, err = nc.Registry.GetNotificationStatus(c.Request.Context(), params.NotificationId)
-		if err != nil {
+		dbStatus, err := nc.Registry.GetNotificationStatus(c.Request.Context(), params.NotificationId)
+
+		if err != nil && errors.As(err, &server.EntityNotFound{}) {
+			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+			return
+		} else if err != nil {
 			slog.Error(err.Error())
 			c.Status(http.StatusInternalServerError)
 			return
 		}
+
+		status = &dbStatus
 	}
 
 	if msg, ok := invalidStatuses[*status]; ok {

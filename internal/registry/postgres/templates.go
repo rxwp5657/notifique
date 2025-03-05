@@ -362,3 +362,33 @@ func (r *Registry) DeleteTemplate(ctx context.Context, templateId string) error 
 
 	return nil
 }
+
+func (r *Registry) GetTemplateVariables(ctx context.Context, templateId string) ([]dto.TemplateVariable, error) {
+	variables := []dto.TemplateVariable{}
+
+	rows, err := r.conn.Query(ctx, getTemplateVariables, templateId)
+
+	if err != nil {
+		return variables, fmt.Errorf("failed to query template variables - %w", err)
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		var variable dto.TemplateVariable
+		err := rows.Scan(
+			&variable.Name,
+			&variable.Type,
+			&variable.Required,
+			&variable.Validation,
+		)
+
+		if err != nil {
+			return variables, fmt.Errorf("failed to scan template variable - %w", err)
+		}
+
+		variables = append(variables, variable)
+	}
+
+	return variables, nil
+}

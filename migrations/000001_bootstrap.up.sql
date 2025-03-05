@@ -22,11 +22,11 @@ CREATE TYPE notification_status AS ENUM (
     'CANCELED'
 );
 
-CREATE TYPE template_variable AS ENUM (
+CREATE TYPE template_variable_type AS ENUM (
     'STRING',
     'NUMBER',
     'DATE',
-    'TIME'
+    'DATETIME'
 );
 
 CREATE TABLE IF NOT EXISTS distribution_lists (
@@ -48,10 +48,36 @@ CREATE TABLE IF NOT EXISTS distribution_list_recipients (
 CREATE UNIQUE INDEX IF NOT EXISTS distribution_list_recipients_idx
 ON distribution_list_recipients("name", recipient);
 
+CREATE TABLE IF NOT EXISTS notification_templates (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "name" VARCHAR NOT NULL,
+    title_template VARCHAR NOT NULL,
+    contents_template VARCHAR NOT NULL,
+    "description" VARCHAR NOT NULL,
+    created_by VARCHAR NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() at time zone 'utc'),
+    updated_by VARCHAR,
+    updated_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS notification_template_variables (
+    template_id uuid NOT NULL,
+    "name" VARCHAR NOT NULL,
+    "type" template_variable_type NOT NULL,
+    "required" BOOLEAN NOT NULL,
+    "validation" VARCHAR,
+    CONSTRAINT template_variable_pk
+        PRIMARY KEY(template_id, "name"),
+    CONSTRAINT template_id_fk
+        FOREIGN KEY (template_id)
+        REFERENCES notification_templates(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS notifications (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    title VARCHAR NOT NULL,
-    contents VARCHAR NOT NULL,
+    title VARCHAR,
+    contents VARCHAR,
+    template_id uuid,
     image_url VARCHAR,
     topic VARCHAR NOT NULL,
     "priority" notification_priority DEFAULT 'LOW',
@@ -61,11 +87,23 @@ CREATE TABLE IF NOT EXISTS notifications (
     CONSTRAINT distribution_list_fk
         FOREIGN KEY (distribution_list)
         REFERENCES distribution_lists("name")
-        ON DELETE SET NULL (distribution_list)
+        ON DELETE SET NULL (distribution_list),
+    CONSTRAINT template_id_fk
+        FOREIGN KEY (template_id)
+        REFERENCES notification_templates(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS notifications_idx
 ON notifications(id, created_at);
+
+CREATE TABLE IF NOT EXISTS notification_template_variable_contents (
+    notification_id uuid NOT NULL,
+    "name" VARCHAR NOT NULL,
+    "value" VARCHAR NOT NULL,
+    CONSTRAINT notification_id_fk
+        FOREIGN KEY (notification_id)
+        REFERENCES notifications(id) ON DELETE CASCADE
+);
 
 CREATE TABLE IF NOT EXISTS notification_status_log(
     notification_id uuid NOT NULL,
@@ -125,31 +163,6 @@ CREATE TABLE IF NOT EXISTS user_config (
     in_app_snooze_until TIMESTAMPTZ,
     push_opt_in BOOLEAN NOT NULL DEFAULT TRUE,
     push_snooze_until TIMESTAMPTZ
-);
-
-CREATE TABLE IF NOT EXISTS notification_templates (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    "name" VARCHAR NOT NULL,
-    title_template VARCHAR NOT NULL,
-    contents_template VARCHAR NOT NULL,
-    "description" VARCHAR NOT NULL,
-    created_by VARCHAR NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT (NOW() at time zone 'utc'),
-    updated_by VARCHAR,
-    updated_at TIMESTAMPTZ
-);
-
-CREATE TABLE IF NOT EXISTS notification_template_variables (
-    template_id uuid NOT NULL,
-    "name" VARCHAR NOT NULL,
-    "type" template_variable NOT NULL,
-    "required" BOOLEAN NOT NULL,
-    "validation" VARCHAR,
-    CONSTRAINT template_variable_pk
-        PRIMARY KEY(template_id, "name"),
-    CONSTRAINT template_id_fk
-        FOREIGN KEY (template_id)
-        REFERENCES notification_templates(id) ON DELETE CASCADE
 );
 
 COMMIT;

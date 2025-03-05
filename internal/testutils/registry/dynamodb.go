@@ -151,9 +151,37 @@ func (t *dynamoregistryTester) GetNotification(ctx context.Context,
 		return dto.NotificationReq{}, err
 	}
 
+	var rawContents *dto.RawContents
+
+	if n.RawContents != nil {
+		rawContents = &dto.RawContents{
+			Title:    n.RawContents.Title,
+			Contents: n.RawContents.Contents,
+		}
+	}
+
+	var templateContents *dto.TemplateContents
+
+	if n.TemplateContents != nil {
+		numVariables := len(n.TemplateContents.Variables)
+		variables := make([]dto.TemplateVariableContents, 0, numVariables)
+
+		for _, v := range n.TemplateContents.Variables {
+			variables = append(variables, dto.TemplateVariableContents{
+				Name:  v.Name,
+				Value: v.Value,
+			})
+		}
+
+		templateContents = &dto.TemplateContents{
+			Id:        n.TemplateContents.Id,
+			Variables: variables,
+		}
+	}
+
 	req := dto.NotificationReq{
-		Title:            n.Title,
-		Contents:         n.Contents,
+		RawContents:      rawContents,
+		TemplateContents: templateContents,
 		Image:            n.Image,
 		Topic:            n.Topic,
 		Priority:         n.Priority,

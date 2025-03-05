@@ -2,6 +2,7 @@ package postgresresgistry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -17,6 +18,7 @@ const InsertNotification = `
 INSERT INTO notifications (
 	title,
 	contents,
+	template_id,
 	image_url,
 	topic,
 	priority,
@@ -26,6 +28,7 @@ INSERT INTO notifications (
 ) VALUES (
 	@title,
 	@contents,
+	@templateId,
 	@imageUrl,
 	@topic,
 	@priority,
@@ -34,6 +37,18 @@ INSERT INTO notifications (
 	@status
 ) RETURNING
 	id;
+`
+
+const insertNotificationTemplateVariableContents = `
+INSERT INTO notification_template_variable_contents(
+	notification_id,
+	name,
+	value
+) VALUES (
+	@notificationId,
+	@name,
+	@value
+);
 `
 
 const InsertNotificationRecipients = `
@@ -145,7 +160,7 @@ func (r *Registry) UpdateNotificationStatus(ctx context.Context, statusLog c.Not
 	return nil
 }
 
-func (r *Registry) SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error) {
+func (r *Registry) SaveNotification(ctx context.Context, createdBy string, notificationReq dto.NotificationReq) (string, error) {
 
 	tx, err := r.conn.Begin(ctx)
 
@@ -154,14 +169,22 @@ func (r *Registry) SaveNotification(ctx context.Context, createdBy string, notif
 	}
 
 	notificationArgs := pgx.NamedArgs{
-		"title":            notification.Title,
-		"contents":         notification.Contents,
-		"imageUrl":         notification.Image,
-		"topic":            notification.Topic,
-		"priority":         notification.Priority,
-		"distributionList": notification.DistributionList,
+		"title":            nil,
+		"contents":         nil,
+		"templateId":       nil,
+		"imageUrl":         notificationReq.Image,
+		"topic":            notificationReq.Topic,
+		"priority":         notificationReq.Priority,
+		"distributionList": notificationReq.DistributionList,
 		"createdAt":        time.Now().Format(time.RFC3339Nano),
 		"status":           c.Created,
+	}
+
+	if notificationReq.RawContents != nil {
+		notificationArgs["title"] = notificationReq.RawContents.Title
+		notificationArgs["contents"] = notificationReq.RawContents.Contents
+	} else {
+		notificationArgs["templateId"] = notificationReq.TemplateContents.Id
 	}
 
 	var notificationIdUUID uuid.UUID
@@ -175,9 +198,34 @@ func (r *Registry) SaveNotification(ctx context.Context, createdBy string, notif
 
 	notificationId := notificationIdUUID.String()
 
-	recipientsArgs := make([]pgx.NamedArgs, 0, len(notification.Recipients))
+	if notificationReq.TemplateContents != nil {
+		numVariables := len(notificationReq.TemplateContents.Variables)
+		variables := make([]pgx.NamedArgs, 0, numVariables)
 
-	for _, recipient := range notification.Recipients {
+		for _, v := range notificationReq.TemplateContents.Variables {
+			variables = append(variables, pgx.NamedArgs{
+				"notificationId": notificationId,
+				"name":           v.Name,
+				"value":          v.Value,
+			})
+		}
+
+		err := batchInsert(
+			ctx,
+			insertNotificationTemplateVariableContents,
+			variables,
+			tx,
+		)
+
+		if err != nil {
+			tx.Rollback(ctx)
+			return "", fmt.Errorf("failed to insert notification template variables - %w", err)
+		}
+	}
+
+	recipientsArgs := make([]pgx.NamedArgs, 0, len(notificationReq.Recipients))
+
+	for _, recipient := range notificationReq.Recipients {
 		recipientsArgs = append(recipientsArgs, pgx.NamedArgs{
 			"notificationId": notificationId,
 			"recipient":      recipient,
@@ -196,9 +244,9 @@ func (r *Registry) SaveNotification(ctx context.Context, createdBy string, notif
 		return "", err
 	}
 
-	channelsArgs := make([]pgx.NamedArgs, 0, len(notification.Channels))
+	channelsArgs := make([]pgx.NamedArgs, 0, len(notificationReq.Channels))
 
-	for _, channel := range notification.Channels {
+	for _, channel := range notificationReq.Channels {
 		channelsArgs = append(channelsArgs, pgx.NamedArgs{
 			"notificationId": notificationId,
 			"channel":        channel,
@@ -239,13 +287,13 @@ func (r *Registry) SaveNotification(ctx context.Context, createdBy string, notif
 	return notificationId, nil
 }
 
-func (r *Registry) GetNotificationStatus(ctx context.Context, id string) (*c.NotificationStatus, error) {
-	var status *c.NotificationStatus
+func (r *Registry) GetNotificationStatus(ctx context.Context, id string) (c.NotificationStatus, error) {
+	var status c.NotificationStatus
 
 	err := r.conn.QueryRow(ctx, getNotificationStatusQry, id).Scan(&status)
 
 	if err == pgx.ErrNoRows {
-		return nil, nil
+		return status, server.EntityNotFound{Id: id, Type: registry.NotificationType}
 	} else if err != nil {
 		return status, fmt.Errorf("failed to query the notification status - %w", err)
 	}
@@ -257,20 +305,18 @@ func (r *Registry) DeleteNotification(ctx context.Context, id string) error {
 
 	status, err := r.GetNotificationStatus(ctx, id)
 
-	if err != nil {
+	if err != nil && errors.As(err, &server.EntityNotFound{}) {
+		return nil
+	} else if err != nil {
 		return err
 	}
 
-	if status == nil {
-		return nil
-	}
-
-	canDelete := registry.IsDeletableStatus(*status)
+	canDelete := registry.IsDeletableStatus(status)
 
 	if !canDelete {
 		return server.InvalidNotificationStatus{
 			Id:     id,
-			Status: string(*status),
+			Status: string(status),
 		}
 	}
 

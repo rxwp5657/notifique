@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/notifique/internal/registry"
 	"github.com/notifique/internal/server"
 	"github.com/notifique/internal/server/controllers"
 	"github.com/notifique/internal/server/dto"
@@ -16,6 +17,7 @@ import (
 
 type NotificationRegistryTester interface {
 	controllers.NotificationRegistry
+	controllers.NotificationTemplateRegistry
 	r.ContainerTester
 	GetNotification(ctx context.Context, notificationId string) (dto.NotificationReq, error)
 }
@@ -48,49 +50,144 @@ func TestNotificationRegistryDynamo(t *testing.T) {
 
 	testCreateNotification(ctx, t, tester)
 	testUpdateNotificationStatus(ctx, t, tester)
+	testDeleteNotification(ctx, t, tester)
 }
 
 func testCreateNotification(ctx context.Context, t *testing.T, nt NotificationRegistryTester) {
 
 	userId := "1234"
-
-	testNofiticationReq := testutils.MakeTestNotificationRequest()
-
 	defer r.Clear(ctx, t, nt)
 
-	t.Run("Should be able to create a new notification", func(t *testing.T) {
-		notificationId, err := nt.SaveNotification(ctx, userId, testNofiticationReq)
-		assert.Nil(t, err)
-		assert.Nil(t, uuid.Validate(notificationId))
+	// Create template for template-based notification tests
+	templateReq := dto.NotificationTemplateReq{
+		Name:             "signed-in-notification",
+		TitleTemplate:    "Hi {user}!",
+		ContentsTemplate: "Welcome {optional} to {app_name}!",
+		Description:      "User has signed-in",
+		Variables: []dto.TemplateVariable{
+			{
+				Name:       "{user}",
+				Type:       "STRING",
+				Required:   true,
+				Validation: testutils.StrPtr("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"),
+			},
+			{
+				Name:     "{app_name}",
+				Type:     "STRING",
+				Required: true,
+			},
+			{
+				Name:     "{optional}",
+				Type:     "NUMBER",
+				Required: false,
+			},
+		},
+	}
 
-		notification, err := nt.GetNotification(ctx, notificationId)
+	templateResp, err := nt.SaveTemplate(ctx, userId, templateReq)
 
-		if err != nil {
-			t.Fatal(err)
-		}
+	if err != nil {
+		t.Fatal(err)
+	}
 
-		assert.Equal(t, testNofiticationReq.Title, notification.Title)
-		assert.Equal(t, testNofiticationReq.Contents, notification.Contents)
-		assert.Equal(t, testNofiticationReq.Topic, notification.Topic)
-		assert.Equal(t, testNofiticationReq.Priority, notification.Priority)
-		assert.Equal(t, testNofiticationReq.DistributionList, notification.DistributionList)
-		assert.ElementsMatch(t, testNofiticationReq.Recipients, notification.Recipients)
-		assert.ElementsMatch(t, testNofiticationReq.Channels, notification.Channels)
+	tests := []struct {
+		name    string
+		request dto.NotificationReq
+	}{
+		{
+			name:    "Create notification with raw contents",
+			request: testutils.MakeTestNotificationRequestRawContents(),
+		},
+		{
+			name: "Create notification with template contents",
+			request: dto.NotificationReq{
+				TemplateContents: &dto.TemplateContents{
+					Id: templateResp.Id,
+					Variables: []dto.TemplateVariableContents{
+						{
+							Name:  "{user}",
+							Value: "550e8400-e29b-41d4-a716-446655440000",
+						},
+						{
+							Name:  "{app_name}",
+							Value: "Test App",
+						},
+						{
+							Name:  "{optional}",
+							Value: "42",
+						},
+					},
+				},
+				Topic:      "template-test",
+				Priority:   "HIGH",
+				Recipients: []string{"user1", "user2"},
+				Channels:   []string{"e-mail", "sms"},
+			},
+		},
+		{
+			name: "Create notification with invalid template variable",
+			request: dto.NotificationReq{
+				TemplateContents: &dto.TemplateContents{
+					Id: templateResp.Id,
+					Variables: []dto.TemplateVariableContents{
+						{
+							Name:  "{user}",
+							Value: "invalid-uuid",
+						},
+						{
+							Name:  "{app_name}",
+							Value: "Test App",
+						},
+					},
+				},
+				Topic:    "invalid-template",
+				Priority: "LOW",
+			},
+		},
+	}
 
-		status, err := nt.GetNotificationStatus(ctx, notificationId)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			notificationId, err := nt.SaveNotification(ctx, userId, tt.request)
 
-		if err != nil {
-			t.Fatal(err)
-		}
+			assert.Nil(t, err)
+			assert.Nil(t, uuid.Validate(notificationId))
 
-		assert.Equal(t, controllers.Created, *status)
-	})
+			// Verify stored notification
+			storedNotification, err := nt.GetNotification(ctx, notificationId)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if tt.request.RawContents != nil {
+				assert.Equal(t, tt.request.RawContents.Title, storedNotification.RawContents.Title)
+				assert.Equal(t, tt.request.RawContents.Contents, storedNotification.RawContents.Contents)
+			}
+
+			if tt.request.TemplateContents != nil {
+				assert.Equal(t, tt.request.TemplateContents.Id, storedNotification.TemplateContents.Id)
+				assert.ElementsMatch(t, tt.request.TemplateContents.Variables, storedNotification.TemplateContents.Variables)
+			}
+
+			assert.Equal(t, tt.request.Topic, storedNotification.Topic)
+			assert.Equal(t, tt.request.Priority, storedNotification.Priority)
+			assert.Equal(t, tt.request.DistributionList, storedNotification.DistributionList)
+			assert.ElementsMatch(t, tt.request.Recipients, storedNotification.Recipients)
+			assert.ElementsMatch(t, tt.request.Channels, storedNotification.Channels)
+
+			status, err := nt.GetNotificationStatus(ctx, notificationId)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assert.Equal(t, controllers.Created, status)
+		})
+	}
 }
 
 func testUpdateNotificationStatus(ctx context.Context, t *testing.T, nt NotificationRegistryTester) {
 
 	user := "1234"
-	testNofiticationReq := testutils.MakeTestNotificationRequest()
+	testNofiticationReq := testutils.MakeTestNotificationRequestRawContents()
 	notificationId, err := nt.SaveNotification(ctx, user, testNofiticationReq)
 
 	if err != nil {
@@ -117,7 +214,7 @@ func testUpdateNotificationStatus(ctx context.Context, t *testing.T, nt Notifica
 			t.Fatal(err)
 		}
 
-		assert.Equal(t, controllers.Queued, *status)
+		assert.Equal(t, controllers.Queued, status)
 	})
 }
 
@@ -134,7 +231,7 @@ func testDeleteNotification(ctx context.Context, t *testing.T, nt NotificationRe
 	}
 
 	for status := range testNotifications {
-		testNofiticationReq := testutils.MakeTestNotificationRequest()
+		testNofiticationReq := testutils.MakeTestNotificationRequestRawContents()
 		notificationId, err := nt.SaveNotification(ctx, user, testNofiticationReq)
 
 		if err != nil {
@@ -204,13 +301,8 @@ func testDeleteNotification(ctx context.Context, t *testing.T, nt NotificationRe
 			assert.Equal(t, tt.expectedError, actualErr)
 
 			if tt.expectedError == nil {
-				status, err := nt.GetNotificationStatus(ctx, tt.notificationId)
-
-				if err != nil {
-					t.Fatal(err)
-				}
-
-				assert.Nil(t, status)
+				_, err := nt.GetNotificationStatus(ctx, tt.notificationId)
+				assert.ErrorAs(t, err, &server.EntityNotFound{Id: tt.notificationId, Type: registry.NotificationType})
 			}
 		})
 	}

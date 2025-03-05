@@ -2,6 +2,7 @@ package dynamoregistry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -32,19 +33,36 @@ type NotificationStatusLog struct {
 	Error          *string `dynamodbav:"errorMsg"`
 }
 
+type rawContents struct {
+	Title    string `dynamodbav:"title"`
+	Contents string `dynamodbav:"contents"`
+}
+
+type templateVariableContents struct {
+	Name  string `dynamodbav:"name"`
+	Value string `dynamodbav:"value"`
+}
+
+type templateContents struct {
+	Id        string                     `dynamodbav:"id"`
+	Variables []templateVariableContents `dynamodbav:"variables"`
+}
+
 type Notification struct {
-	Id               string   `dynamodbav:"id"`
-	CreatedBy        string   `dynamodbav:"createdBy"`
-	CreatedAt        string   `dynamodbav:"createdAt"`
-	Title            string   `dynamodbav:"title"`
-	Contents         string   `dynamodbav:"contents"`
-	Image            *string  `dynamodbav:"image"`
-	Topic            string   `dynamodbav:"topic"`
-	Priority         string   `dynamodbav:"priority"`
-	DistributionList *string  `dynamodbav:"distributionList"`
-	Recipients       []string `dynamodbav:"recipients"`
-	Channels         []string `dynamodbav:"channels"`
-	Status           string   `dynamodbav:"status"`
+	Id               string            `dynamodbav:"id"`
+	RawContents      *rawContents      `dynamodbav:"rawContents"`
+	TemplateContents *templateContents `dynamodbav:"templateContents"`
+	CreatedBy        string            `dynamodbav:"createdBy"`
+	CreatedAt        string            `dynamodbav:"createdAt"`
+	Title            string            `dynamodbav:"title"`
+	Contents         string            `dynamodbav:"contents"`
+	Image            *string           `dynamodbav:"image"`
+	Topic            string            `dynamodbav:"topic"`
+	Priority         string            `dynamodbav:"priority"`
+	DistributionList *string           `dynamodbav:"distributionList"`
+	Recipients       []string          `dynamodbav:"recipients"`
+	Channels         []string          `dynamodbav:"channels"`
+	Status           string            `dynamodbav:"status"`
 }
 
 func (n Notification) GetKey() (DynamoKey, error) {
@@ -73,8 +91,6 @@ func (r *Registry) SaveNotification(ctx context.Context, createdBy string, notif
 		Id:               id,
 		CreatedBy:        createdBy,
 		CreatedAt:        time.Now().Format(time.RFC3339),
-		Title:            notificationReq.Title,
-		Contents:         notificationReq.Contents,
 		Image:            notificationReq.Image,
 		Topic:            notificationReq.Topic,
 		Priority:         notificationReq.Priority,
@@ -82,6 +98,28 @@ func (r *Registry) SaveNotification(ctx context.Context, createdBy string, notif
 		Recipients:       notificationReq.Recipients,
 		Channels:         notificationReq.Channels,
 		Status:           string(c.Created),
+	}
+
+	if notificationReq.RawContents != nil {
+		notification.RawContents = &rawContents{
+			Title:    notificationReq.RawContents.Title,
+			Contents: notificationReq.RawContents.Contents,
+		}
+	} else {
+		numVariables := len(notificationReq.TemplateContents.Variables)
+		variables := make([]templateVariableContents, 0, numVariables)
+
+		for _, v := range notificationReq.TemplateContents.Variables {
+			variables = append(variables, templateVariableContents{
+				Name:  v.Name,
+				Value: v.Value,
+			})
+		}
+
+		notification.TemplateContents = &templateContents{
+			Id:        notificationReq.TemplateContents.Id,
+			Variables: variables,
+		}
 	}
 
 	item, err := attributevalue.MarshalMap(notification)
@@ -169,9 +207,9 @@ func (r *Registry) UpdateNotificationStatus(ctx context.Context, statusLog c.Not
 	return nil
 }
 
-func (r *Registry) GetNotificationStatus(ctx context.Context, id string) (*c.NotificationStatus, error) {
+func (r *Registry) GetNotificationStatus(ctx context.Context, id string) (c.NotificationStatus, error) {
 
-	var status *c.NotificationStatus
+	var status c.NotificationStatus
 
 	key, err := Notification{Id: id}.GetKey()
 
@@ -202,6 +240,10 @@ func (r *Registry) GetNotificationStatus(ctx context.Context, id string) (*c.Not
 		return status, fmt.Errorf("failed to retrieve the notification status - %w", err)
 	}
 
+	if len(resp.Item) == 0 {
+		return status, server.EntityNotFound{Id: id, Type: registry.NotificationType}
+	}
+
 	tmp := struct {
 		Status string `dynamodbav:"status"`
 	}{}
@@ -212,8 +254,7 @@ func (r *Registry) GetNotificationStatus(ctx context.Context, id string) (*c.Not
 		return status, fmt.Errorf("failed to unmarshal status - %w", err)
 	}
 
-	tmpStatus := c.NotificationStatus(tmp.Status)
-	status = &tmpStatus
+	status = c.NotificationStatus(tmp.Status)
 
 	return status, nil
 }
@@ -222,20 +263,18 @@ func (r *Registry) DeleteNotification(ctx context.Context, id string) error {
 
 	status, err := r.GetNotificationStatus(ctx, id)
 
-	if err != nil {
+	if err != nil && errors.As(err, &server.EntityNotFound{}) {
+		return nil
+	} else if err != nil {
 		return err
 	}
 
-	if status == nil {
-		return nil
-	}
-
-	canDelete := registry.IsDeletableStatus(*status)
+	canDelete := registry.IsDeletableStatus(status)
 
 	if !canDelete {
 		return server.InvalidNotificationStatus{
 			Id:     id,
-			Status: string(*status),
+			Status: string(status),
 		}
 	}
 
