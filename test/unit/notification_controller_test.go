@@ -34,9 +34,10 @@ func TestNotificationController(t *testing.T) {
 	}
 
 	testCreateNotification(t, testApp.Engine, *testApp)
-	// testDeleteNotification(t, testApp.Engine, *testApp)
-	// testCancelNotificationDelivery(t, testApp.Engine, *testApp)
+	testDeleteNotification(t, testApp.Engine, *testApp)
+	testCancelNotificationDelivery(t, testApp.Engine, *testApp)
 }
+
 func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) {
 	mock.Publisher.
 		EXPECT().
@@ -48,7 +49,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 		EXPECT().
 		UpdateNotificationStatus(gomock.Any(), gomock.Any()).
 		Return(nil).
-		AnyTimes()
+		Times(2)
 
 	registryMock := mock.Registry.MockNotificationRegistry
 	userId := "1234"
@@ -435,12 +436,12 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 	}
 
 	notificationId := uuid.NewString()
-	createdStatus := testutils.StatusPtr(controllers.Created)
-	canceledStatus := testutils.StatusPtr(controllers.Canceled)
+	createdStatus := controllers.Created
+	canceledStatus := controllers.Canceled
 
 	expectedStatusLog := controllers.NotificationStatusLog{
 		NotificationId: notificationId,
-		Status:         *canceledStatus,
+		Status:         canceledStatus,
 	}
 
 	tests := []struct {
@@ -458,7 +459,7 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 				mock.Cache.
 					EXPECT().
 					GetNotificationStatus(gomock.Any(), notificationId).
-					Return(createdStatus, nil).
+					Return(testutils.StatusPtr(createdStatus), nil).
 					Times(1)
 
 				mock.Cache.
@@ -538,7 +539,7 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 			expectedStatus: 400,
 			expectedError:  "Notification is being sent",
 			setupMock: func() {
-				sendingStatus := testutils.StatusPtr(controllers.Sending)
+				sendingStatus := controllers.Sending
 				mock.Cache.
 					EXPECT().
 					GetNotificationStatus(gomock.Any(), notificationId).
@@ -558,7 +559,7 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 			expectedStatus: 400,
 			expectedError:  "Notification has been sent",
 			setupMock: func() {
-				sentStatus := testutils.StatusPtr(controllers.Sent)
+				sentStatus := controllers.Sent
 				mock.Cache.
 					EXPECT().
 					GetNotificationStatus(gomock.Any(), notificationId).
@@ -580,7 +581,7 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 				mock.Cache.
 					EXPECT().
 					GetNotificationStatus(gomock.Any(), notificationId).
-					Return(createdStatus, nil).
+					Return(testutils.StatusPtr(createdStatus), nil).
 					Times(1)
 
 				mock.Cache.
