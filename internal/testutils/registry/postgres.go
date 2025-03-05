@@ -36,6 +36,7 @@ const getNotification = `
 SELECT
 	title,
 	contents,
+	template_id,
 	image_url,
 	topic,
 	"priority",
@@ -104,6 +105,16 @@ WHERE
 	id = $1;
 `
 
+const getNotificationTemplateVariableContets = `
+SELECT
+	name,
+	value
+FROM
+	notification_template_variable_contents
+WHERE
+	notification_id = $1;
+`
+
 type postgresresgistryTester struct {
 	*ps.Registry
 	conn *pgxpool.Pool
@@ -163,14 +174,49 @@ func (t *postgresresgistryTester) DistributionListExists(ctx context.Context, dl
 	return numDLsWithName != 0, nil
 }
 
+func getNotificationData[T any](ctx context.Context,
+	t *postgresresgistryTester, query, notificationId string,
+	rowConsumer func(rows *pgx.Rows) (T, error)) ([]T, error) {
+
+	data := []T{}
+
+	rows, err := t.conn.Query(ctx, query, notificationId)
+
+	if err != nil {
+		return data, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+
+		row, err := rowConsumer(&rows)
+
+		if err != nil {
+			return data, err
+		}
+
+		data = append(data, row)
+	}
+
+	return data, nil
+}
+
 func (t *postgresresgistryTester) GetNotification(ctx context.Context, notificationId string) (dto.NotificationReq, error) {
 
 	notification := dto.NotificationReq{}
 
+	contents := struct {
+		Title      *string
+		Contents   *string
+		TemplateId *string
+	}{}
+
 	err := t.conn.QueryRow(ctx, getNotification, notificationId).
 		Scan(
-			&notification.Title,
-			&notification.Contents,
+			&contents.Title,
+			&contents.Contents,
+			&contents.TemplateId,
 			&notification.Image,
 			&notification.Topic,
 			&notification.Priority,
@@ -181,34 +227,37 @@ func (t *postgresresgistryTester) GetNotification(ctx context.Context, notificat
 		return notification, fmt.Errorf("failed to retrieve notification info - %w", err)
 	}
 
-	queryData := func(query string) ([]string, error) {
-
-		data := []string{}
-
-		rows, err := t.conn.Query(ctx, query, notificationId)
-
-		if err != nil {
-			return data, err
-		}
-
-		defer rows.Close()
-
-		for rows.Next() {
-			row := ""
-
-			err = rows.Scan(&row)
-
-			if err != nil {
-				return data, err
-			}
-
-			data = append(data, row)
-		}
-
-		return data, nil
+	queryString := func(rows *pgx.Rows) (string, error) {
+		row := ""
+		err = (*rows).Scan(&row)
+		return row, err
 	}
 
-	channels, err := queryData(getNotificationChannels)
+	queryVariable := func(rows *pgx.Rows) (dto.TemplateVariableContents, error) {
+		row := dto.TemplateVariableContents{}
+		err = (*rows).Scan(&row.Name, &row.Value)
+		return row, err
+	}
+
+	if contents.TemplateId != nil {
+		variables, err := getNotificationData(ctx, t, getNotificationTemplateVariableContets, notificationId, queryVariable)
+
+		if err != nil {
+			return notification, fmt.Errorf("failed to retrieve notification template variables - %w", err)
+		}
+
+		notification.TemplateContents = &dto.TemplateContents{
+			Id:        *contents.TemplateId,
+			Variables: variables,
+		}
+	} else {
+		notification.RawContents = &dto.RawContents{
+			Title:    *contents.Title,
+			Contents: *contents.Contents,
+		}
+	}
+
+	channels, err := getNotificationData(ctx, t, getNotificationChannels, notificationId, queryString)
 
 	if err != nil {
 		return notification, fmt.Errorf("failed to retrieve notification channels - %w", err)
@@ -216,7 +265,7 @@ func (t *postgresresgistryTester) GetNotification(ctx context.Context, notificat
 
 	notification.Channels = channels
 
-	recipients, err := queryData(getNotificationRecipients)
+	recipients, err := getNotificationData(ctx, t, getNotificationRecipients, notificationId, queryString)
 
 	if err != nil {
 		return notification, fmt.Errorf("failed to retrieve notification recipients - %w", err)

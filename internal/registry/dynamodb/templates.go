@@ -321,3 +321,67 @@ func (r *Registry) DeleteTemplate(ctx context.Context, id string) error {
 
 	return nil
 }
+
+func (r *Registry) GetTemplateVariables(ctx context.Context, templateId string) ([]dto.TemplateVariable, error) {
+
+	variables := []dto.TemplateVariable{}
+
+	key, err := NotificationTemplate{Id: templateId}.GetKey()
+
+	if err != nil {
+		return variables, fmt.Errorf("failed to make notification template key - %w", err)
+	}
+
+	projExp := expression.
+		ProjectionBuilder(expression.NamesList(expression.Name("variables")))
+
+	expr, err := expression.
+		NewBuilder().
+		WithProjection(projExp).
+		Build()
+
+	if err != nil {
+		return variables, fmt.Errorf("failed to build expression - %w", err)
+	}
+
+	resp, err := r.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName:                aws.String(NotificationsTemplateTable),
+		Key:                      key,
+		ProjectionExpression:     expr.Projection(),
+		ExpressionAttributeNames: expr.Names(),
+	})
+
+	if err != nil {
+		return variables, fmt.Errorf("failed to retrieve the notification template variables - %w", err)
+	}
+
+	if len(resp.Item) == 0 {
+		return variables, server.EntityNotFound{
+			Id:   templateId,
+			Type: registry.NotificationTemplateType,
+		}
+	}
+
+	tmp := struct {
+		Variables []TemplateVariable `dynamodbav:"variables"`
+	}{}
+
+	err = attributevalue.UnmarshalMap(resp.Item, &tmp)
+
+	if err != nil {
+		return variables, fmt.Errorf("failed to unmarshal variables - %w", err)
+	}
+
+	variables = make([]dto.TemplateVariable, 0, len(tmp.Variables))
+
+	for _, v := range tmp.Variables {
+		variables = append(variables, dto.TemplateVariable{
+			Name:       v.Name,
+			Type:       v.Type,
+			Required:   v.Required,
+			Validation: v.Validation,
+		})
+	}
+
+	return variables, nil
+}

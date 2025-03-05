@@ -928,21 +928,23 @@ components:
               type: object
               description: Template-based notification
               required:
-                - name
+                - templateId
                 - variables
               properties:
-                name:
+                templateId:
                   type: string
-                  description: Name of existing template
-                  example: "maintenance-alert"
+                  format: uuid
+                  description: Id of the notification template
                 variables:
-                  type: object
+                  type: array
                   description: Template variables
-                  example:
-                    service: "Payment API"
-                    date: "2024-03-20"
-                    startTime: "14:00"
-                    endTime: "16:00"
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      value:
+                        type: string
         - type: object
           properties:
             content:

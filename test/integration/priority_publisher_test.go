@@ -38,9 +38,13 @@ func testPriorityPublisher(t *testing.T, s c.NotificationRegistry, p c.Notificat
 
 	userId := "1234"
 
+	rawContents := &dto.RawContents{
+		Title:    "Notification 1",
+		Contents: "Notification Contents 1",
+	}
+
 	testNotificationReq := dto.NotificationReq{
-		Title:            "Notification 1",
-		Contents:         "Notification Contents 1",
+		RawContents:      rawContents,
 		Topic:            "Testing",
 		Priority:         "MEDIUM",
 		DistributionList: nil,

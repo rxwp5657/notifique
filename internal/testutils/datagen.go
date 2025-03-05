@@ -62,10 +62,50 @@ func MakeSummaries(lists []dto.DistributionList) []dto.DistributionListSummary {
 	return summaries
 }
 
-func MakeTestNotificationRequest() dto.NotificationReq {
+func MakeTestNotificationRequestRawContents() dto.NotificationReq {
+
+	rawContents := &dto.RawContents{
+		Title:    "Notification 1",
+		Contents: "Notification Contents 1",
+	}
+
 	testNofiticationReq := dto.NotificationReq{
-		Title:            "Notification 1",
-		Contents:         "Notification Contents 1",
+		RawContents:      rawContents,
+		Topic:            "Testing",
+		Priority:         "MEDIUM",
+		DistributionList: nil,
+		Recipients:       []string{"1234"},
+		Channels:         []string{"in-app", "e-mail"},
+	}
+
+	return testNofiticationReq
+}
+
+func MakeTestNotificationRequestTemplateContents(templateId string, templateReq dto.NotificationTemplateReq) dto.NotificationReq {
+
+	variables := make([]dto.TemplateVariableContents, 0, len(templateReq.Variables))
+
+	testVariables := map[dto.TemplateVariableType]string{
+		dto.Number:   "10",
+		dto.String:   "test string",
+		dto.Date:     "2025-01-19",
+		dto.DateTime: "2025-01-19T00:00:00Z",
+	}
+
+	for _, v := range templateReq.Variables {
+		variables = append(variables, dto.TemplateVariableContents{
+			Name:  v.Name,
+			Value: testVariables[dto.TemplateVariableType(v.Type)],
+		})
+	}
+
+	templateContents := &dto.TemplateContents{
+		Id:        templateId,
+		Variables: variables,
+	}
+
+	testNofiticationReq := dto.NotificationReq{
+		TemplateContents: templateContents,
 		Topic:            "Testing",
 		Priority:         "MEDIUM",
 		DistributionList: nil,

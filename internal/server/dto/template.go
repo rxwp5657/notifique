@@ -1,8 +1,17 @@
 package dto
 
+type TemplateVariableType string
+
+const (
+	String   TemplateVariableType = "STRING"
+	Date     TemplateVariableType = "DATE"
+	DateTime TemplateVariableType = "DATETIME"
+	Number   TemplateVariableType = "NUMBER"
+)
+
 type TemplateVariable struct {
 	Name       string  `json:"name" binding:"required,max=120"`
-	Type       string  `json:"type" binding:"required,oneof=STRING DATE TIME NUMBER"`
+	Type       string  `json:"type" binding:"required,oneof=STRING DATE DATETIME NUMBER"`
 	Required   bool    `json:"required"`
 	Validation *string `json:"validation"`
 }
