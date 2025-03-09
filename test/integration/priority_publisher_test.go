@@ -49,7 +49,7 @@ func testPriorityPublisher(t *testing.T, s c.NotificationRegistry, p c.Notificat
 		Priority:         "MEDIUM",
 		DistributionList: nil,
 		Recipients:       []string{userId},
-		Channels:         []string{"in-app", "e-mail"},
+		Channels:         []dto.NotificationChannel{"in-app", "e-mail"},
 	}
 
 	notificationId, err := s.SaveNotification(context.TODO(), userId, testNotificationReq)

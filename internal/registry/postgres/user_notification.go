@@ -63,7 +63,7 @@ FROM
 	user_notifications
 %s
 ORDER BY
-	created_at DESC
+	id DESC
 LIMIT
 	@limit;
 `

@@ -12,17 +12,6 @@ import (
 	"github.com/notifique/internal/server/dto"
 )
 
-type NotificationStatus string
-
-const (
-	Created  NotificationStatus = "CREATED"
-	Queued   NotificationStatus = "QUEUED"
-	Failed   NotificationStatus = "FAILED"
-	Sending  NotificationStatus = "SENDING"
-	Sent     NotificationStatus = "SENT"
-	Canceled NotificationStatus = "CANCELED"
-)
-
 type Notification struct {
 	dto.NotificationReq
 	Id string `json:"id"`
@@ -30,7 +19,7 @@ type Notification struct {
 
 type NotificationStatusLog struct {
 	NotificationId string
-	Status         NotificationStatus
+	Status         dto.NotificationStatus
 	ErrorMsg       *string
 }
 
@@ -38,8 +27,9 @@ type NotificationRegistry interface {
 	SaveNotification(ctx context.Context, createdBy string, notification dto.NotificationReq) (string, error)
 	UpdateNotificationStatus(ctx context.Context, statusLog NotificationStatusLog) error
 	DeleteNotification(ctx context.Context, id string) error
-	GetNotificationStatus(ctx context.Context, notificationId string) (NotificationStatus, error)
+	GetNotificationStatus(ctx context.Context, notificationId string) (dto.NotificationStatus, error)
 	GetTemplateVariables(ctx context.Context, templateId string) ([]dto.TemplateVariable, error)
+	GetNotifications(ctx context.Context, filters dto.PageFilter) (dto.Page[dto.NotificationSummary], error)
 }
 
 type NotificationPublisher interface {
@@ -47,7 +37,7 @@ type NotificationPublisher interface {
 }
 
 type NotificationCache interface {
-	GetNotificationStatus(ctx context.Context, notificationId string) (*NotificationStatus, error)
+	GetNotificationStatus(ctx context.Context, notificationId string) (*dto.NotificationStatus, error)
 	UpdateNotificationStatus(ctx context.Context, statusLog NotificationStatusLog) error
 }
 
@@ -108,7 +98,7 @@ func (nc *NotificationController) CreateNotification(c *gin.Context) {
 
 	statusLog := NotificationStatusLog{
 		NotificationId: notificationId,
-		Status:         Created,
+		Status:         dto.Created,
 	}
 
 	if err := nc.Cache.UpdateNotificationStatus(context.TODO(), statusLog); err != nil {
@@ -158,9 +148,9 @@ func (nc *NotificationController) CancelDelivery(c *gin.Context) {
 		return
 	}
 
-	invalidStatuses := map[NotificationStatus]string{
-		Sending: SendingNotificationMsg,
-		Sent:    SentNotificationMsg,
+	invalidStatuses := map[dto.NotificationStatus]string{
+		dto.Sending: SendingNotificationMsg,
+		dto.Sent:    SentNotificationMsg,
 	}
 
 	status, err := nc.Cache.GetNotificationStatus(c.Request.Context(), params.NotificationId)
@@ -193,7 +183,7 @@ func (nc *NotificationController) CancelDelivery(c *gin.Context) {
 
 	statusLog := NotificationStatusLog{
 		NotificationId: params.NotificationId,
-		Status:         Canceled,
+		Status:         dto.Canceled,
 	}
 
 	// Update both cache and registry
@@ -210,4 +200,23 @@ func (nc *NotificationController) CancelDelivery(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
+}
+
+func (nc *NotificationController) GetNotifications(c *gin.Context) {
+	var filters dto.PageFilter
+
+	if err := c.ShouldBind(&filters); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	notifications, err := nc.Registry.GetNotifications(c.Request.Context(), filters)
+
+	if err != nil {
+		slog.Error(err.Error())
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusOK, notifications)
 }

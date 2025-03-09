@@ -63,7 +63,7 @@ paths:
                 properties:
                   data:
                     items:
-                      $ref: "#/components/schemas/NotificationModel"
+                      $ref: "#/components/schemas/NotificationSummaryModel"
     post:
       tags:
         - notifications
@@ -882,6 +882,59 @@ components:
         - resultCount
         - data
 
+    NotificationStatus:
+      type: string
+      enum: [CREATED, QUEUED, FAILED, SENDING, SENT, CANCELED]
+
+    NotificationPriority:
+      type: string
+      enum: [HIGH, MEDIUM, LOW]
+
+    NotificationChannels:
+      type: array
+      uniqueItems: true
+      description: Delivery channels to use
+      items:
+        type: string
+        enum: [e-mail, in-app]
+
+    NotificationContents:
+      oneOf:
+        - type: object
+          description: Raw notification contents
+          required:
+            - title
+            - contents
+          properties:
+            title:
+              type: string
+              minLength: 1
+              maxLength: 120
+            contents:
+              type: string
+              minLength: 1
+              maxLength: 1024
+        - type: object
+          description: Template-based notification
+          required:
+            - templateId
+            - variables
+          properties:
+            templateId:
+              type: string
+              format: uuid
+              description: Id of the notification template
+            variables:
+              type: array
+              description: Template variables to substitute
+              items:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  value:
+                    type: string
+
     NotificationBase:
       type: object
       properties:
@@ -891,9 +944,7 @@ components:
           maxLength: 120
           description: Topic category for the notification
         priority:
-          type: string
-          enum: [HIGH, MEDIUM, LOW]
-          description: Priority level of the notification
+          $ref: "#/components/schemas/NotificationPriority"
         image:
           type: string
           format: uri
@@ -910,58 +961,7 @@ components:
             type: string
             minLength: 1
         channels:
-          type: array
-          uniqueItems: true
-          description: Delivery channels to use
-          items:
-            type: string
-            enum: [e-mail, sms, in-app]
-
-    NotificationRequestModel:
-      allOf:
-        - $ref: "#/components/schemas/NotificationBase"
-      type: object
-      oneOf:
-        - type: object
-          properties:            
-            template:
-              type: object
-              description: Template-based notification
-              required:
-                - templateId
-                - variables
-              properties:
-                templateId:
-                  type: string
-                  format: uuid
-                  description: Id of the notification template
-                variables:
-                  type: array
-                  description: Template variables
-                  items:
-                    type: object
-                    properties:
-                      name:
-                        type: string
-                      value:
-                        type: string
-        - type: object
-          properties:
-            content:
-              type: object
-              description: Direct content notification
-              required:
-                - title
-                - contents
-              properties:
-                title:
-                  type: string
-                  minLength: 1
-                  maxLength: 120
-                contents:
-                  type: string
-                  minLength: 1
-                  maxLength: 1024
+          $ref: "#/components/schemas/NotificationChannels"
 
     NotificationModel:
       allOf:
@@ -978,9 +978,29 @@ components:
           format: uuid
           nullable: false
         status:
+          $ref: "#/components/schemas/NotificationStatus"
+        createdAt:
           type: string
-          enum: [CREATED, QUEUED, SENT, SENDING, FAILED]
-          description: Status of the notification
+          format: date-time
+          description: Timestamp when the notification was created
+        createdBy:
+          type: string
+          description: Identifier of the user who created the notification
+        contents:
+          $ref: "#/components/schemas/NotificationContents"
+
+    NotificationSummaryModel:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          nullable: false
+        topic:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Topic category for the notification
         createdAt:
           type: string
           format: date-time
@@ -991,6 +1011,23 @@ components:
         contentsType:
           type: string
           enum: [TEMPLATE, DIRECT]
+        priority:
+          $ref: "#/components/schemas/NotificationPriority"
+        status:
+          $ref: "#/components/schemas/NotificationStatus"
+
+    NotificationRequestModel:
+      allOf:
+        - $ref: "#/components/schemas/NotificationBase"
+        - type: object
+          properties:
+            contents:
+              $ref: "#/components/schemas/NotificationContents"
+          required:
+            - topic
+            - priority
+            - contents
+            - channels
 
     UserNotificationModel:
       type: object

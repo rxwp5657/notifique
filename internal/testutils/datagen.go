@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/notifique/internal/server/controllers"
 	"github.com/notifique/internal/server/dto"
 )
 
@@ -75,7 +74,7 @@ func MakeTestNotificationRequestRawContents() dto.NotificationReq {
 		Priority:         "MEDIUM",
 		DistributionList: nil,
 		Recipients:       []string{"1234"},
-		Channels:         []string{"in-app", "e-mail"},
+		Channels:         []dto.NotificationChannel{"in-app", "e-mail"},
 	}
 
 	return testNofiticationReq
@@ -110,7 +109,7 @@ func MakeTestNotificationRequestTemplateContents(templateId string, templateReq 
 		Priority:         "MEDIUM",
 		DistributionList: nil,
 		Recipients:       []string{"1234"},
-		Channels:         []string{"in-app", "e-mail"},
+		Channels:         []dto.NotificationChannel{"in-app", "e-mail"},
 	}
 
 	return testNofiticationReq
@@ -225,10 +224,35 @@ func MakeTestNotificationTemplateInfoResp(numresps int) []dto.NotificationTempla
 	return resps
 }
 
+func MakeNotificationSummary(req dto.NotificationReq, id, userId string) dto.NotificationSummary {
+
+	var contentsType dto.NotificationContentsType
+
+	if req.RawContents != nil {
+		contentsType = dto.Raw
+	} else {
+		contentsType = dto.Template
+	}
+
+	return dto.NotificationSummary{
+		Id:           id,
+		Topic:        req.Topic,
+		ContentsType: contentsType,
+		Priority:     req.Priority,
+		Status:       dto.Created,
+		CreatedAt:    time.Now().Format(time.RFC3339Nano),
+		CreatedBy:    userId,
+	}
+}
+
 func StrPtr(s string) *string {
 	return &s
 }
 
-func StatusPtr(status controllers.NotificationStatus) *controllers.NotificationStatus {
+func StatusPtr(status dto.NotificationStatus) *dto.NotificationStatus {
 	return &status
+}
+
+func IntPtr(i int) *int {
+	return &i
 }

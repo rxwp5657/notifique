@@ -36,6 +36,7 @@ func TestNotificationController(t *testing.T) {
 	testCreateNotification(t, testApp.Engine, *testApp)
 	testDeleteNotification(t, testApp.Engine, *testApp)
 	testCancelNotificationDelivery(t, testApp.Engine, *testApp)
+	testGetNotifications(t, testApp.Engine, *testApp)
 }
 
 func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) {
@@ -436,8 +437,8 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 	}
 
 	notificationId := uuid.NewString()
-	createdStatus := controllers.Created
-	canceledStatus := controllers.Canceled
+	createdStatus := dto.Created
+	canceledStatus := dto.Canceled
 
 	expectedStatusLog := controllers.NotificationStatusLog{
 		NotificationId: notificationId,
@@ -511,7 +512,7 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 			expectedStatus: 400,
 			expectedError:  "Notification is being sent",
 			setupMock: func() {
-				sendingStatus := testutils.StatusPtr(controllers.Sending)
+				sendingStatus := testutils.StatusPtr(dto.Sending)
 				mock.Cache.
 					EXPECT().
 					GetNotificationStatus(gomock.Any(), notificationId).
@@ -525,7 +526,7 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 			expectedStatus: 400,
 			expectedError:  "Notification has been sent",
 			setupMock: func() {
-				sentStatus := testutils.StatusPtr(controllers.Sent)
+				sentStatus := testutils.StatusPtr(dto.Sent)
 				mock.Cache.
 					EXPECT().
 					GetNotificationStatus(gomock.Any(), notificationId).
@@ -539,7 +540,7 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 			expectedStatus: 400,
 			expectedError:  "Notification is being sent",
 			setupMock: func() {
-				sendingStatus := controllers.Sending
+				sendingStatus := dto.Sending
 				mock.Cache.
 					EXPECT().
 					GetNotificationStatus(gomock.Any(), notificationId).
@@ -559,7 +560,7 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 			expectedStatus: 400,
 			expectedError:  "Notification has been sent",
 			setupMock: func() {
-				sentStatus := controllers.Sent
+				sentStatus := dto.Sent
 				mock.Cache.
 					EXPECT().
 					GetNotificationStatus(gomock.Any(), notificationId).
@@ -600,6 +601,99 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 			}
 
 			w := cancelDelivery(tt.notificationId)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.expectedError != "" {
+				resp := make(map[string]string)
+				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+					t.Fatal(err)
+				}
+				assert.Contains(t, resp["error"], tt.expectedError)
+			}
+		})
+	}
+}
+
+func testGetNotifications(t *testing.T, e *gin.Engine, mock di.MockedBackend) {
+	userId := "1234"
+	registryMock := mock.Registry.MockNotificationRegistry
+	getNotifications := func(filters dto.PageFilter) *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodGet, notificationsUrl, nil)
+		req.Header.Add("userId", userId)
+		testutils.AddPaginationFilters(req, &filters)
+		e.ServeHTTP(w, req)
+		return w
+	}
+
+	tests := []struct {
+		name           string
+		filters        dto.PageFilter
+		setupMock      func()
+		expectedStatus int
+		expectedError  string
+	}{
+		{
+			name: "Can get notifications with no pagination",
+			setupMock: func() {
+				registryMock.
+					EXPECT().
+					GetNotifications(gomock.Any(), dto.PageFilter{}).
+					Return(dto.Page[dto.NotificationSummary]{
+						Data:        []dto.NotificationSummary{},
+						ResultCount: 0,
+					}, nil)
+			},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name: "Can get notifications with custom pagination",
+			filters: dto.PageFilter{
+				NextToken:  testutils.StrPtr("token"),
+				MaxResults: testutils.IntPtr(20),
+			},
+			setupMock: func() {
+				registryMock.
+					EXPECT().
+					GetNotifications(gomock.Any(), dto.PageFilter{
+						NextToken:  testutils.StrPtr("token"),
+						MaxResults: testutils.IntPtr(20),
+					}).
+					Return(dto.Page[dto.NotificationSummary]{
+						Data:        []dto.NotificationSummary{},
+						ResultCount: 0,
+					}, nil)
+			},
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name: "Should fail if maxResults is less than 1",
+			filters: dto.PageFilter{
+				MaxResults: testutils.IntPtr(0),
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Key: 'PageFilter.MaxResults' Error:Field validation for 'MaxResults' failed on the 'min' tag",
+		},
+		{
+			name: "Should fail if there's an error retrieving notifications",
+			setupMock: func() {
+				registryMock.
+					EXPECT().
+					GetNotifications(gomock.Any(), gomock.Any()).
+					Return(dto.Page[dto.NotificationSummary]{}, errors.New("db error"))
+			},
+			expectedStatus: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupMock != nil {
+				tt.setupMock()
+			}
+
+			w := getNotifications(tt.filters)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 

@@ -16,6 +16,7 @@ import (
 
 const InsertNotification = `
 INSERT INTO notifications (
+	id,
 	title,
 	contents,
 	template_id,
@@ -24,8 +25,10 @@ INSERT INTO notifications (
 	priority,
 	distribution_list,
 	created_at,
+	created_by,
 	status
 ) VALUES (
+	@id,
 	@title,
 	@contents,
 	@templateId,
@@ -34,9 +37,9 @@ INSERT INTO notifications (
 	@priority,
 	@distributionList,
 	@createdAt,
+	@createdBy,
 	@status
-) RETURNING
-	id;
+);
 `
 
 const insertNotificationTemplateVariableContents = `
@@ -110,6 +113,38 @@ WHERE
 	id = $1;
 `
 
+const getNotificationSummaries = `
+SELECT
+	id,
+	topic,
+	template_id,
+	created_at,
+	created_by,
+	priority,
+	status
+FROM
+	notifications
+%s
+ORDER BY
+	id DESC
+LIMIT
+	@limit;
+`
+
+type notificationKey struct {
+	Id string `db:"id"`
+}
+
+type notificationSummary struct {
+	Id         string    `db:"id"`
+	Topic      string    `db:"topic"`
+	TemplateId *string   `db:"template_id"`
+	CreatedAt  time.Time `db:"created_at"`
+	CreatedBy  string    `db:"created_by"`
+	Priority   string    `db:"priority"`
+	Status     string    `db:"status"`
+}
+
 func (r *Registry) createStatusLog(ctx context.Context, tx pgx.Tx, statusLog c.NotificationStatusLog) error {
 
 	args := pgx.NamedArgs{
@@ -168,7 +203,17 @@ func (r *Registry) SaveNotification(ctx context.Context, createdBy string, notif
 		return "", fmt.Errorf("failed to start transaction - %w", err)
 	}
 
+	id, err := uuid.NewV7()
+
+	if err != nil {
+		tx.Rollback(ctx)
+		return "", fmt.Errorf("failed to generate notification id - %w", err)
+	}
+
+	notificationId := id.String()
+
 	notificationArgs := pgx.NamedArgs{
+		"id":               notificationId,
 		"title":            nil,
 		"contents":         nil,
 		"templateId":       nil,
@@ -177,7 +222,8 @@ func (r *Registry) SaveNotification(ctx context.Context, createdBy string, notif
 		"priority":         notificationReq.Priority,
 		"distributionList": notificationReq.DistributionList,
 		"createdAt":        time.Now().Format(time.RFC3339Nano),
-		"status":           c.Created,
+		"createdBy":        createdBy,
+		"status":           dto.Created,
 	}
 
 	if notificationReq.RawContents != nil {
@@ -187,16 +233,12 @@ func (r *Registry) SaveNotification(ctx context.Context, createdBy string, notif
 		notificationArgs["templateId"] = notificationReq.TemplateContents.Id
 	}
 
-	var notificationIdUUID uuid.UUID
-
-	err = tx.QueryRow(ctx, InsertNotification, notificationArgs).Scan(&notificationIdUUID)
+	_, err = tx.Exec(ctx, InsertNotification, notificationArgs)
 
 	if err != nil {
 		tx.Rollback(ctx)
 		return "", fmt.Errorf("failed to insert notification - %w", err)
 	}
-
-	notificationId := notificationIdUUID.String()
 
 	if notificationReq.TemplateContents != nil {
 		numVariables := len(notificationReq.TemplateContents.Variables)
@@ -267,7 +309,7 @@ func (r *Registry) SaveNotification(ctx context.Context, createdBy string, notif
 
 	statusLog := c.NotificationStatusLog{
 		NotificationId: notificationId,
-		Status:         c.Created,
+		Status:         dto.Created,
 		ErrorMsg:       nil,
 	}
 
@@ -287,8 +329,8 @@ func (r *Registry) SaveNotification(ctx context.Context, createdBy string, notif
 	return notificationId, nil
 }
 
-func (r *Registry) GetNotificationStatus(ctx context.Context, id string) (c.NotificationStatus, error) {
-	var status c.NotificationStatus
+func (r *Registry) GetNotificationStatus(ctx context.Context, id string) (dto.NotificationStatus, error) {
+	var status dto.NotificationStatus
 
 	err := r.conn.QueryRow(ctx, getNotificationStatusQry, id).Scan(&status)
 
@@ -342,4 +384,93 @@ func (r *Registry) DeleteNotification(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (r *Registry) GetNotifications(ctx context.Context, filters dto.PageFilter) (dto.Page[dto.NotificationSummary], error) {
+
+	var page dto.Page[dto.NotificationSummary]
+
+	args := pgx.NamedArgs{"limit": server.PageSize}
+	whereFilter := ""
+
+	if filters.MaxResults != nil {
+		args["limit"] = *filters.MaxResults
+	}
+
+	if filters.NextToken != nil {
+		whereFilter = "id < @id"
+
+		var unmarsalledKey notificationKey
+		err := registry.UnmarshalKey(*filters.NextToken, &unmarsalledKey)
+
+		if err != nil {
+			return page, err
+		}
+
+		args["id"] = unmarsalledKey.Id
+	}
+
+	whereStmt := ""
+
+	if whereFilter != "" {
+		whereStmt = fmt.Sprintf("WHERE %s", whereFilter)
+	}
+
+	query := fmt.Sprintf(getNotificationSummaries, whereStmt)
+
+	rows, err := r.conn.Query(ctx, query, args)
+
+	if err != nil {
+		return page, fmt.Errorf("failed to query rows - %w", err)
+	}
+
+	defer rows.Close()
+
+	collectedSummaries, err := pgx.CollectRows(rows, pgx.RowToStructByName[notificationSummary])
+
+	if err != nil {
+		return page, fmt.Errorf("failed to collect rows - %w", err)
+	}
+
+	summaries := make([]dto.NotificationSummary, 0, len(collectedSummaries))
+
+	for _, s := range collectedSummaries {
+
+		contentsType := dto.Raw
+
+		if s.TemplateId != nil {
+			contentsType = dto.Template
+		}
+
+		summaries = append(summaries, dto.NotificationSummary{
+			Id:           s.Id,
+			Topic:        s.Topic,
+			ContentsType: contentsType,
+			CreatedAt:    s.CreatedAt.Format(time.RFC3339Nano),
+			CreatedBy:    s.CreatedBy,
+			Priority:     dto.NotificationPriority(s.Priority),
+			Status:       dto.NotificationStatus(s.Status),
+		})
+	}
+
+	numSummaries := len(summaries)
+
+	if numSummaries == args["limit"] {
+		lastSummarie := summaries[numSummaries-1]
+		lastKey := notificationKey{Id: lastSummarie.Id}
+
+		key, err := registry.MarshalKey(lastKey)
+
+		if err != nil {
+			return page, err
+		}
+
+		page.NextToken = &key
+	}
+
+	page.PrevToken = filters.NextToken
+	page.ResultCount = len(summaries)
+	page.Data = summaries
+
+	return page, nil
 }

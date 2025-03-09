@@ -1,13 +1,13 @@
 package registry
 
-import c "github.com/notifique/internal/server/controllers"
+import dto "github.com/notifique/internal/server/dto"
 
-func IsDeletableStatus(status c.NotificationStatus) bool {
+func IsDeletableStatus(status dto.NotificationStatus) bool {
 
-	deletableStatuses := map[c.NotificationStatus]struct{}{
-		c.Sent:    {},
-		c.Failed:  {},
-		c.Created: {},
+	deletableStatuses := map[dto.NotificationStatus]struct{}{
+		dto.Sent:    {},
+		dto.Failed:  {},
+		dto.Created: {},
 	}
 
 	_, ok := deletableStatuses[status]

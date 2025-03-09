@@ -179,15 +179,21 @@ func (t *dynamoregistryTester) GetNotification(ctx context.Context,
 		}
 	}
 
+	channels := make([]dto.NotificationChannel, 0, len(n.Channels))
+
+	for _, c := range n.Channels {
+		channels = append(channels, dto.NotificationChannel(c))
+	}
+
 	req := dto.NotificationReq{
 		RawContents:      rawContents,
 		TemplateContents: templateContents,
 		Image:            n.Image,
 		Topic:            n.Topic,
-		Priority:         n.Priority,
+		Priority:         dto.NotificationPriority(n.Priority),
 		DistributionList: n.DistributionList,
 		Recipients:       n.Recipients,
-		Channels:         n.Channels,
+		Channels:         channels,
 	}
 
 	return req, nil

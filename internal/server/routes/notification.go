@@ -16,6 +16,7 @@ func SetupNotificationRoutes(r *gin.Engine, version string, controller *c.Notifi
 
 	g := r.Group(version)
 	{
+		g.GET("/notifications", controller.GetNotifications)
 		g.POST("/notifications", controller.CreateNotification)
 		g.POST("/notifications/:id/cancel", controller.CancelDelivery)
 		g.DELETE("/notifications/:id", controller.DeleteNotification)
