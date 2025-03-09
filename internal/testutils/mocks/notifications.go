@@ -57,10 +57,10 @@ func (mr *MockNotificationRegistryMockRecorder) DeleteNotification(ctx, id any) 
 }
 
 // GetNotificationStatus mocks base method.
-func (m *MockNotificationRegistry) GetNotificationStatus(ctx context.Context, notificationId string) (controllers.NotificationStatus, error) {
+func (m *MockNotificationRegistry) GetNotificationStatus(ctx context.Context, notificationId string) (dto.NotificationStatus, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetNotificationStatus", ctx, notificationId)
-	ret0, _ := ret[0].(controllers.NotificationStatus)
+	ret0, _ := ret[0].(dto.NotificationStatus)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -69,6 +69,21 @@ func (m *MockNotificationRegistry) GetNotificationStatus(ctx context.Context, no
 func (mr *MockNotificationRegistryMockRecorder) GetNotificationStatus(ctx, notificationId any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNotificationStatus", reflect.TypeOf((*MockNotificationRegistry)(nil).GetNotificationStatus), ctx, notificationId)
+}
+
+// GetNotifications mocks base method.
+func (m *MockNotificationRegistry) GetNotifications(ctx context.Context, filters dto.PageFilter) (dto.Page[dto.NotificationSummary], error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNotifications", ctx, filters)
+	ret0, _ := ret[0].(dto.Page[dto.NotificationSummary])
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNotifications indicates an expected call of GetNotifications.
+func (mr *MockNotificationRegistryMockRecorder) GetNotifications(ctx, filters any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNotifications", reflect.TypeOf((*MockNotificationRegistry)(nil).GetNotifications), ctx, filters)
 }
 
 // GetTemplateVariables mocks base method.
@@ -178,10 +193,10 @@ func (m *MockNotificationCache) EXPECT() *MockNotificationCacheMockRecorder {
 }
 
 // GetNotificationStatus mocks base method.
-func (m *MockNotificationCache) GetNotificationStatus(ctx context.Context, notificationId string) (*controllers.NotificationStatus, error) {
+func (m *MockNotificationCache) GetNotificationStatus(ctx context.Context, notificationId string) (*dto.NotificationStatus, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetNotificationStatus", ctx, notificationId)
-	ret0, _ := ret[0].(*controllers.NotificationStatus)
+	ret0, _ := ret[0].(*dto.NotificationStatus)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

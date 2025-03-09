@@ -7,14 +7,7 @@ import (
 	"fmt"
 
 	c "github.com/notifique/internal/server/controllers"
-)
-
-type Priority string
-
-const (
-	low    Priority = "LOW"
-	medium Priority = "MEDIUM"
-	high   Priority = "HIGH"
+	"github.com/notifique/internal/server/dto"
 )
 
 type Publisher interface {
@@ -50,11 +43,11 @@ func (p *PriorityPublisher) Publish(ctx context.Context, n c.Notification) error
 	var queueUri *string = nil
 
 	switch n.Priority {
-	case string(low):
+	case dto.Low:
 		queueUri = p.queues.Low
-	case string(medium):
+	case dto.Medium:
 		queueUri = p.queues.Medium
-	case string(high):
+	case dto.High:
 		queueUri = p.queues.High
 	default:
 		return fmt.Errorf("invalid priority")
@@ -74,13 +67,13 @@ func (p *PriorityPublisher) Publish(ctx context.Context, n c.Notification) error
 
 	publishErr := p.publisher.Publish(ctx, *queueUri, message)
 
-	status := c.Queued
+	status := dto.Queued
 
 	var errorMsg *string
 
 	if publishErr != nil {
 		errorsArr = append(errorsArr, publishErr)
-		status = c.Failed
+		status = dto.Failed
 		errStr := publishErr.Error()
 		errorMsg = &errStr
 	}

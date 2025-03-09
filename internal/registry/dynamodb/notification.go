@@ -54,8 +54,6 @@ type Notification struct {
 	TemplateContents *templateContents `dynamodbav:"templateContents"`
 	CreatedBy        string            `dynamodbav:"createdBy"`
 	CreatedAt        string            `dynamodbav:"createdAt"`
-	Title            string            `dynamodbav:"title"`
-	Contents         string            `dynamodbav:"contents"`
 	Image            *string           `dynamodbav:"image"`
 	Topic            string            `dynamodbav:"topic"`
 	Priority         string            `dynamodbav:"priority"`
@@ -63,6 +61,21 @@ type Notification struct {
 	Recipients       []string          `dynamodbav:"recipients"`
 	Channels         []string          `dynamodbav:"channels"`
 	Status           string            `dynamodbav:"status"`
+	ContentsType     string            `dynamodbav:"contentType"`
+}
+
+type notificationSummary struct {
+	Id           string `dynamodbav:"id"`
+	Topic        string `dynamodbav:"topic"`
+	CreatedAt    string `dynamodbav:"createdAt"`
+	CreatedBy    string `dynamodbav:"createdBy"`
+	Priority     string `dynamodbav:"priority"`
+	Status       string `dynamodbav:"status"`
+	ContentsType string `dynamodbav:"contentType"`
+}
+
+type notificationKey struct {
+	Id string `dynamodbav:"id"`
 }
 
 func (n Notification) GetKey() (DynamoKey, error) {
@@ -79,6 +92,10 @@ func (n Notification) GetKey() (DynamoKey, error) {
 	return key, nil
 }
 
+func (n notificationKey) GetKey() (DynamoKey, error) {
+	return Notification{Id: n.Id}.GetKey()
+}
+
 func (r *Registry) SaveNotification(ctx context.Context, createdBy string, notificationReq dto.NotificationReq) (string, error) {
 
 	if createdBy == "" {
@@ -87,17 +104,27 @@ func (r *Registry) SaveNotification(ctx context.Context, createdBy string, notif
 
 	id := uuid.NewString()
 
+	channels := dto.NotificationChannel("").
+		ToStrSlice(notificationReq.Channels)
+
+	contentsType := dto.Raw
+
+	if notificationReq.RawContents == nil {
+		contentsType = dto.Template
+	}
+
 	notification := Notification{
 		Id:               id,
 		CreatedBy:        createdBy,
 		CreatedAt:        time.Now().Format(time.RFC3339),
 		Image:            notificationReq.Image,
 		Topic:            notificationReq.Topic,
-		Priority:         notificationReq.Priority,
+		Priority:         string(notificationReq.Priority),
 		DistributionList: notificationReq.DistributionList,
 		Recipients:       notificationReq.Recipients,
-		Channels:         notificationReq.Channels,
-		Status:           string(c.Created),
+		Channels:         channels,
+		Status:           string(dto.Created),
+		ContentsType:     string(contentsType),
 	}
 
 	if notificationReq.RawContents != nil {
@@ -139,7 +166,7 @@ func (r *Registry) SaveNotification(ctx context.Context, createdBy string, notif
 
 	log := c.NotificationStatusLog{
 		NotificationId: id,
-		Status:         c.Created,
+		Status:         dto.Created,
 		ErrorMsg:       nil,
 	}
 
@@ -207,9 +234,9 @@ func (r *Registry) UpdateNotificationStatus(ctx context.Context, statusLog c.Not
 	return nil
 }
 
-func (r *Registry) GetNotificationStatus(ctx context.Context, id string) (c.NotificationStatus, error) {
+func (r *Registry) GetNotificationStatus(ctx context.Context, id string) (dto.NotificationStatus, error) {
 
-	var status c.NotificationStatus
+	var status dto.NotificationStatus
 
 	key, err := Notification{Id: id}.GetKey()
 
@@ -254,7 +281,7 @@ func (r *Registry) GetNotificationStatus(ctx context.Context, id string) (c.Noti
 		return status, fmt.Errorf("failed to unmarshal status - %w", err)
 	}
 
-	status = c.NotificationStatus(tmp.Status)
+	status = dto.NotificationStatus(tmp.Status)
 
 	return status, nil
 }
@@ -294,4 +321,87 @@ func (r *Registry) DeleteNotification(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (r *Registry) GetNotifications(ctx context.Context, filters dto.PageFilter) (dto.Page[dto.NotificationSummary], error) {
+
+	page := dto.Page[dto.NotificationSummary]{}
+
+	projExp := expression.
+		ProjectionBuilder(expression.NamesList(
+			expression.Name("id"),
+			expression.Name("topic"),
+			expression.Name("createdAt"),
+			expression.Name("createdBy"),
+			expression.Name("priority"),
+			expression.Name("status"),
+			expression.Name("contentType"),
+		))
+
+	expr, err := expression.
+		NewBuilder().
+		WithProjection(projExp).
+		Build()
+
+	if err != nil {
+		return page, fmt.Errorf("failed to build expression - %w", err)
+	}
+
+	pageParams, err := makePageFilters(notificationKey{}, filters)
+
+	if err != nil {
+		return page, fmt.Errorf("failed to make page params - %w", err)
+	}
+
+	input := &dynamodb.ScanInput{
+		TableName:                aws.String(NotificationsTable),
+		ProjectionExpression:     expr.Projection(),
+		ExpressionAttributeNames: expr.Names(),
+		Limit:                    pageParams.Limit,
+		ExclusiveStartKey:        pageParams.ExclusiveStartKey,
+	}
+
+	resp, err := r.client.Scan(ctx, input)
+
+	if err != nil {
+		return page, fmt.Errorf("failed to retrieve notifications - %w", err)
+	}
+
+	var notificationsSummaries []notificationSummary
+	err = attributevalue.UnmarshalListOfMaps(resp.Items, &notificationsSummaries)
+
+	if err != nil {
+		return page, fmt.Errorf("failed to unmarshall the notifications list - %w", err)
+	}
+
+	if len(resp.LastEvaluatedKey) != 0 {
+		key := notificationKey{}
+		encoded, err := marshalNextToken(&key, resp.LastEvaluatedKey)
+
+		if err != nil {
+			return page, fmt.Errorf("failed to encode next token - %w", err)
+		}
+
+		page.NextToken = &encoded
+	}
+
+	notifications := make([]dto.NotificationSummary, 0, len(notificationsSummaries))
+
+	for _, n := range notificationsSummaries {
+		notifications = append(notifications, dto.NotificationSummary{
+			Id:           n.Id,
+			Topic:        n.Topic,
+			CreatedAt:    n.CreatedAt,
+			CreatedBy:    n.CreatedBy,
+			Priority:     dto.NotificationPriority(n.Priority),
+			Status:       dto.NotificationStatus(n.Status),
+			ContentsType: dto.NotificationContentsType(n.ContentsType),
+		})
+	}
+
+	page.PrevToken = filters.NextToken
+	page.ResultCount = len(notifications)
+	page.Data = notifications
+
+	return page, nil
 }

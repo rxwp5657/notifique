@@ -257,7 +257,17 @@ func (t *postgresresgistryTester) GetNotification(ctx context.Context, notificat
 		}
 	}
 
-	channels, err := getNotificationData(ctx, t, getNotificationChannels, notificationId, queryString)
+	getChannel := func(rows *pgx.Rows) (dto.NotificationChannel, error) {
+		row, err := queryString(rows)
+
+		if err != nil {
+			return "", err
+		}
+
+		return dto.NotificationChannel(row), nil
+	}
+
+	channels, err := getNotificationData(ctx, t, getNotificationChannels, notificationId, getChannel)
 
 	if err != nil {
 		return notification, fmt.Errorf("failed to retrieve notification channels - %w", err)

@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/notifique/internal/cache"
 	"github.com/notifique/internal/server/controllers"
+	"github.com/notifique/internal/server/dto"
 	"github.com/notifique/internal/testutils"
 	"github.com/notifique/internal/testutils/containers"
 	"github.com/stretchr/testify/assert"
@@ -42,7 +43,7 @@ func TestCache(t *testing.T) {
 
 	t.Run("Can set/retrieve the notification status", func(t *testing.T) {
 
-		status := testutils.StatusPtr(controllers.Created)
+		status := testutils.StatusPtr(dto.Created)
 
 		err := redisCache.UpdateNotificationStatus(ctx, controllers.NotificationStatusLog{
 			NotificationId: notificationId,
@@ -54,6 +55,6 @@ func TestCache(t *testing.T) {
 		status, err = redisCache.GetNotificationStatus(ctx, notificationId)
 
 		assert.Nil(t, err)
-		assert.Equal(t, controllers.Created, *status)
+		assert.Equal(t, dto.Created, *status)
 	})
 }

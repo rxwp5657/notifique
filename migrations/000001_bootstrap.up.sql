@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS notification_template_variables (
 );
 
 CREATE TABLE IF NOT EXISTS notifications (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    id uuid PRIMARY KEY,
     title VARCHAR,
     contents VARCHAR,
     template_id uuid,
@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     "priority" notification_priority DEFAULT 'LOW',
     distribution_list VARCHAR,
     created_at TIMESTAMPTZ NOT NULL,
+    created_by VARCHAR NOT NULL,
     "status" notification_status NOT NULL,
     CONSTRAINT distribution_list_fk
         FOREIGN KEY (distribution_list)

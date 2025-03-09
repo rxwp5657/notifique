@@ -36,6 +36,7 @@ func TestNotificationRegistryPostgres(t *testing.T) {
 	testCreateNotification(ctx, t, tester)
 	testUpdateNotificationStatus(ctx, t, tester)
 	testDeleteNotification(ctx, t, tester)
+	testGetNotifications(ctx, t, tester)
 }
 
 func TestNotificationRegistryDynamo(t *testing.T) {
@@ -51,6 +52,7 @@ func TestNotificationRegistryDynamo(t *testing.T) {
 	testCreateNotification(ctx, t, tester)
 	testUpdateNotificationStatus(ctx, t, tester)
 	testDeleteNotification(ctx, t, tester)
+	testGetNotifications(ctx, t, tester)
 }
 
 func testCreateNotification(ctx context.Context, t *testing.T, nt NotificationRegistryTester) {
@@ -121,7 +123,7 @@ func testCreateNotification(ctx context.Context, t *testing.T, nt NotificationRe
 				Topic:      "template-test",
 				Priority:   "HIGH",
 				Recipients: []string{"user1", "user2"},
-				Channels:   []string{"e-mail", "sms"},
+				Channels:   []dto.NotificationChannel{"e-mail", "sms"},
 			},
 		},
 		{
@@ -179,7 +181,7 @@ func testCreateNotification(ctx context.Context, t *testing.T, nt NotificationRe
 			if err != nil {
 				t.Fatal(err)
 			}
-			assert.Equal(t, controllers.Created, status)
+			assert.Equal(t, dto.Created, status)
 		})
 	}
 }
@@ -200,7 +202,7 @@ func testUpdateNotificationStatus(ctx context.Context, t *testing.T, nt Notifica
 
 		log := controllers.NotificationStatusLog{
 			NotificationId: notificationId,
-			Status:         controllers.Queued,
+			Status:         dto.Queued,
 			ErrorMsg:       nil,
 		}
 
@@ -214,7 +216,7 @@ func testUpdateNotificationStatus(ctx context.Context, t *testing.T, nt Notifica
 			t.Fatal(err)
 		}
 
-		assert.Equal(t, controllers.Queued, status)
+		assert.Equal(t, dto.Queued, status)
 	})
 }
 
@@ -222,12 +224,12 @@ func testDeleteNotification(ctx context.Context, t *testing.T, nt NotificationRe
 
 	user := "1234"
 
-	testNotifications := map[controllers.NotificationStatus]string{
-		controllers.Created: "",
-		controllers.Queued:  "",
-		controllers.Sending: "",
-		controllers.Sent:    "",
-		controllers.Failed:  "",
+	testNotifications := map[dto.NotificationStatus]string{
+		dto.Created: "",
+		dto.Queued:  "",
+		dto.Sending: "",
+		dto.Sent:    "",
+		dto.Failed:  "",
 	}
 
 	for status := range testNotifications {
@@ -259,33 +261,33 @@ func testDeleteNotification(ctx context.Context, t *testing.T, nt NotificationRe
 	}{
 		{
 			name:           "Can delete a notification in CREATED state",
-			notificationId: testNotifications[controllers.Created],
+			notificationId: testNotifications[dto.Created],
 			expectedError:  nil,
 		},
 		{
 			name:           "Can delete a notification in FAILED state",
-			notificationId: testNotifications[controllers.Failed],
+			notificationId: testNotifications[dto.Failed],
 			expectedError:  nil,
 		},
 		{
 			name:           "Can delete a notification in SENT state",
-			notificationId: testNotifications[controllers.Sent],
+			notificationId: testNotifications[dto.Sent],
 			expectedError:  nil,
 		},
 		{
 			name:           "Should fail deleting a notification on QUEUED state",
-			notificationId: testNotifications[controllers.Queued],
+			notificationId: testNotifications[dto.Queued],
 			expectedError: server.InvalidNotificationStatus{
-				Id:     testNotifications[controllers.Queued],
-				Status: string(controllers.Queued),
+				Id:     testNotifications[dto.Queued],
+				Status: string(dto.Queued),
 			},
 		},
 		{
 			name:           "Should fail deleting a notification on SENDING state",
-			notificationId: testNotifications[controllers.Sending],
+			notificationId: testNotifications[dto.Sending],
 			expectedError: server.InvalidNotificationStatus{
-				Id:     testNotifications[controllers.Sending],
-				Status: string(controllers.Sending),
+				Id:     testNotifications[dto.Sending],
+				Status: string(dto.Sending),
 			},
 		},
 		{
@@ -306,4 +308,103 @@ func testDeleteNotification(ctx context.Context, t *testing.T, nt NotificationRe
 			}
 		})
 	}
+}
+
+func testGetNotifications(ctx context.Context, t *testing.T, nt NotificationRegistryTester) {
+
+	user := "1234"
+	testNotificationSummaries := map[string]dto.NotificationSummary{}
+
+	templateReq := testutils.MakeTestNotificationTemplateRequest()
+
+	templateResp, err := nt.SaveTemplate(ctx, user, templateReq)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := range 4 {
+		var testNofiticationReq dto.NotificationReq
+
+		if i%2 == 0 {
+			testNofiticationReq = testutils.MakeTestNotificationRequestRawContents()
+		} else {
+			testNofiticationReq = testutils.MakeTestNotificationRequestTemplateContents(
+				templateResp.Id,
+				templateReq,
+			)
+		}
+
+		notificationId, err := nt.SaveNotification(ctx, user, testNofiticationReq)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		summary := testutils.MakeNotificationSummary(testNofiticationReq, notificationId, user)
+		testNotificationSummaries[notificationId] = summary
+	}
+
+	areSummariesEqual := func(t *testing.T, a, b dto.NotificationSummary) {
+		assert.Equal(t, a.Id, b.Id)
+		assert.Equal(t, a.Topic, b.Topic)
+		assert.Equal(t, a.Priority, b.Priority)
+		assert.Equal(t, a.Status, b.Status)
+		assert.Equal(t, a.ContentsType, b.ContentsType)
+		assert.Equal(t, a.CreatedBy, b.CreatedBy)
+	}
+
+	defer r.Clear(ctx, t, nt)
+
+	t.Run("Should be able to get notifications", func(t *testing.T) {
+
+		filters := dto.PageFilter{
+			NextToken:  nil,
+			MaxResults: nil,
+		}
+
+		page, err := nt.GetNotifications(ctx, filters)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Nil(t, page.NextToken)
+		assert.Nil(t, page.PrevToken)
+		assert.Equal(t, len(testNotificationSummaries), page.ResultCount)
+
+		for _, s := range page.Data {
+			areSummariesEqual(t, s, testNotificationSummaries[s.Id])
+		}
+	})
+
+	t.Run("Should be able to get notifications with pagination", func(t *testing.T) {
+
+		filters := dto.PageFilter{
+			NextToken:  nil,
+			MaxResults: testutils.IntPtr(1),
+		}
+
+		summaries := make([]dto.NotificationSummary, 0, len(testNotificationSummaries))
+
+		for {
+			page, err := nt.GetNotifications(ctx, filters)
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			summaries = append(summaries, page.Data...)
+
+			if page.NextToken == nil {
+				break
+			}
+
+			filters.NextToken = page.NextToken
+		}
+
+		for _, s := range summaries {
+			areSummariesEqual(t, s, testNotificationSummaries[s.Id])
+		}
+	})
 }

@@ -8,6 +8,7 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	c "github.com/notifique/internal/server/controllers"
+	dto "github.com/notifique/internal/server/dto"
 )
 
 type RedisConfigurator interface {
@@ -27,7 +28,7 @@ func getNotificationStatusKey(notificationId string) string {
 	return fmt.Sprintf("notifications:%s:status", notificationId)
 }
 
-func (rc *RedisCache) GetNotificationStatus(ctx context.Context, notificationId string) (*c.NotificationStatus, error) {
+func (rc *RedisCache) GetNotificationStatus(ctx context.Context, notificationId string) (*dto.NotificationStatus, error) {
 	status, err := rc.client.Get(ctx, getNotificationStatusKey(notificationId)).Result()
 
 	if err == redis.Nil {
@@ -36,7 +37,7 @@ func (rc *RedisCache) GetNotificationStatus(ctx context.Context, notificationId 
 		return nil, fmt.Errorf("failed to retrieve notification status - %w", err)
 	}
 
-	return (*c.NotificationStatus)(&status), nil
+	return (*dto.NotificationStatus)(&status), nil
 }
 
 func (rc *RedisCache) UpdateNotificationStatus(ctx context.Context, statusLog c.NotificationStatusLog) error {
