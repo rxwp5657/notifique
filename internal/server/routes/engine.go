@@ -77,9 +77,10 @@ func NewEngine(cfg EngineConfig) (*gin.Engine, error) {
 	_ = SetupNotificationTemplateRoutes(r, version, &ntc)
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		v.RegisterValidation("distributionListName", server.DLNameValidator)
+		v.RegisterValidation("distributionlistname", server.DLNameValidator)
 		v.RegisterValidation("unique_var_name", server.UniqueTemplateVarValidator)
 		v.RegisterValidation("future", server.FutureValidator)
+		v.RegisterValidation("templatevarname", server.TemplateNameValidator)
 	}
 
 	return r, nil

@@ -30,7 +30,7 @@ type RawContents struct {
 }
 
 type TemplateVariableContents struct {
-	Name  string `json:"name" binding:"required"`
+	Name  string `json:"name" binding:"required,max=120,templatevarname"`
 	Value string `json:"value" binding:"required"`
 }
 
@@ -45,7 +45,7 @@ type NotificationReq struct {
 	Image            *string               `json:"image" binding:"omitempty,uri"`
 	Topic            string                `json:"topic" binding:"required,min=1,max=120"`
 	Priority         NotificationPriority  `json:"priority" binding:"oneof=HIGH MEDIUM LOW"`
-	DistributionList *string               `json:"distributionList" binding:"omitempty,max=120,min=3,distributionListName"`
+	DistributionList *string               `json:"distributionList" binding:"omitempty,max=120,min=3,distributionlistname"`
 	Recipients       []string              `json:"recipients" binding:"unique,max=256,dive,min=1"`
 	Channels         []NotificationChannel `json:"channels" binding:"unique,dive,oneof=e-mail sms in-app"`
 }
@@ -62,6 +62,14 @@ type NotificationSummary struct {
 	Status       NotificationStatus       `json:"status"`
 	CreatedAt    string                   `json:"createdAt"`
 	CreatedBy    string                   `json:"createdBy"`
+}
+
+type NotificationResp struct {
+	NotificationReq
+	Id        string             `json:"id"`
+	Status    NotificationStatus `json:"status"`
+	CreatedAt string             `json:"createdAt"`
+	CreatedBy string             `json:"createdBy"`
 }
 
 func (c NotificationChannel) ToStrSlice(channels []NotificationChannel) []string {

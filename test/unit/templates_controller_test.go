@@ -208,6 +208,20 @@ func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  testutils.StrPtr(`Key: 'NotificationTemplateReq.Variables' Error:Field validation for 'Variables' failed on the 'unique_var_name' tag`),
 		},
+		{
+			name: "Should fail if the notification template has variables with a name that contains the separator",
+			modifyRequest: func(req dto.NotificationTemplateReq) dto.NotificationTemplateReq {
+				badName := dto.TemplateVariable{
+					Name:     "bad~name",
+					Type:     "STRING",
+					Required: false,
+				}
+				req.Variables = append(req.Variables, badName)
+				return req
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  testutils.StrPtr(`Key: 'NotificationTemplateReq.Variables[2].Name' Error:Field validation for 'Name' failed on the 'templatevarname' tag`),
+		},
 	}
 
 	for _, tt := range tests {

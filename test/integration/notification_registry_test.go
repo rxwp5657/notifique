@@ -19,7 +19,6 @@ type NotificationRegistryTester interface {
 	controllers.NotificationRegistry
 	controllers.NotificationTemplateRegistry
 	r.ContainerTester
-	GetNotification(ctx context.Context, notificationId string) (dto.NotificationReq, error)
 }
 
 func TestNotificationRegistryPostgres(t *testing.T) {
@@ -37,6 +36,7 @@ func TestNotificationRegistryPostgres(t *testing.T) {
 	testUpdateNotificationStatus(ctx, t, tester)
 	testDeleteNotification(ctx, t, tester)
 	testGetNotifications(ctx, t, tester)
+	testGetNotification(ctx, t, tester)
 }
 
 func TestNotificationRegistryDynamo(t *testing.T) {
@@ -53,6 +53,7 @@ func TestNotificationRegistryDynamo(t *testing.T) {
 	testUpdateNotificationStatus(ctx, t, tester)
 	testDeleteNotification(ctx, t, tester)
 	testGetNotifications(ctx, t, tester)
+	testGetNotification(ctx, t, tester)
 }
 
 func testCreateNotification(ctx context.Context, t *testing.T, nt NotificationRegistryTester) {
@@ -142,8 +143,10 @@ func testCreateNotification(ctx context.Context, t *testing.T, nt NotificationRe
 						},
 					},
 				},
-				Topic:    "invalid-template",
-				Priority: "LOW",
+				Topic:      "invalid-template",
+				Priority:   "LOW",
+				Recipients: []string{"user1", "user2"},
+				Channels:   []dto.NotificationChannel{"e-mail", "sms"},
 			},
 		},
 	}
@@ -406,5 +409,120 @@ func testGetNotifications(ctx context.Context, t *testing.T, nt NotificationRegi
 		for _, s := range summaries {
 			areSummariesEqual(t, s, testNotificationSummaries[s.Id])
 		}
+	})
+}
+
+func testGetNotification(ctx context.Context, t *testing.T, nt NotificationRegistryTester) {
+	user := "1234"
+
+	templateReq := testutils.MakeTestNotificationTemplateRequest()
+	templateResp, err := nt.SaveTemplate(ctx, user, templateReq)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer r.Clear(ctx, t, nt)
+
+	t.Run("Should be able to retrieve a notification with RawContents", func(t *testing.T) {
+		notificationReq := testutils.MakeTestNotificationRequestRawContents()
+		notificationId, err := nt.SaveNotification(ctx, user, notificationReq)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		notification, err := nt.GetNotification(ctx, notificationId)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, notificationReq.RawContents.Title, notification.RawContents.Title)
+		assert.Equal(t, notificationReq.RawContents.Contents, notification.RawContents.Contents)
+		assert.Equal(t, notificationReq.Topic, notification.Topic)
+		assert.Equal(t, notificationReq.Priority, notification.Priority)
+		assert.Equal(t, notificationReq.DistributionList, notification.DistributionList)
+		assert.ElementsMatch(t, notificationReq.Recipients, notification.Recipients)
+		assert.ElementsMatch(t, notificationReq.Channels, notification.Channels)
+	})
+
+	t.Run("Should be able to retrieve a notification with TemplateContents", func(t *testing.T) {
+		notificationReq := testutils.MakeTestNotificationRequestTemplateContents(
+			templateResp.Id,
+			templateReq,
+		)
+		notificationId, err := nt.SaveNotification(ctx, user, notificationReq)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		notification, err := nt.GetNotification(ctx, notificationId)
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, notificationReq.TemplateContents.Id, notification.TemplateContents.Id)
+		assert.ElementsMatch(t, notificationReq.TemplateContents.Variables, notification.TemplateContents.Variables)
+		assert.Equal(t, notificationReq.Topic, notification.Topic)
+		assert.Equal(t, notificationReq.Priority, notification.Priority)
+		assert.Equal(t, notificationReq.DistributionList, notification.DistributionList)
+		assert.ElementsMatch(t, notificationReq.Recipients, notification.Recipients)
+		assert.ElementsMatch(t, notificationReq.Channels, notification.Channels)
+	})
+
+	t.Run("Should return EntityNotFound if the notification doesn't exist", func(t *testing.T) {
+		nonExistentId := uuid.NewString()
+		_, err := nt.GetNotification(ctx, nonExistentId)
+
+		assert.ErrorAs(t, err, &server.EntityNotFound{Id: nonExistentId, Type: registry.NotificationType})
+	})
+
+	t.Run("Should be able to retrieve a notification with TemplateContents and no variables", func(t *testing.T) {
+		// Create simple template with no variables
+		templateReq := dto.NotificationTemplateReq{
+			Name:             "simple-template",
+			TitleTemplate:    "Simple Title",
+			ContentsTemplate: "Simple Contents",
+			Description:      "Template with no variables",
+			Variables:        []dto.TemplateVariable{},
+		}
+
+		templateResp, err := nt.SaveTemplate(ctx, user, templateReq)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Create notification using template
+		notificationReq := dto.NotificationReq{
+			TemplateContents: &dto.TemplateContents{
+				Id:        templateResp.Id,
+				Variables: []dto.TemplateVariableContents{},
+			},
+			Topic:      "simple-template-test",
+			Priority:   "LOW",
+			Recipients: []string{"user1"},
+			Channels:   []dto.NotificationChannel{"e-mail"},
+		}
+
+		notificationId, err := nt.SaveNotification(ctx, user, notificationReq)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Retrieve and verify notification
+		notification, err := nt.GetNotification(ctx, notificationId)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, notificationReq.TemplateContents.Id, notification.TemplateContents.Id)
+		assert.Empty(t, notification.TemplateContents.Variables)
+		assert.Equal(t, notificationReq.Topic, notification.Topic)
+		assert.Equal(t, notificationReq.Priority, notification.Priority)
+		assert.ElementsMatch(t, notificationReq.Recipients, notification.Recipients)
+		assert.ElementsMatch(t, notificationReq.Channels, notification.Channels)
 	})
 }

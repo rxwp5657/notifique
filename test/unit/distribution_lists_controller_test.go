@@ -163,7 +163,7 @@ func testCreateDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistrib
 			t.Fatal(err)
 		}
 
-		expectedMsg := "DistributionList.Name' Error:Field validation for 'Name' failed on the 'distributionListName' tag"
+		expectedMsg := "DistributionList.Name' Error:Field validation for 'Name' failed on the 'distributionlistname' tag"
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, resp["error"], expectedMsg)

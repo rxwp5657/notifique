@@ -30,6 +30,7 @@ type NotificationRegistry interface {
 	GetNotificationStatus(ctx context.Context, notificationId string) (dto.NotificationStatus, error)
 	GetTemplateVariables(ctx context.Context, templateId string) ([]dto.TemplateVariable, error)
 	GetNotifications(ctx context.Context, filters dto.PageFilter) (dto.Page[dto.NotificationSummary], error)
+	GetNotification(ctx context.Context, notificationId string) (dto.NotificationResp, error)
 }
 
 type NotificationPublisher interface {
@@ -219,4 +220,26 @@ func (nc *NotificationController) GetNotifications(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, notifications)
+}
+
+func (nc *NotificationController) GetNotification(c *gin.Context) {
+	var params dto.NotificationUriParams
+
+	if err := c.ShouldBindUri(&params); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	notification, err := nc.Registry.GetNotification(c.Request.Context(), params.NotificationId)
+
+	if err != nil && errors.As(err, &server.EntityNotFound{}) {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	} else if err != nil {
+		slog.Error(err.Error())
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	c.JSON(http.StatusOK, notification)
 }

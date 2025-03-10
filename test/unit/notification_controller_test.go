@@ -37,6 +37,7 @@ func TestNotificationController(t *testing.T) {
 	testDeleteNotification(t, testApp.Engine, *testApp)
 	testCancelNotificationDelivery(t, testApp.Engine, *testApp)
 	testGetNotifications(t, testApp.Engine, *testApp)
+	testGetNotification(t, testApp.Engine, *testApp)
 }
 
 func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) {
@@ -338,6 +339,19 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  `Key: 'NotificationReq.Image' Error:Field validation for 'Image' failed on the 'uri' tag`,
+		},
+		{
+			name: "Should fail when a template name has the ~ separator character",
+			modifyRequest: func(req dto.NotificationReq) dto.NotificationReq {
+				req.RawContents = nil
+				req.TemplateContents = &dto.TemplateContents{
+					Id:        uuid.NewString(),
+					Variables: []dto.TemplateVariableContents{{Name: "{u~ser}", Value: "John"}},
+				}
+				return req
+			},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Key: 'NotificationReq.TemplateContents.Variables[0].Name' Error:Field validation for 'Name' failed on the 'templatevarname' tag",
 		},
 	}
 
@@ -694,6 +708,79 @@ func testGetNotifications(t *testing.T, e *gin.Engine, mock di.MockedBackend) {
 			}
 
 			w := getNotifications(tt.filters)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.expectedError != "" {
+				resp := make(map[string]string)
+				if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+					t.Fatal(err)
+				}
+				assert.Contains(t, resp["error"], tt.expectedError)
+			}
+		})
+	}
+}
+
+func testGetNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) {
+
+	userId := "1234"
+	registryMock := mock.Registry.MockNotificationRegistry
+
+	getNotification := func(notificationId string) *httptest.ResponseRecorder {
+		url := fmt.Sprintf("%s/%s", notificationsUrl, notificationId)
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodGet, url, nil)
+		req.Header.Add("userId", userId)
+		e.ServeHTTP(w, req)
+		return w
+	}
+
+	tests := []struct {
+		name           string
+		notificationId string
+		setupMock      func()
+		expectedStatus int
+		expectedError  string
+	}{
+		{
+			name:           "Can get a notification",
+			notificationId: uuid.NewString(),
+			expectedStatus: http.StatusOK,
+			setupMock: func() {
+				registryMock.
+					EXPECT().
+					GetNotification(gomock.Any(), gomock.Any()).
+					Return(dto.NotificationResp{}, nil)
+			},
+		},
+		{
+			name:           "Should fail when notification doesn't exist",
+			notificationId: uuid.NewString(),
+			expectedStatus: http.StatusNotFound,
+			expectedError:  "not found",
+			setupMock: func() {
+				registryMock.
+					EXPECT().
+					GetNotification(gomock.Any(), gomock.Any()).
+					Return(dto.NotificationResp{}, server.EntityNotFound{})
+			},
+		},
+		{
+			name:           "Should fail if the id is not an uuid",
+			notificationId: "not-an-uuid",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "Key: 'NotificationUriParams.NotificationId' Error:Field validation for 'NotificationId' failed on the 'uuid' tag",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.setupMock != nil {
+				tt.setupMock()
+			}
+
+			w := getNotification(tt.notificationId)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	r "regexp"
@@ -13,6 +14,8 @@ import (
 )
 
 type TemplateVariableValidator func(string) error
+
+const TemplateVariableNameSeparator = "~"
 
 var FutureValidator validator.Func = func(fl validator.FieldLevel) bool {
 	dateStr, ok := fl.Field().Interface().(string)
@@ -182,4 +185,14 @@ func ValidateTemplateVars(templateVars []dto.TemplateVariable, suppliedVars []dt
 	}
 
 	return errors.Join(errorArr...)
+}
+
+var TemplateNameValidator validator.Func = func(fl validator.FieldLevel) bool {
+	str, ok := fl.Field().Interface().(string)
+
+	if !ok {
+		return false
+	}
+
+	return !strings.Contains(str, TemplateVariableNameSeparator)
 }
