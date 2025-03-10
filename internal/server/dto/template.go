@@ -10,7 +10,7 @@ const (
 )
 
 type TemplateVariable struct {
-	Name       string  `json:"name" binding:"required,max=120"`
+	Name       string  `json:"name" binding:"required,max=120,templatevarname"`
 	Type       string  `json:"type" binding:"required,oneof=STRING DATE DATETIME NUMBER"`
 	Required   bool    `json:"required"`
 	Validation *string `json:"validation"`

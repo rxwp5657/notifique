@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -129,6 +130,41 @@ ORDER BY
 	id DESC
 LIMIT
 	@limit;
+`
+
+const getNotification = `
+SELECT
+	id,
+	title,
+	contents,
+	template_id,
+	image_url,
+	topic,
+	priority,
+	distribution_list,
+	created_at,
+	created_by,
+	status,
+	ARRAY_AGG(distinct channel) AS channels,
+	ARRAY_AGG(distinct recipient) AS recipients,
+	ARRAY_AGG(
+		distinct nvc.name || '%s' || nvc.value
+	) AS variable_names
+FROM
+	notifications AS n
+JOIN
+	notification_recipients AS nr ON
+		nr.notification_id = n.id
+JOIN
+	notification_channels AS nc ON
+		nc.notification_id = n.id
+LEFT JOIN
+	notification_template_variable_contents AS nvc ON
+		nvc.notification_id = n.id
+WHERE
+	id = $1
+GROUP BY
+	n.id;
 `
 
 type notificationKey struct {
@@ -473,4 +509,93 @@ func (r *Registry) GetNotifications(ctx context.Context, filters dto.PageFilter)
 	page.Data = summaries
 
 	return page, nil
+}
+
+func (r *Registry) GetNotification(ctx context.Context, notificationId string) (dto.NotificationResp, error) {
+
+	notification := dto.NotificationResp{}
+
+	rawContents := struct {
+		Title    *string
+		Contents *string
+	}{}
+
+	var templateId *string = nil
+
+	createdAt := time.Time{}
+	channelsAgg := []string{}
+	recipientsAgg := []string{}
+	variablesAgg := []*string{}
+
+	query := fmt.Sprintf(getNotification, server.TemplateVariableNameSeparator)
+
+	err := r.conn.QueryRow(ctx, query, notificationId).Scan(
+		&notification.Id,
+		&rawContents.Title,
+		&rawContents.Contents,
+		&templateId,
+		&notification.Image,
+		&notification.Topic,
+		&notification.Priority,
+		&notification.DistributionList,
+		&createdAt,
+		&notification.CreatedBy,
+		&notification.Status,
+		&channelsAgg,
+		&recipientsAgg,
+		&variablesAgg,
+	)
+
+	if err == pgx.ErrNoRows {
+		return notification, server.EntityNotFound{Id: notificationId, Type: registry.NotificationType}
+	} else if err != nil {
+		return notification, fmt.Errorf("failed to query the notification - %w", err)
+	}
+
+	notification.CreatedAt = createdAt.Format(time.RFC3339Nano)
+	notification.Recipients = recipientsAgg
+
+	channels := make([]dto.NotificationChannel, 0, len(channelsAgg))
+
+	for _, c := range channelsAgg {
+		channels = append(channels, dto.NotificationChannel(c))
+	}
+
+	notification.Channels = channels
+
+	if templateId != nil {
+
+		variables := make([]dto.TemplateVariableContents, 0, len(variablesAgg))
+
+		for _, v := range variablesAgg {
+
+			if v == nil {
+				continue
+			}
+
+			name, value, ok := strings.Cut(*v, "~")
+
+			if !ok {
+				return notification, fmt.Errorf("failed to parse template variable - %w", err)
+			}
+
+			variables = append(variables, dto.TemplateVariableContents{
+				Name:  name,
+				Value: value,
+			})
+		}
+
+		notification.TemplateContents = &dto.TemplateContents{
+			Id:        *templateId,
+			Variables: variables,
+		}
+
+	} else {
+		notification.RawContents = &dto.RawContents{
+			Title:    *rawContents.Title,
+			Contents: *rawContents.Contents,
+		}
+	}
+
+	return notification, nil
 }

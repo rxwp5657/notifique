@@ -405,3 +405,73 @@ func (r *Registry) GetNotifications(ctx context.Context, filters dto.PageFilter)
 
 	return page, nil
 }
+
+func (r *Registry) GetNotification(ctx context.Context, notificationId string) (dto.NotificationResp, error) {
+
+	notificationResp := dto.NotificationResp{}
+
+	key, err := Notification{Id: notificationId}.GetKey()
+
+	if err != nil {
+		return notificationResp, fmt.Errorf("failed to make notification key - %w", err)
+	}
+
+	resp, err := r.client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(NotificationsTable),
+		Key:       key,
+	})
+
+	if err != nil {
+		return notificationResp, fmt.Errorf("failed to retrieve notification - %w", err)
+	}
+
+	if len(resp.Item) == 0 {
+		return notificationResp, server.EntityNotFound{Id: notificationId, Type: registry.NotificationType}
+	}
+
+	var notification Notification
+	err = attributevalue.UnmarshalMap(resp.Item, &notification)
+
+	if err != nil {
+		return notificationResp, fmt.Errorf("failed to unmarshal notification - %w", err)
+	}
+
+	channels := make([]dto.NotificationChannel, 0, len(notification.Channels))
+
+	for _, c := range notification.Channels {
+		channels = append(channels, dto.NotificationChannel(c))
+	}
+
+	notificationResp.NotificationReq = dto.NotificationReq{
+		Image:            notification.Image,
+		Topic:            notification.Topic,
+		Priority:         dto.NotificationPriority(notification.Priority),
+		DistributionList: notification.DistributionList,
+		Recipients:       notification.Recipients,
+		Channels:         channels,
+	}
+
+	if notification.ContentsType == string(dto.Raw) {
+		notificationResp.NotificationReq.RawContents = &dto.RawContents{
+			Title:    notification.RawContents.Title,
+			Contents: notification.RawContents.Contents,
+		}
+	} else {
+		numVariables := len(notification.TemplateContents.Variables)
+		variables := make([]dto.TemplateVariableContents, 0, numVariables)
+
+		for _, v := range notification.TemplateContents.Variables {
+			variables = append(variables, dto.TemplateVariableContents{
+				Name:  v.Name,
+				Value: v.Value,
+			})
+		}
+
+		notificationResp.NotificationReq.TemplateContents = &dto.TemplateContents{
+			Id:        notification.TemplateContents.Id,
+			Variables: variables,
+		}
+	}
+
+	return notificationResp, nil
+}

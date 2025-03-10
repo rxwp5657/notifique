@@ -931,7 +931,7 @@ components:
                 type: object
                 properties:
                   name:
-                    type: string
+                    $ref: "#/components/schemas/NotificationTemplateVariableName"
                   value:
                     type: string
 
@@ -1206,6 +1206,12 @@ components:
         - $ref: "#/components/schemas/NotificationTemplateBase"
         - $ref: "#/components/schemas/NotificationTemplateModel"
 
+    NotificationTemplateVariableName:
+      type: string
+      description: Variable name that must appear in the template
+      maxLength: 120
+      pattern: "^[^~]+$"
+
     TemplateVariable:
       type: object
       required:
@@ -1213,9 +1219,7 @@ components:
         - type
       properties:
         name:
-          type: string
-          description: Variable name without braces
-          maxLength: 120
+          $ref: "#/components/schemas/NotificationTemplateVariableName"
         type:
           type: string
           enum: [string, date, time, number]

@@ -142,63 +142,6 @@ func (t *dynamoregistryTester) getNotification(ctx context.Context,
 	return n, nil
 }
 
-func (t *dynamoregistryTester) GetNotification(ctx context.Context,
-	notificationId string) (dto.NotificationReq, error) {
-
-	n, err := t.getNotification(ctx, notificationId)
-
-	if err != nil {
-		return dto.NotificationReq{}, err
-	}
-
-	var rawContents *dto.RawContents
-
-	if n.RawContents != nil {
-		rawContents = &dto.RawContents{
-			Title:    n.RawContents.Title,
-			Contents: n.RawContents.Contents,
-		}
-	}
-
-	var templateContents *dto.TemplateContents
-
-	if n.TemplateContents != nil {
-		numVariables := len(n.TemplateContents.Variables)
-		variables := make([]dto.TemplateVariableContents, 0, numVariables)
-
-		for _, v := range n.TemplateContents.Variables {
-			variables = append(variables, dto.TemplateVariableContents{
-				Name:  v.Name,
-				Value: v.Value,
-			})
-		}
-
-		templateContents = &dto.TemplateContents{
-			Id:        n.TemplateContents.Id,
-			Variables: variables,
-		}
-	}
-
-	channels := make([]dto.NotificationChannel, 0, len(n.Channels))
-
-	for _, c := range n.Channels {
-		channels = append(channels, dto.NotificationChannel(c))
-	}
-
-	req := dto.NotificationReq{
-		RawContents:      rawContents,
-		TemplateContents: templateContents,
-		Image:            n.Image,
-		Topic:            n.Topic,
-		Priority:         dto.NotificationPriority(n.Priority),
-		DistributionList: n.DistributionList,
-		Recipients:       n.Recipients,
-		Channels:         channels,
-	}
-
-	return req, nil
-}
-
 func (t *dynamoregistryTester) InsertUserNotifications(ctx context.Context,
 	userId string, un []dto.UserNotification) error {
 
