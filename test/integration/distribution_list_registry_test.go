@@ -7,10 +7,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/controllers"
+	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/registry"
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/controllers"
-	"github.com/notifique/internal/server/dto"
 	"github.com/notifique/internal/testutils"
 	r "github.com/notifique/internal/testutils/registry"
 )
@@ -110,7 +110,7 @@ func testCreateDistributionList(ctx context.Context, t *testing.T, dlt Distribut
 
 		err = dlt.CreateDistributionList(context.TODO(), dl)
 
-		assert.ErrorAs(t, err, &server.DistributionListAlreadyExists{Name: dl.Name})
+		assert.ErrorAs(t, err, &internal.DistributionListAlreadyExists{Name: dl.Name})
 	})
 
 	r.Clear(ctx, t, dlt)
@@ -244,7 +244,7 @@ func testGetDistributionListRecipients(ctx context.Context, t *testing.T, dlt Di
 		dlName := "Missing Distribution List"
 		pageFilters := dto.PageFilter{}
 		_, err := dlt.GetRecipients(ctx, dlName, pageFilters)
-		assert.ErrorAs(t, err, &server.EntityNotFound{Id: dlName, Type: registry.DistributionListType})
+		assert.ErrorAs(t, err, &internal.EntityNotFound{Id: dlName, Type: registry.DistributionListType})
 	})
 }
 
@@ -279,7 +279,7 @@ func testAddRecipients(ctx context.Context, t *testing.T, dlt DistributionListTe
 	t.Run("Should fail when trying to add recipients to a DL that doesn't exist", func(t *testing.T) {
 		dlName := "Missing Distribution List"
 		_, err := dlt.AddRecipients(ctx, dlName, newRecipients)
-		assert.ErrorAs(t, err, &server.EntityNotFound{Id: dlName, Type: registry.DistributionListType})
+		assert.ErrorAs(t, err, &internal.EntityNotFound{Id: dlName, Type: registry.DistributionListType})
 	})
 }
 
@@ -339,7 +339,7 @@ func testRemoveRecipients(ctx context.Context, t *testing.T, dlt DistributionLis
 	t.Run("Should fail when trying to delete recipients of a DL that doesn't exist", func(t *testing.T) {
 		dlName := "Missing Distribution List"
 		_, err := dlt.DeleteRecipients(ctx, dlName, recipientsToDelete)
-		assert.ErrorAs(t, err, &server.EntityNotFound{Id: dlName, Type: registry.DistributionListType})
+		assert.ErrorAs(t, err, &internal.EntityNotFound{Id: dlName, Type: registry.DistributionListType})
 	})
 }
 

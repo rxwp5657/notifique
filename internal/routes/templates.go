@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/gin-gonic/gin"
-	c "github.com/notifique/internal/server/controllers"
+	c "github.com/notifique/internal/controllers"
 )
 
 func SetupNotificationTemplateRoutes(r *gin.Engine, version string, controller *c.NotificationTemplateController) error {

@@ -26,19 +26,19 @@ test: vet
 
 gen-mocks: vet
 	go run go.uber.org/mock/mockgen \
-		-source=./internal/server/controllers/users.go \
+		-source=./internal/controllers/users.go \
 		-destination=./internal/testutils/mocks/users.go
 
 	go run go.uber.org/mock/mockgen \
-		-source=./internal/server/controllers/distribution_lists.go \
+		-source=./internal/controllers/distribution_lists.go \
 		-destination=./internal/testutils/mocks/distribution_lists.go
 
 	go run go.uber.org/mock/mockgen \
-		-source=./internal/server/controllers/notifications.go \
+		-source=./internal/controllers/notifications.go \
 		-destination=./internal/testutils/mocks/notifications.go
 
 	go run go.uber.org/mock/mockgen \
-		-source=./internal/server/controllers/templates.go \
+		-source=./internal/controllers/templates.go \
 		-destination=./internal/testutils/mocks/templates.go
 
 .PHONY:gen-mocks

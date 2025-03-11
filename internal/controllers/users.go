@@ -11,8 +11,8 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/gin-gonic/gin"
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/dto"
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/dto"
 )
 
 type UserRegistry interface {
@@ -78,7 +78,7 @@ func (nc *UserController) SetReadStatus(c *gin.Context) {
 	err := nc.Registry.SetReadStatus(c, userId, n.NotificationId)
 
 	if err != nil {
-		if errors.As(err, &server.EntityNotFound{}) {
+		if errors.As(err, &internal.EntityNotFound{}) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		} else {

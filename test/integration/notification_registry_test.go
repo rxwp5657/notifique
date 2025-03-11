@@ -7,10 +7,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/controllers"
+	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/registry"
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/controllers"
-	"github.com/notifique/internal/server/dto"
 	"github.com/notifique/internal/testutils"
 	r "github.com/notifique/internal/testutils/registry"
 )
@@ -280,7 +280,7 @@ func testDeleteNotification(ctx context.Context, t *testing.T, nt NotificationRe
 		{
 			name:           "Should fail deleting a notification on QUEUED state",
 			notificationId: testNotifications[dto.Queued],
-			expectedError: server.InvalidNotificationStatus{
+			expectedError: internal.InvalidNotificationStatus{
 				Id:     testNotifications[dto.Queued],
 				Status: string(dto.Queued),
 			},
@@ -288,7 +288,7 @@ func testDeleteNotification(ctx context.Context, t *testing.T, nt NotificationRe
 		{
 			name:           "Should fail deleting a notification on SENDING state",
 			notificationId: testNotifications[dto.Sending],
-			expectedError: server.InvalidNotificationStatus{
+			expectedError: internal.InvalidNotificationStatus{
 				Id:     testNotifications[dto.Sending],
 				Status: string(dto.Sending),
 			},
@@ -307,7 +307,7 @@ func testDeleteNotification(ctx context.Context, t *testing.T, nt NotificationRe
 
 			if tt.expectedError == nil {
 				_, err := nt.GetNotificationStatus(ctx, tt.notificationId)
-				assert.ErrorAs(t, err, &server.EntityNotFound{Id: tt.notificationId, Type: registry.NotificationType})
+				assert.ErrorAs(t, err, &internal.EntityNotFound{Id: tt.notificationId, Type: registry.NotificationType})
 			}
 		})
 	}
@@ -477,7 +477,7 @@ func testGetNotification(ctx context.Context, t *testing.T, nt NotificationRegis
 		nonExistentId := uuid.NewString()
 		_, err := nt.GetNotification(ctx, nonExistentId)
 
-		assert.ErrorAs(t, err, &server.EntityNotFound{Id: nonExistentId, Type: registry.NotificationType})
+		assert.ErrorAs(t, err, &internal.EntityNotFound{Id: nonExistentId, Type: registry.NotificationType})
 	})
 
 	t.Run("Should be able to retrieve a notification with TemplateContents and no variables", func(t *testing.T) {

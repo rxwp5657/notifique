@@ -11,9 +11,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/registry"
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/dto"
 )
 
 type DynamoDBAPI interface {
@@ -134,7 +134,7 @@ func makePageFilters[T DynamoPrimaryKey](key T, filters dto.PageFilter) (DynamoP
 
 	params := DynamoPageParams{}
 
-	params.Limit = aws.Int32(server.PageSize)
+	params.Limit = aws.Int32(internal.PageSize)
 
 	if filters.MaxResults != nil {
 		limit := int32(*filters.MaxResults)

@@ -10,9 +10,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/registry"
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/dto"
 )
 
 const (
@@ -157,7 +157,7 @@ func (s *Registry) CreateDistributionList(ctx context.Context, dlReq dto.Distrib
 	}
 
 	if exists {
-		return server.DistributionListAlreadyExists{Name: dlReq.Name}
+		return internal.DistributionListAlreadyExists{Name: dlReq.Name}
 	}
 
 	summary := DistListSummary{
@@ -375,7 +375,7 @@ func (s *Registry) GetRecipients(ctx context.Context, distlistName string, filte
 	}
 
 	if !exists {
-		return page, server.EntityNotFound{
+		return page, internal.EntityNotFound{
 			Id:   distlistName,
 			Type: registry.DistributionListType,
 		}
@@ -561,7 +561,7 @@ func (s *Registry) AddRecipients(ctx context.Context, listName string, recipient
 	}
 
 	if !exists {
-		return nil, server.EntityNotFound{
+		return nil, internal.EntityNotFound{
 			Id:   listName,
 			Type: registry.DistributionListType,
 		}
@@ -627,7 +627,7 @@ func (s *Registry) DeleteRecipients(ctx context.Context, listName string, recipi
 	}
 
 	if !exists {
-		return nil, server.EntityNotFound{
+		return nil, internal.EntityNotFound{
 			Id:   listName,
 			Type: registry.DistributionListType,
 		}

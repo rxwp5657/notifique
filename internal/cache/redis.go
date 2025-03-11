@@ -7,8 +7,8 @@ import (
 
 	redis "github.com/redis/go-redis/v9"
 
-	c "github.com/notifique/internal/server/controllers"
-	dto "github.com/notifique/internal/server/dto"
+	c "github.com/notifique/internal/controllers"
+	dto "github.com/notifique/internal/dto"
 )
 
 type RedisConfigurator interface {

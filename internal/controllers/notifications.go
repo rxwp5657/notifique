@@ -8,8 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/dto"
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/dto"
 )
 
 type Notification struct {
@@ -69,7 +69,7 @@ func (nc *NotificationController) CreateNotification(c *gin.Context) {
 			templateId,
 		)
 
-		if err != nil && errors.As(err, &server.EntityNotFound{}) {
+		if err != nil && errors.As(err, &internal.EntityNotFound{}) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		} else if err != nil {
@@ -79,7 +79,7 @@ func (nc *NotificationController) CreateNotification(c *gin.Context) {
 		}
 
 		suppliedVars := notificationReq.TemplateContents.Variables
-		err = server.ValidateTemplateVars(templateVars, suppliedVars)
+		err = internal.ValidateTemplateVars(templateVars, suppliedVars)
 
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -165,7 +165,7 @@ func (nc *NotificationController) CancelDelivery(c *gin.Context) {
 	if status == nil {
 		dbStatus, err := nc.Registry.GetNotificationStatus(c.Request.Context(), params.NotificationId)
 
-		if err != nil && errors.As(err, &server.EntityNotFound{}) {
+		if err != nil && errors.As(err, &internal.EntityNotFound{}) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		} else if err != nil {
@@ -232,7 +232,7 @@ func (nc *NotificationController) GetNotification(c *gin.Context) {
 
 	notification, err := nc.Registry.GetNotification(c.Request.Context(), params.NotificationId)
 
-	if err != nil && errors.As(err, &server.EntityNotFound{}) {
+	if err != nil && errors.As(err, &internal.EntityNotFound{}) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	} else if err != nil {

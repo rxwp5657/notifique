@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/registry"
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/dto"
 )
 
 type distributionList struct {
@@ -151,7 +151,7 @@ func (ps *Registry) CreateDistributionList(ctx context.Context, distributionList
 	}
 
 	if list != nil {
-		return server.DistributionListAlreadyExists{
+		return internal.DistributionListAlreadyExists{
 			Name: list.Name,
 		}
 	}
@@ -208,7 +208,7 @@ func (ps *Registry) GetDistributionLists(ctx context.Context, filters dto.PageFi
 
 	page := dto.Page[dto.DistributionListSummary]{}
 
-	args := pgx.NamedArgs{"limit": server.PageSize}
+	args := pgx.NamedArgs{"limit": internal.PageSize}
 
 	nextTokenFilter := ""
 
@@ -319,13 +319,13 @@ func (ps *Registry) GetRecipients(ctx context.Context, distlistName string, filt
 	}
 
 	if summary == nil {
-		return page, server.EntityNotFound{
+		return page, internal.EntityNotFound{
 			Id:   distlistName,
 			Type: registry.DistributionListType,
 		}
 	}
 
-	args := pgx.NamedArgs{"limit": server.PageSize}
+	args := pgx.NamedArgs{"limit": internal.PageSize}
 	whereFilters := make([]string, 0)
 
 	if filters.MaxResults != nil {
@@ -414,7 +414,7 @@ func (ps *Registry) AddRecipients(ctx context.Context, distlistName string, reci
 	}
 
 	if exists == nil {
-		return nil, server.EntityNotFound{
+		return nil, internal.EntityNotFound{
 			Id:   distlistName,
 			Type: registry.DistributionListType,
 		}
@@ -484,7 +484,7 @@ func (ps *Registry) DeleteRecipients(ctx context.Context, distlistName string, r
 	}
 
 	if exists == nil {
-		return nil, server.EntityNotFound{
+		return nil, internal.EntityNotFound{
 			Id:   distlistName,
 			Type: registry.DistributionListType,
 		}

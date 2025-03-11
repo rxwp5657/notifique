@@ -10,8 +10,8 @@ import (
 
 	"github.com/microcosm-cc/bluemonday"
 
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/dto"
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/dto"
 )
 
 type NotificationTemplateRegistry interface {
@@ -95,7 +95,7 @@ func (ntc *NotificationTemplateController) GetTemplateDetails(c *gin.Context) {
 	notification, err := ntc.Registry.GetTemplateDetails(c.Request.Context(), params.Id)
 
 	if err != nil {
-		if errors.As(err, &server.EntityNotFound{}) {
+		if errors.As(err, &internal.EntityNotFound{}) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		} else {

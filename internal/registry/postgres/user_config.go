@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/notifique/internal/server/dto"
+	"github.com/notifique/internal/dto"
 )
 
 type userConfig struct {

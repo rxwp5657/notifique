@@ -15,12 +15,12 @@ import (
 	"github.com/notifique/internal/broker"
 	"github.com/notifique/internal/cache"
 	"github.com/notifique/internal/config"
+	"github.com/notifique/internal/controllers"
 	"github.com/notifique/internal/deployments"
 	"github.com/notifique/internal/publish"
 	"github.com/notifique/internal/registry/dynamodb"
 	"github.com/notifique/internal/registry/postgres"
-	"github.com/notifique/internal/server/controllers"
-	"github.com/notifique/internal/server/routes"
+	"github.com/notifique/internal/routes"
 	"github.com/notifique/internal/testutils/config"
 	"github.com/notifique/internal/testutils/containers"
 	"github.com/notifique/internal/testutils/mocks"
@@ -30,16 +30,16 @@ import (
 
 // Injectors from wire.go:
 
-func InjectPgPrioritySQS(envfile string) (*gin.Engine, error) {
+func InjectPgPrioritySQS(envfile *string) (*gin.Engine, error) {
 	envConfig, err := config.NewEnvConfig(envfile)
 	if err != nil {
 		return nil, err
 	}
-	registry, err := postgresresgistry.NewPostgresRegistry(envConfig)
+	client, err := cache.NewRedisClient(envConfig)
 	if err != nil {
 		return nil, err
 	}
-	client, err := cache.NewRedisClient(envConfig)
+	registry, err := postgresresgistry.NewPostgresRegistry(envConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -64,11 +64,12 @@ func InjectPgPrioritySQS(envfile string) (*gin.Engine, error) {
 		return nil, err
 	}
 	engineConfig := routes.EngineConfig{
-		Registry:            registry,
-		Cache:               redisCache,
-		Publisher:           priorityPublisher,
-		Broker:              redis,
-		VersionConfigurator: envConfig,
+		RedisClient:        client,
+		Registry:           registry,
+		Cache:              redisCache,
+		Publisher:          priorityPublisher,
+		Broker:             redis,
+		EngineConfigurator: envConfig,
 	}
 	engine, err := routes.NewEngine(engineConfig)
 	if err != nil {
@@ -77,16 +78,16 @@ func InjectPgPrioritySQS(envfile string) (*gin.Engine, error) {
 	return engine, nil
 }
 
-func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
+func InjectPgPriorityRabbitMQ(envfile *string) (*gin.Engine, func(), error) {
 	envConfig, err := config.NewEnvConfig(envfile)
 	if err != nil {
 		return nil, nil, err
 	}
-	registry, err := postgresresgistry.NewPostgresRegistry(envConfig)
+	client, err := cache.NewRedisClient(envConfig)
 	if err != nil {
 		return nil, nil, err
 	}
-	client, err := cache.NewRedisClient(envConfig)
+	registry, err := postgresresgistry.NewPostgresRegistry(envConfig)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -112,11 +113,12 @@ func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
 		return nil, nil, err
 	}
 	engineConfig := routes.EngineConfig{
-		Registry:            registry,
-		Cache:               redisCache,
-		Publisher:           priorityPublisher,
-		Broker:              redis,
-		VersionConfigurator: envConfig,
+		RedisClient:        client,
+		Registry:           registry,
+		Cache:              redisCache,
+		Publisher:          priorityPublisher,
+		Broker:             redis,
+		EngineConfigurator: envConfig,
 	}
 	engine, err := routes.NewEngine(engineConfig)
 	if err != nil {
@@ -128,21 +130,21 @@ func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
 	}, nil
 }
 
-func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
+func InjectDynamoPrioritySQS(envfile *string) (*gin.Engine, error) {
 	envConfig, err := config.NewEnvConfig(envfile)
 	if err != nil {
 		return nil, err
 	}
-	client, err := dynamoregistry.NewDynamoDBClient(envConfig)
+	client, err := cache.NewRedisClient(envConfig)
 	if err != nil {
 		return nil, err
 	}
-	registry := dynamoregistry.NewDynamoDBRegistry(client)
-	redisClient, err := cache.NewRedisClient(envConfig)
+	dynamodbClient, err := dynamoregistry.NewDynamoDBClient(envConfig)
 	if err != nil {
 		return nil, err
 	}
-	redisCache, err := cache.NewRedisCache(redisClient)
+	registry := dynamoregistry.NewDynamoDBRegistry(dynamodbClient)
+	redisCache, err := cache.NewRedisCache(client)
 	if err != nil {
 		return nil, err
 	}
@@ -158,16 +160,17 @@ func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
 		QueueConfigurator: envConfig,
 	}
 	priorityPublisher := publish.NewPriorityPublisher(priorityPublisherCfg)
-	redis, err := broker.NewRedisBroker(redisClient, envConfig)
+	redis, err := broker.NewRedisBroker(client, envConfig)
 	if err != nil {
 		return nil, err
 	}
 	engineConfig := routes.EngineConfig{
-		Registry:            registry,
-		Cache:               redisCache,
-		Publisher:           priorityPublisher,
-		Broker:              redis,
-		VersionConfigurator: envConfig,
+		RedisClient:        client,
+		Registry:           registry,
+		Cache:              redisCache,
+		Publisher:          priorityPublisher,
+		Broker:             redis,
+		EngineConfigurator: envConfig,
 	}
 	engine, err := routes.NewEngine(engineConfig)
 	if err != nil {
@@ -176,21 +179,21 @@ func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
 	return engine, nil
 }
 
-func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
+func InjectDynamoPriorityRabbitMQ(envfile *string) (*gin.Engine, func(), error) {
 	envConfig, err := config.NewEnvConfig(envfile)
 	if err != nil {
 		return nil, nil, err
 	}
-	client, err := dynamoregistry.NewDynamoDBClient(envConfig)
+	client, err := cache.NewRedisClient(envConfig)
 	if err != nil {
 		return nil, nil, err
 	}
-	registry := dynamoregistry.NewDynamoDBRegistry(client)
-	redisClient, err := cache.NewRedisClient(envConfig)
+	dynamodbClient, err := dynamoregistry.NewDynamoDBClient(envConfig)
 	if err != nil {
 		return nil, nil, err
 	}
-	redisCache, err := cache.NewRedisCache(redisClient)
+	registry := dynamoregistry.NewDynamoDBRegistry(dynamodbClient)
+	redisCache, err := cache.NewRedisCache(client)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -206,17 +209,18 @@ func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
 		QueueConfigurator: envConfig,
 	}
 	priorityPublisher := publish.NewPriorityPublisher(priorityPublisherCfg)
-	redis, err := broker.NewRedisBroker(redisClient, envConfig)
+	redis, err := broker.NewRedisBroker(client, envConfig)
 	if err != nil {
 		cleanup()
 		return nil, nil, err
 	}
 	engineConfig := routes.EngineConfig{
-		Registry:            registry,
-		Cache:               redisCache,
-		Publisher:           priorityPublisher,
-		Broker:              redis,
-		VersionConfigurator: envConfig,
+		RedisClient:        client,
+		Registry:           registry,
+		Cache:              redisCache,
+		Publisher:          priorityPublisher,
+		Broker:             redis,
+		EngineConfigurator: envConfig,
 	}
 	engine, err := routes.NewEngine(engineConfig)
 	if err != nil {
@@ -374,13 +378,15 @@ func InjectMockedBackend(ctx context.Context, mockController *gomock.Controller)
 	mockNotificationPublisher := mock_controllers.NewMockNotificationPublisher(mockController)
 	mockUserNotificationBroker := mock_controllers.NewMockUserNotificationBroker(mockController)
 	mockNotificationCache := mock_controllers.NewMockNotificationCache(mockController)
-	testVersionConfiguratorFunc := config_test.NewTestVersionConfigurator()
+	client := _wireClientValue
+	testEngineConfigurator := config_test.NewTestVersionConfigurator()
 	engineConfig := routes.EngineConfig{
-		Registry:            mockedRegistry,
-		Cache:               mockNotificationCache,
-		Publisher:           mockNotificationPublisher,
-		Broker:              mockUserNotificationBroker,
-		VersionConfigurator: testVersionConfiguratorFunc,
+		RedisClient:        client,
+		Registry:           mockedRegistry,
+		Cache:              mockNotificationCache,
+		Publisher:          mockNotificationPublisher,
+		Broker:             mockUserNotificationBroker,
+		EngineConfigurator: testEngineConfigurator,
 	}
 	engine, err := routes.NewEngine(engineConfig)
 	if err != nil {
@@ -396,7 +402,11 @@ func InjectMockedBackend(ctx context.Context, mockController *gomock.Controller)
 	return mockedBackend, nil
 }
 
-func InjectRabbitMQPriorityDeployer(envfile string) (*deployments.RabbitMQPriorityDeployer, func(), error) {
+var (
+	_wireClientValue = (*redis.Client)(nil)
+)
+
+func InjectRabbitMQPriorityDeployer(envfile *string) (*deployments.RabbitMQPriorityDeployer, func(), error) {
 	envConfig, err := config.NewEnvConfig(envfile)
 	if err != nil {
 		return nil, nil, err
@@ -410,7 +420,7 @@ func InjectRabbitMQPriorityDeployer(envfile string) (*deployments.RabbitMQPriori
 	}, nil
 }
 
-func InjectSQSPriorityDeployer(envfile string) (*deployments.SQSPriorityDeployer, func(), error) {
+func InjectSQSPriorityDeployer(envfile *string) (*deployments.SQSPriorityDeployer, func(), error) {
 	envConfig, err := config.NewEnvConfig(envfile)
 	if err != nil {
 		return nil, nil, err
@@ -532,9 +542,9 @@ var MockedRegistrySet = wire.NewSet(
 	MockedNotificationTemplateRegistrySet, mock_controllers.NewMockedRegistry, wire.Bind(new(routes.Registry), new(*mock_controllers.MockedRegistry)),
 )
 
-var TestVersionConfiguratorSet = wire.NewSet(config_test.NewTestVersionConfigurator, wire.Bind(new(routes.VersionConfigurator), new(config_test.TestVersionConfiguratorFunc)))
+var TestVersionConfiguratorSet = wire.NewSet(config_test.NewTestVersionConfigurator, wire.Bind(new(routes.EngineConfigurator), new(config_test.TestEngineConfigurator)))
 
-var EnvConfigSet = wire.NewSet(config.NewEnvConfig, wire.Bind(new(postgresresgistry.PostgresConfigurator), new(*config.EnvConfig)), wire.Bind(new(dynamoregistry.DynamoConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.PriorityQueueConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.SQSConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.RabbitMQConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.RabbitMQPriorityConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.SQSPriorityConfigurator), new(*config.EnvConfig)), wire.Bind(new(cache.RedisConfigurator), new(*config.EnvConfig)), wire.Bind(new(broker.BrokerConfigurator), new(*config.EnvConfig)), wire.Bind(new(routes.VersionConfigurator), new(*config.EnvConfig)))
+var EnvConfigSet = wire.NewSet(config.NewEnvConfig, wire.Bind(new(postgresresgistry.PostgresConfigurator), new(*config.EnvConfig)), wire.Bind(new(dynamoregistry.DynamoConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.PriorityQueueConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.SQSConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.RabbitMQConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.RabbitMQPriorityConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.SQSPriorityConfigurator), new(*config.EnvConfig)), wire.Bind(new(cache.RedisConfigurator), new(*config.EnvConfig)), wire.Bind(new(broker.BrokerConfigurator), new(*config.EnvConfig)), wire.Bind(new(routes.EngineConfigurator), new(*config.EnvConfig)))
 
 var MockedNotificationCacheSet = wire.NewSet(mock_controllers.NewMockNotificationCache, wire.Bind(new(routes.Cache), new(*mock_controllers.MockNotificationCache)))
 

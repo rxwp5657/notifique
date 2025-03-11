@@ -11,9 +11,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/registry"
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/dto"
 )
 
 const (
@@ -203,7 +203,7 @@ func (s *Registry) SetReadStatus(ctx context.Context, userId, notificationId str
 	if err != nil {
 		target := &types.ConditionalCheckFailedException{}
 		if errors.As(err, &target) {
-			return server.EntityNotFound{
+			return internal.EntityNotFound{
 				Id:   notificationId,
 				Type: registry.NotificationType,
 			}

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/notifique/internal/server/dto"
+	"github.com/notifique/internal/dto"
 )
 
 func makePageURLQuery(req *http.Request, filters dto.PageFilter) url.Values {

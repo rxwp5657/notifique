@@ -8,8 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/expression"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/notifique/internal/dto"
 	ds "github.com/notifique/internal/registry/dynamodb"
-	"github.com/notifique/internal/server/dto"
 	"github.com/notifique/internal/testutils/containers"
 )
 

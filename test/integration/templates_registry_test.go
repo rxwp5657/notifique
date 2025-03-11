@@ -10,10 +10,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/controllers"
+	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/registry"
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/controllers"
-	"github.com/notifique/internal/server/dto"
 	"github.com/notifique/internal/testutils"
 	r "github.com/notifique/internal/testutils/registry"
 )
@@ -214,7 +214,7 @@ func testGetNotificationTemplateDetails(ctx context.Context, t *testing.T, ntr T
 		nonExistentId := uuid.New().String()
 		_, err := ntr.GetTemplateDetails(ctx, nonExistentId)
 
-		assert.ErrorAs(t, err, &server.EntityNotFound{
+		assert.ErrorAs(t, err, &internal.EntityNotFound{
 			Id:   nonExistentId,
 			Type: registry.NotificationTemplateType,
 		})

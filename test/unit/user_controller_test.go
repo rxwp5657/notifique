@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/notifique/internal/server/dto"
+	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"

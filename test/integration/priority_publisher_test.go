@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	c "github.com/notifique/internal/controllers"
 	di "github.com/notifique/internal/di"
-	c "github.com/notifique/internal/server/controllers"
-	dto "github.com/notifique/internal/server/dto"
+	dto "github.com/notifique/internal/dto"
 	"github.com/stretchr/testify/assert"
 )
 

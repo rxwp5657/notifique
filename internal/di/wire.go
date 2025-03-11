@@ -10,9 +10,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
+	"github.com/notifique/internal/controllers"
 	"github.com/notifique/internal/deployments"
-	"github.com/notifique/internal/server/controllers"
-	"github.com/notifique/internal/server/routes"
+	"github.com/notifique/internal/routes"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/mock/gomock"
 
@@ -209,7 +209,7 @@ var MockedRegistrySet = wire.NewSet(
 
 var TestVersionConfiguratorSet = wire.NewSet(
 	tcfg.NewTestVersionConfigurator,
-	wire.Bind(new(routes.VersionConfigurator), new(tcfg.TestVersionConfiguratorFunc)),
+	wire.Bind(new(routes.EngineConfigurator), new(tcfg.TestEngineConfigurator)),
 )
 
 var EnvConfigSet = wire.NewSet(
@@ -223,7 +223,7 @@ var EnvConfigSet = wire.NewSet(
 	wire.Bind(new(pub.SQSPriorityConfigurator), new(*cfg.EnvConfig)),
 	wire.Bind(new(cache.RedisConfigurator), new(*cfg.EnvConfig)),
 	wire.Bind(new(bk.BrokerConfigurator), new(*cfg.EnvConfig)),
-	wire.Bind(new(routes.VersionConfigurator), new(*cfg.EnvConfig)),
+	wire.Bind(new(routes.EngineConfigurator), new(*cfg.EnvConfig)),
 )
 
 var MockedNotificationCacheSet = wire.NewSet(
@@ -235,7 +235,7 @@ var EngineConfigSet = wire.NewSet(
 	wire.Struct(new(routes.EngineConfig), "*"),
 )
 
-func InjectPgPrioritySQS(envfile string) (*gin.Engine, error) {
+func InjectPgPrioritySQS(envfile *string) (*gin.Engine, error) {
 
 	wire.Build(
 		EnvConfigSet,
@@ -252,7 +252,7 @@ func InjectPgPrioritySQS(envfile string) (*gin.Engine, error) {
 	return nil, nil
 }
 
-func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
+func InjectPgPriorityRabbitMQ(envfile *string) (*gin.Engine, func(), error) {
 
 	wire.Build(
 		EnvConfigSet,
@@ -269,7 +269,7 @@ func InjectPgPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
 	return nil, nil, nil
 }
 
-func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
+func InjectDynamoPrioritySQS(envfile *string) (*gin.Engine, error) {
 
 	wire.Build(
 		EnvConfigSet,
@@ -286,7 +286,7 @@ func InjectDynamoPrioritySQS(envfile string) (*gin.Engine, error) {
 	return nil, nil
 }
 
-func InjectDynamoPriorityRabbitMQ(envfile string) (*gin.Engine, func(), error) {
+func InjectDynamoPriorityRabbitMQ(envfile *string) (*gin.Engine, func(), error) {
 
 	wire.Build(
 		EnvConfigSet,
@@ -346,6 +346,7 @@ func InjectMockedBackend(ctx context.Context, mockController *gomock.Controller)
 		MockedUserNotificationBroker,
 		MockedNotificationCacheSet,
 		EngineConfigSet,
+		wire.Value((*redis.Client)(nil)),
 		routes.NewEngine,
 		wire.Struct(new(MockedBackend), "*"),
 	)
@@ -353,7 +354,7 @@ func InjectMockedBackend(ctx context.Context, mockController *gomock.Controller)
 	return nil, nil
 }
 
-func InjectRabbitMQPriorityDeployer(envfile string) (*deployments.RabbitMQPriorityDeployer, func(), error) {
+func InjectRabbitMQPriorityDeployer(envfile *string) (*deployments.RabbitMQPriorityDeployer, func(), error) {
 
 	wire.Build(
 		EnvConfigSet,
@@ -363,7 +364,7 @@ func InjectRabbitMQPriorityDeployer(envfile string) (*deployments.RabbitMQPriori
 	return nil, nil, nil
 }
 
-func InjectSQSPriorityDeployer(envfile string) (*deployments.SQSPriorityDeployer, func(), error) {
+func InjectSQSPriorityDeployer(envfile *string) (*deployments.SQSPriorityDeployer, func(), error) {
 
 	wire.Build(
 		EnvConfigSet,

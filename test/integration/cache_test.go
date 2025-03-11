@@ -6,8 +6,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/notifique/internal/cache"
-	"github.com/notifique/internal/server/controllers"
-	"github.com/notifique/internal/server/dto"
+	"github.com/notifique/internal/controllers"
+	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/testutils"
 	"github.com/notifique/internal/testutils/containers"
 	"github.com/stretchr/testify/assert"

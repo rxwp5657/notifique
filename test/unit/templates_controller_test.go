@@ -15,10 +15,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
+	"github.com/notifique/internal"
 	di "github.com/notifique/internal/di"
+	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/registry"
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/dto"
 	"github.com/notifique/internal/testutils"
 )
 
@@ -395,7 +395,7 @@ func testGetNotificationTemplateDetails(t *testing.T, e *gin.Engine, mock di.Moc
 				mock.Registry.MockNotificationTemplateRegistry.
 					EXPECT().
 					GetTemplateDetails(gomock.Any(), gomock.Any()).
-					Return(dto.NotificationTemplateDetails{}, server.EntityNotFound{
+					Return(dto.NotificationTemplateDetails{}, internal.EntityNotFound{
 						Id:   missingTemplateId,
 						Type: registry.NotificationTemplateType,
 					})
