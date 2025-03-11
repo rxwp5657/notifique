@@ -7,8 +7,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
+
+	"github.com/go-redis/redis_rate/v10"
+	redis "github.com/redis/go-redis/v9"
+
 	"github.com/notifique/internal/server"
 	"github.com/notifique/internal/server/controllers"
+	"github.com/notifique/internal/server/middleware"
 )
 
 const versionRegex = "(/v[0-9]{1,2}|^$)"
@@ -20,8 +25,10 @@ type Registry interface {
 	controllers.NotificationTemplateRegistry
 }
 
-type VersionConfigurator interface {
+type EngineConfigurator interface {
 	GetVersion() (string, error)
+	GetExpectedHost() *string
+	GetRequestsPerSecond() (*int, error)
 }
 
 type Cache interface {
@@ -29,16 +36,17 @@ type Cache interface {
 }
 
 type EngineConfig struct {
-	Registry            Registry
-	Cache               Cache
-	Publisher           controllers.NotificationPublisher
-	Broker              controllers.UserNotificationBroker
-	VersionConfigurator VersionConfigurator
+	RedisClient        *redis.Client
+	Registry           Registry
+	Cache              Cache
+	Publisher          controllers.NotificationPublisher
+	Broker             controllers.UserNotificationBroker
+	EngineConfigurator EngineConfigurator
 }
 
 func NewEngine(cfg EngineConfig) (*gin.Engine, error) {
 
-	version, err := cfg.VersionConfigurator.GetVersion()
+	version, err := cfg.EngineConfigurator.GetVersion()
 
 	if err != nil {
 		return nil, err
@@ -70,6 +78,24 @@ func NewEngine(cfg EngineConfig) (*gin.Engine, error) {
 	}
 
 	r := gin.Default()
+
+	expectedHost := cfg.EngineConfigurator.GetExpectedHost()
+	r.Use(middleware.Security(expectedHost))
+
+	requestsPerSecond, err := cfg.EngineConfigurator.GetRequestsPerSecond()
+
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.RedisClient != nil && requestsPerSecond != nil {
+		if *requestsPerSecond <= 0 {
+			return nil, fmt.Errorf("requests per second should be greater than 0")
+		}
+
+		rateLimitier := redis_rate.NewLimiter(cfg.RedisClient)
+		r.Use(middleware.RateLimit(rateLimitier, *requestsPerSecond))
+	}
 
 	_ = SetupNotificationRoutes(r, version, &nc)
 	_ = SetupDistributionListRoutes(r, version, &dlc)

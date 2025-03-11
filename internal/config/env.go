@@ -24,6 +24,8 @@ const (
 	brokerCapacity      = "BROKER_CAPACITY"
 	redisUrl            = "REDIS_URL"
 	apiVersion          = "API_VERSION"
+	expectedHost        = "EXPECTED_HOST"
+	requestsPerSecond   = "REQUESTS_PER_SECOND"
 )
 
 type EnvConfig struct{}
@@ -130,11 +132,45 @@ func (cfg EnvConfig) GetVersion() (string, error) {
 	return version, nil
 }
 
-func NewEnvConfig(envFile string) (*EnvConfig, error) {
-	err := godotenv.Load(envFile)
+func (cfg EnvConfig) GetExpectedHost() *string {
+
+	host, ok := os.LookupEnv(expectedHost)
+
+	if !ok {
+		return nil
+	}
+
+	return &host
+}
+
+func (cfg EnvConfig) GetRequestsPerSecond() (*int, error) {
+
+	rps, ok := os.LookupEnv(requestsPerSecond)
+
+	if !ok {
+		return nil, nil
+	}
+
+	rpsInt, err := strconv.Atoi(rps)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to load env file %s - %w", envFile, err)
+		return nil, err
+	}
+
+	return &rpsInt, nil
+}
+
+func NewEnvConfig(envFile *string) (*EnvConfig, error) {
+
+	if envFile == nil {
+		cfg := EnvConfig{}
+		return &cfg, nil
+	}
+
+	err := godotenv.Load(*envFile)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to load env file %s - %w", *envFile, err)
 	}
 
 	cfg := EnvConfig{}

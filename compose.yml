@@ -1,19 +1,35 @@
 services:
   notifique:
-    image: notifique:v0.1.0
+    image: notifique:v0
     environment:
       - GIN_MODE=release
+      - LOW_PRIORITY_QUEUE=notifique-low
+      - MEDIUM_PRIORITY_QUEUE=notifique-medium
+      - HIGH_PRIORITY_QUEUE=notifique-high
+      - RABBITMQ_URL=amqp://rabbitmq:5672/
+      - POSTGRES_URL=postgres://postgres:postgres@postgres:5432/notifique?sslmode=disable
+      - BROKER_CAPACITY=10
+      - REDIS_URL=redis://redis:6379
+      - API_VERSION=/v0
+      - REQUESTS_PER_SECOND=0
     ports:
       - 8080:8080
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_started
 
-  dynamodb-local:
-    image: amazon/dynamodb-local:2.4.0
-    environment:
-      - name=value
-    ports:
-      - 8000:8000
-    volumes:
-      - ./volumes/dynamodb:/home/dynamodblocal/data
+  # dynamodb-local:
+  #   image: amazon/dynamodb-local:2.4.0
+  #   environment:
+  #     - name=value
+  #   ports:
+  #     - 8000:8000
+  #   volumes:
+  #     - ./volumes/dynamodb:/home/dynamodblocal/data
 
   postgres:
     image: postgres:16.3
@@ -25,17 +41,22 @@ services:
       - POSTGRES_DB=notifique
       - POSTGRES_PASSWORD=postgres
 
-  local-stack:
-    image: localstack/localstack:3.4
-    ports:
-      - 4566:4566
-    environment:
-      - SERVICES=sqs
+  # local-stack:
+  #   image: localstack/localstack:3.4
+  #   ports:
+  #     - 4566:4566
+  #   environment:
+  #     - SERVICES=sqs
 
   rabbitmq:
     image: rabbitmq:3.13.3
     ports:
       - 5672:5672
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 5s
+      timeout: 30s
+      retries: 3
 
   redis:
     image: redis:7.4-rc1-alpine

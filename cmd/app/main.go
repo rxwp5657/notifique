@@ -8,7 +8,7 @@ import (
 
 func main() {
 
-	r, close, err := di.InjectDynamoPriorityRabbitMQ(".env")
+	r, close, err := di.InjectPgPriorityRabbitMQ(nil)
 
 	if err != nil {
 		log.Fatalf("failed to create engine - %v", err)

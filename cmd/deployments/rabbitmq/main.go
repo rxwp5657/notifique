@@ -8,7 +8,8 @@ import (
 
 func main() {
 
-	deployer, cleanup, err := di.InjectRabbitMQPriorityDeployer(".env")
+	env := "./config/local.env"
+	deployer, cleanup, err := di.InjectRabbitMQPriorityDeployer(&env)
 
 	if err != nil {
 		log.Fatal(err)

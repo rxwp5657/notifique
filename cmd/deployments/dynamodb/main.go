@@ -10,7 +10,8 @@ import (
 
 func main() {
 
-	configurator, err := cfg.NewEnvConfig(".env")
+	env := "./config/local.env"
+	configurator, err := cfg.NewEnvConfig(&env)
 
 	if err != nil {
 		log.Fatal(err)

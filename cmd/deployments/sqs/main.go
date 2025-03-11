@@ -8,7 +8,8 @@ import (
 
 func main() {
 
-	deployer, cleanup, err := di.InjectSQSPriorityDeployer(".env")
+	env := "./config/local.env"
+	deployer, cleanup, err := di.InjectSQSPriorityDeployer(&env)
 
 	if err != nil {
 		log.Fatalf("failed to create deployment - %v", err)
