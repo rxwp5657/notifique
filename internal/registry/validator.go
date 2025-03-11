@@ -1,6 +1,6 @@
 package registry
 
-import dto "github.com/notifique/internal/server/dto"
+import dto "github.com/notifique/internal/dto"
 
 func IsDeletableStatus(status dto.NotificationStatus) bool {
 

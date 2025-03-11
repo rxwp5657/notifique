@@ -8,8 +8,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/notifique/internal/dto"
 	ps "github.com/notifique/internal/registry/postgres"
-	"github.com/notifique/internal/server/dto"
 	"github.com/notifique/internal/testutils/containers"
 )
 

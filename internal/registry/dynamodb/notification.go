@@ -12,10 +12,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/google/uuid"
+	"github.com/notifique/internal"
+	c "github.com/notifique/internal/controllers"
+	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/registry"
-	"github.com/notifique/internal/server"
-	c "github.com/notifique/internal/server/controllers"
-	"github.com/notifique/internal/server/dto"
 )
 
 const (
@@ -268,7 +268,7 @@ func (r *Registry) GetNotificationStatus(ctx context.Context, id string) (dto.No
 	}
 
 	if len(resp.Item) == 0 {
-		return status, server.EntityNotFound{Id: id, Type: registry.NotificationType}
+		return status, internal.EntityNotFound{Id: id, Type: registry.NotificationType}
 	}
 
 	tmp := struct {
@@ -290,7 +290,7 @@ func (r *Registry) DeleteNotification(ctx context.Context, id string) error {
 
 	status, err := r.GetNotificationStatus(ctx, id)
 
-	if err != nil && errors.As(err, &server.EntityNotFound{}) {
+	if err != nil && errors.As(err, &internal.EntityNotFound{}) {
 		return nil
 	} else if err != nil {
 		return err
@@ -299,7 +299,7 @@ func (r *Registry) DeleteNotification(ctx context.Context, id string) error {
 	canDelete := registry.IsDeletableStatus(status)
 
 	if !canDelete {
-		return server.InvalidNotificationStatus{
+		return internal.InvalidNotificationStatus{
 			Id:     id,
 			Status: string(status),
 		}
@@ -426,7 +426,7 @@ func (r *Registry) GetNotification(ctx context.Context, notificationId string) (
 	}
 
 	if len(resp.Item) == 0 {
-		return notificationResp, server.EntityNotFound{Id: notificationId, Type: registry.NotificationType}
+		return notificationResp, internal.EntityNotFound{Id: notificationId, Type: registry.NotificationType}
 	}
 
 	var notification Notification

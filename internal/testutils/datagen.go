@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/notifique/internal/server/dto"
+	"github.com/notifique/internal/dto"
 )
 
 const (

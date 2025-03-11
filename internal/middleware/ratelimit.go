@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis_rate/v10"
-	"github.com/notifique/internal/server/controllers"
+	"github.com/notifique/internal/controllers"
 )
 
 const (

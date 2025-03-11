@@ -9,9 +9,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/registry"
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/dto"
 )
 
 type userNotification struct {
@@ -84,7 +84,7 @@ func (ps *Registry) GetUserNotifications(ctx context.Context, filters dto.UserNo
 
 	page := dto.Page[dto.UserNotification]{}
 
-	args := pgx.NamedArgs{"limit": server.PageSize}
+	args := pgx.NamedArgs{"limit": internal.PageSize}
 	whereFilters := make([]string, 0)
 
 	if filters.MaxResults != nil {
@@ -189,7 +189,7 @@ func (ps *Registry) SetReadStatus(ctx context.Context, userId, notificationId st
 	if err != nil {
 		tx.Rollback(ctx)
 		if errors.Is(err, pgx.ErrNoRows) {
-			return server.EntityNotFound{
+			return internal.EntityNotFound{
 				Id:   notificationId,
 				Type: registry.NotificationType,
 			}

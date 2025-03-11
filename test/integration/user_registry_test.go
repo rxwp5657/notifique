@@ -10,10 +10,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/controllers"
+	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/registry"
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/controllers"
-	"github.com/notifique/internal/server/dto"
 	"github.com/notifique/internal/testutils"
 	r "github.com/notifique/internal/testutils/registry"
 )
@@ -194,7 +194,7 @@ func testSetReadStatus(ctx context.Context, t *testing.T, ust UserRegistryTester
 		testIdStr := testId.String()
 		err = ust.SetReadStatus(ctx, userId, testIdStr)
 
-		assert.ErrorAs(t, err, &server.EntityNotFound{
+		assert.ErrorAs(t, err, &internal.EntityNotFound{
 			Id:   testIdStr,
 			Type: registry.NotificationType,
 		})

@@ -1,4 +1,4 @@
-package server
+package internal
 
 import (
 	"errors"
@@ -10,7 +10,7 @@ import (
 	r "regexp"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/notifique/internal/server/dto"
+	"github.com/notifique/internal/dto"
 )
 
 type TemplateVariableValidator func(string) error

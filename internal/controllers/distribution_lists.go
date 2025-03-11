@@ -8,8 +8,8 @@ import (
 	"golang.org/x/net/context"
 
 	"github.com/gin-gonic/gin"
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/dto"
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/dto"
 )
 
 type DistributionRegistry interface {
@@ -36,7 +36,7 @@ func (dc *DistributionListController) CreateDistributionList(c *gin.Context) {
 	}
 
 	if err := dc.Registry.CreateDistributionList(c, dl); err != nil {
-		if errors.As(err, &server.DistributionListAlreadyExists{}) {
+		if errors.As(err, &internal.DistributionListAlreadyExists{}) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		} else {
@@ -85,7 +85,7 @@ func (dc *DistributionListController) GetRecipients(c *gin.Context) {
 	recipients, err := dc.Registry.GetRecipients(c, uriParams.Name, filter)
 
 	if err != nil {
-		if errors.As(err, &server.EntityNotFound{}) {
+		if errors.As(err, &internal.EntityNotFound{}) {
 			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 			return
 		} else {
@@ -144,7 +144,7 @@ func (dc *DistributionListController) handleRecipients(c *gin.Context, handler r
 	summary, err := handler(c, uriParams.Name, recipients.Recipients)
 
 	if err != nil {
-		if errors.As(err, &server.EntityNotFound{}) {
+		if errors.As(err, &internal.EntityNotFound{}) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		} else {

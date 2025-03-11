@@ -13,10 +13,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
+	"github.com/notifique/internal"
 	di "github.com/notifique/internal/di"
+	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/registry"
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/dto"
 	"github.com/notifique/internal/testutils"
 	mk "github.com/notifique/internal/testutils/mocks"
 )
@@ -81,7 +81,7 @@ func testCreateDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistrib
 		mock.
 			EXPECT().
 			CreateDistributionList(gomock.Any(), gomock.Any()).
-			Return(server.DistributionListAlreadyExists{
+			Return(internal.DistributionListAlreadyExists{
 				Name: dl.Name,
 			})
 
@@ -172,7 +172,7 @@ func testCreateDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistrib
 	t.Run("Should fail if the distribution list name already exists", func(t *testing.T) {
 		mock.EXPECT().
 			CreateDistributionList(gomock.Any(), gomock.Any()).
-			Return(server.DistributionListAlreadyExists{Name: dl.Name})
+			Return(internal.DistributionListAlreadyExists{Name: dl.Name})
 
 		w := createDistributionList(dl)
 
@@ -287,7 +287,7 @@ func testAddRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionRegi
 		mock.
 			EXPECT().
 			AddRecipients(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(nil, server.EntityNotFound{
+			Return(nil, internal.EntityNotFound{
 				Id:   dl.Name,
 				Type: registry.DistributionListType,
 			})
@@ -426,7 +426,7 @@ func testDeleteRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionR
 		mock.
 			EXPECT().
 			DeleteRecipients(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(nil, server.EntityNotFound{
+			Return(nil, internal.EntityNotFound{
 				Id:   dl.Name,
 				Type: registry.DistributionListType,
 			})
@@ -625,7 +625,7 @@ func testGetDistributionListRescipients(t *testing.T, e *gin.Engine, mock mk.Moc
 	t.Run("Should return 404 if the distribution list doesn't exists", func(t *testing.T) {
 		mock.EXPECT().
 			GetRecipients(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return(dto.Page[string]{}, server.EntityNotFound{
+			Return(dto.Page[string]{}, internal.EntityNotFound{
 				Id:   dlName,
 				Type: registry.DistributionListType,
 			})

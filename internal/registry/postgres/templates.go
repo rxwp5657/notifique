@@ -9,9 +9,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/registry"
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/dto"
 )
 
 const insertNotificationTemplate = `
@@ -188,7 +188,7 @@ func (r *Registry) GetTemplates(ctx context.Context, filters dto.NotificationTem
 
 	page := dto.Page[dto.NotificationTemplateInfoResp]{}
 
-	args := pgx.NamedArgs{"limit": server.PageSize}
+	args := pgx.NamedArgs{"limit": internal.PageSize}
 
 	whereFilters := make([]string, 0)
 
@@ -294,7 +294,7 @@ func (r *Registry) GetTemplateDetails(ctx context.Context, templateId string) (d
 		)
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return details, server.EntityNotFound{
+		return details, internal.EntityNotFound{
 			Id:   templateId,
 			Type: registry.NotificationTemplateType,
 		}

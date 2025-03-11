@@ -9,10 +9,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/notifique/internal"
+	c "github.com/notifique/internal/controllers"
+	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/registry"
-	"github.com/notifique/internal/server"
-	c "github.com/notifique/internal/server/controllers"
-	"github.com/notifique/internal/server/dto"
 )
 
 const InsertNotification = `
@@ -371,7 +371,7 @@ func (r *Registry) GetNotificationStatus(ctx context.Context, id string) (dto.No
 	err := r.conn.QueryRow(ctx, getNotificationStatusQry, id).Scan(&status)
 
 	if err == pgx.ErrNoRows {
-		return status, server.EntityNotFound{Id: id, Type: registry.NotificationType}
+		return status, internal.EntityNotFound{Id: id, Type: registry.NotificationType}
 	} else if err != nil {
 		return status, fmt.Errorf("failed to query the notification status - %w", err)
 	}
@@ -383,7 +383,7 @@ func (r *Registry) DeleteNotification(ctx context.Context, id string) error {
 
 	status, err := r.GetNotificationStatus(ctx, id)
 
-	if err != nil && errors.As(err, &server.EntityNotFound{}) {
+	if err != nil && errors.As(err, &internal.EntityNotFound{}) {
 		return nil
 	} else if err != nil {
 		return err
@@ -392,7 +392,7 @@ func (r *Registry) DeleteNotification(ctx context.Context, id string) error {
 	canDelete := registry.IsDeletableStatus(status)
 
 	if !canDelete {
-		return server.InvalidNotificationStatus{
+		return internal.InvalidNotificationStatus{
 			Id:     id,
 			Status: string(status),
 		}
@@ -426,7 +426,7 @@ func (r *Registry) GetNotifications(ctx context.Context, filters dto.PageFilter)
 
 	var page dto.Page[dto.NotificationSummary]
 
-	args := pgx.NamedArgs{"limit": server.PageSize}
+	args := pgx.NamedArgs{"limit": internal.PageSize}
 	whereFilter := ""
 
 	if filters.MaxResults != nil {
@@ -527,7 +527,7 @@ func (r *Registry) GetNotification(ctx context.Context, notificationId string) (
 	recipientsAgg := []string{}
 	variablesAgg := []*string{}
 
-	query := fmt.Sprintf(getNotification, server.TemplateVariableNameSeparator)
+	query := fmt.Sprintf(getNotification, internal.TemplateVariableNameSeparator)
 
 	err := r.conn.QueryRow(ctx, query, notificationId).Scan(
 		&notification.Id,
@@ -547,7 +547,7 @@ func (r *Registry) GetNotification(ctx context.Context, notificationId string) (
 	)
 
 	if err == pgx.ErrNoRows {
-		return notification, server.EntityNotFound{Id: notificationId, Type: registry.NotificationType}
+		return notification, internal.EntityNotFound{Id: notificationId, Type: registry.NotificationType}
 	} else if err != nil {
 		return notification, fmt.Errorf("failed to query the notification - %w", err)
 	}

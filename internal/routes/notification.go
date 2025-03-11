@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	c "github.com/notifique/internal/server/controllers"
+	c "github.com/notifique/internal/controllers"
 )
 
 func SetupNotificationRoutes(r *gin.Engine, version string, controller *c.NotificationController) error {

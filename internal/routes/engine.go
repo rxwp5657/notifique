@@ -11,9 +11,9 @@ import (
 	"github.com/go-redis/redis_rate/v10"
 	redis "github.com/redis/go-redis/v9"
 
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/controllers"
-	"github.com/notifique/internal/server/middleware"
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/controllers"
+	"github.com/notifique/internal/middleware"
 )
 
 const versionRegex = "(/v[0-9]{1,2}|^$)"
@@ -103,10 +103,10 @@ func NewEngine(cfg EngineConfig) (*gin.Engine, error) {
 	_ = SetupNotificationTemplateRoutes(r, version, &ntc)
 
 	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
-		v.RegisterValidation("distributionlistname", server.DLNameValidator)
-		v.RegisterValidation("unique_var_name", server.UniqueTemplateVarValidator)
-		v.RegisterValidation("future", server.FutureValidator)
-		v.RegisterValidation("templatevarname", server.TemplateNameValidator)
+		v.RegisterValidation("distributionlistname", internal.DLNameValidator)
+		v.RegisterValidation("unique_var_name", internal.UniqueTemplateVarValidator)
+		v.RegisterValidation("future", internal.FutureValidator)
+		v.RegisterValidation("templatevarname", internal.TemplateNameValidator)
 	}
 
 	return r, nil

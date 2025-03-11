@@ -11,9 +11,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/google/uuid"
 
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/registry"
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/dto"
 )
 
 const (
@@ -265,7 +265,7 @@ func (r *Registry) GetTemplateDetails(ctx context.Context, templateId string) (d
 	}
 
 	if len(response.Item) == 0 {
-		return details, server.EntityNotFound{
+		return details, internal.EntityNotFound{
 			Id:   templateId,
 			Type: registry.NotificationTemplateType,
 		}
@@ -356,7 +356,7 @@ func (r *Registry) GetTemplateVariables(ctx context.Context, templateId string) 
 	}
 
 	if len(resp.Item) == 0 {
-		return variables, server.EntityNotFound{
+		return variables, internal.EntityNotFound{
 			Id:   templateId,
 			Type: registry.NotificationTemplateType,
 		}

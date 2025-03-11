@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	c "github.com/notifique/internal/server/controllers"
-	"github.com/notifique/internal/server/dto"
+	c "github.com/notifique/internal/controllers"
+	"github.com/notifique/internal/dto"
 )
 
 type Publisher interface {

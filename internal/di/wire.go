@@ -10,9 +10,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/gin-gonic/gin"
 	"github.com/google/wire"
+	"github.com/notifique/internal/controllers"
 	"github.com/notifique/internal/deployments"
-	"github.com/notifique/internal/server/controllers"
-	"github.com/notifique/internal/server/routes"
+	"github.com/notifique/internal/routes"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/mock/gomock"
 

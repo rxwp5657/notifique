@@ -12,11 +12,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/controllers"
 	di "github.com/notifique/internal/di"
+	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/registry"
-	"github.com/notifique/internal/server"
-	"github.com/notifique/internal/server/controllers"
-	"github.com/notifique/internal/server/dto"
 	"github.com/notifique/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -124,7 +124,7 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 				registryMock.
 					EXPECT().
 					GetTemplateVariables(gomock.Any(), gomock.Any()).
-					Return(nil, server.EntityNotFound{
+					Return(nil, internal.EntityNotFound{
 						Id: randomTemplateId, Type: registry.NotificationTemplateType,
 					})
 			},
@@ -763,7 +763,7 @@ func testGetNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) {
 				registryMock.
 					EXPECT().
 					GetNotification(gomock.Any(), gomock.Any()).
-					Return(dto.NotificationResp{}, server.EntityNotFound{})
+					Return(dto.NotificationResp{}, internal.EntityNotFound{})
 			},
 		},
 		{
