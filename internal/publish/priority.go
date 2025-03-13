@@ -11,7 +11,7 @@ import (
 )
 
 type Publisher interface {
-	Publish(ctx context.Context, queueName string, message []byte) error
+	Publish(ctx context.Context, queueName, messageId string, message []byte) error
 }
 
 type PriorityQueueConfigurator interface {
@@ -38,7 +38,7 @@ type PriorityPublisherCfg struct {
 	QueueConfigurator PriorityQueueConfigurator
 }
 
-func (p *PriorityPublisher) Publish(ctx context.Context, n c.Notification) error {
+func (p *PriorityPublisher) Publish(ctx context.Context, n c.NotificationMsg) error {
 
 	var queueUri *string = nil
 
@@ -65,7 +65,7 @@ func (p *PriorityPublisher) Publish(ctx context.Context, n c.Notification) error
 
 	errorsArr := []error{}
 
-	publishErr := p.publisher.Publish(ctx, *queueUri, message)
+	publishErr := p.publisher.Publish(ctx, *queueUri, n.Hash, message)
 
 	status := dto.Queued
 

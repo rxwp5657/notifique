@@ -2,7 +2,10 @@ package controllers
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 
@@ -12,9 +15,10 @@ import (
 	"github.com/notifique/internal/dto"
 )
 
-type Notification struct {
+type NotificationMsg struct {
 	dto.NotificationReq
-	Id string `json:"id"`
+	Id   string `json:"id"`
+	Hash string `json:"hash"`
 }
 
 type NotificationStatusLog struct {
@@ -34,12 +38,15 @@ type NotificationRegistry interface {
 }
 
 type NotificationPublisher interface {
-	Publish(ctx context.Context, notification Notification) error
+	Publish(ctx context.Context, notification NotificationMsg) error
 }
 
 type NotificationCache interface {
 	GetNotificationStatus(ctx context.Context, notificationId string) (*dto.NotificationStatus, error)
 	UpdateNotificationStatus(ctx context.Context, statusLog NotificationStatusLog) error
+	NotificationExists(ctx context.Context, hash string) (bool, error)
+	SetNotificationHash(ctx context.Context, hash string) error
+	DeleteNotificationHash(ctx context.Context, hash string) error
 }
 
 type NotificationController struct {
@@ -51,11 +58,35 @@ type NotificationController struct {
 const SendingNotificationMsg = "Notification is being sent"
 const SentNotificationMsg = "Notification has been sent"
 
+func makeNotificationHash(body []byte) string {
+	hash := md5.Sum(body)
+	return hex.EncodeToString(hash[:])
+}
+
 func (nc *NotificationController) CreateNotification(c *gin.Context) {
 	var notificationReq dto.NotificationReq
 
 	if err := c.ShouldBindJSON(&notificationReq); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	body, err := io.ReadAll(c.Request.Body)
+
+	if err != nil {
+		slog.Error(err.Error())
+		c.Status(http.StatusInternalServerError)
+		return
+	}
+
+	hash := makeNotificationHash(body)
+
+	if exists, err := nc.Cache.NotificationExists(c.Request.Context(), hash); err != nil {
+		slog.Error(err.Error())
+		c.Status(http.StatusInternalServerError)
+		return
+	} else if exists {
+		c.Status(http.StatusNoContent)
 		return
 	}
 
@@ -106,10 +137,16 @@ func (nc *NotificationController) CreateNotification(c *gin.Context) {
 		slog.Error(err.Error())
 	}
 
+	if err := nc.Cache.SetNotificationHash(c.Request.Context(), hash); err != nil {
+		slog.Error("Failed to set notification hash",
+			"error", err.Error(),
+			"notificationId", notificationId)
+	}
+
 	go func() {
 		ctx := context.Background()
 
-		notificationWithId := Notification{
+		notificationWithId := NotificationMsg{
 			NotificationReq: notificationReq,
 			Id:              notificationId,
 		}
@@ -118,6 +155,12 @@ func (nc *NotificationController) CreateNotification(c *gin.Context) {
 			slog.Error("Failed to publish notification",
 				"error", err.Error(),
 				"notificationId", notificationId)
+
+			if err := nc.Cache.DeleteNotificationHash(ctx, hash); err != nil {
+				slog.Error("Failed to delete notification hash",
+					"error", err.Error(),
+					"notificationId", notificationId)
+			}
 		}
 	}()
 }

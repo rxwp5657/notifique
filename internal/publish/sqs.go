@@ -31,11 +31,12 @@ type SQSPriorityConfigurator interface {
 	PriorityQueueConfigurator
 }
 
-func (p *SQSPublisher) Publish(ctx context.Context, queueUrl string, message []byte) error {
+func (p *SQSPublisher) Publish(ctx context.Context, queueUrl, messageId string, message []byte) error {
 
 	_, err := p.client.SendMessage(ctx, &sqs.SendMessageInput{
-		MessageBody: aws.String(string(message)),
-		QueueUrl:    &queueUrl,
+		MessageBody:            aws.String(string(message)),
+		QueueUrl:               &queueUrl,
+		MessageDeduplicationId: &messageId,
 	})
 
 	return err

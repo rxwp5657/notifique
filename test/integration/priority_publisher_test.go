@@ -58,7 +58,7 @@ func testPriorityPublisher(t *testing.T, s c.NotificationRegistry, p c.Notificat
 		t.Fatalf("failed to insert test notification - %v", err)
 	}
 
-	testNotification := c.Notification{
+	testNotification := c.NotificationMsg{
 		NotificationReq: testNotificationReq,
 		Id:              notificationId,
 	}

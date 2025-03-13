@@ -18,6 +18,7 @@ type RedisConfigurator interface {
 type CacheRedisApi interface {
 	Get(ctx context.Context, key string) *redis.StringCmd
 	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.StatusCmd
+	Del(ctx context.Context, keys ...string) *redis.IntCmd
 }
 
 type RedisCache struct {
@@ -26,6 +27,10 @@ type RedisCache struct {
 
 func getNotificationStatusKey(notificationId string) string {
 	return fmt.Sprintf("notifications:%s:status", notificationId)
+}
+
+func getHashKey(hash string) string {
+	return fmt.Sprintf("notifications:hash:%s", hash)
 }
 
 func (rc *RedisCache) GetNotificationStatus(ctx context.Context, notificationId string) (*dto.NotificationStatus, error) {
@@ -50,6 +55,49 @@ func (rc *RedisCache) UpdateNotificationStatus(ctx context.Context, statusLog c.
 
 	if err != nil {
 		return fmt.Errorf("failed to set notification status - %w", err)
+	}
+
+	return nil
+}
+
+func (rc *RedisCache) NotificationExists(ctx context.Context, hash string) (bool, error) {
+
+	_, err := rc.client.Get(ctx, getHashKey(hash)).Result()
+
+	if err == redis.Nil {
+		return false, nil
+	} else if err != nil {
+		return false, fmt.Errorf("failed to retrieve notification hash - %w", err)
+	}
+
+	return true, nil
+}
+
+func (rc *RedisCache) SetNotificationHash(ctx context.Context, hash string) error {
+
+	key := getHashKey(hash)
+
+	_, err := rc.client.
+		Set(ctx, key, "1", time.Duration(5*time.Minute)).
+		Result()
+
+	if err != nil {
+		return fmt.Errorf("failed to set notification hash - %w", err)
+	}
+
+	return nil
+}
+
+func (rc *RedisCache) DeleteNotificationHash(ctx context.Context, hash string) error {
+
+	key := getHashKey(hash)
+
+	_, err := rc.client.Del(ctx, key).Result()
+
+	if err == redis.Nil {
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("failed to delete the notification hash - %w", err)
 	}
 
 	return nil

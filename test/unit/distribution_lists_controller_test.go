@@ -93,7 +93,7 @@ func testCreateDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistrib
 			t.Fatal(err)
 		}
 
-		errTemplate := "Distribution list %s already exists"
+		errTemplate := "distribution list %s already exists"
 		expectedMsg := fmt.Sprintf(errTemplate, dl.Name)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
@@ -182,7 +182,7 @@ func testCreateDistributionList(t *testing.T, e *gin.Engine, mock mk.MockDistrib
 			t.Fatal(err)
 		}
 
-		expectedMsg := fmt.Sprintf("Distribution list %s already exists", dl.Name)
+		expectedMsg := fmt.Sprintf("distribution list %s already exists", dl.Name)
 
 		assert.Equal(t, http.StatusBadRequest, w.Code)
 		assert.Contains(t, resp["error"], expectedMsg)
@@ -300,7 +300,7 @@ func testAddRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionRegi
 			t.Fatal(err)
 		}
 
-		expectedMsg := fmt.Sprintf("Entity %v of type %v not found",
+		expectedMsg := fmt.Sprintf("entity %v of type %v not found",
 			dl.Name,
 			registry.DistributionListType,
 		)
@@ -439,7 +439,7 @@ func testDeleteRecipients(t *testing.T, e *gin.Engine, mock mk.MockDistributionR
 			t.Fatal(err)
 		}
 
-		expectedMsg := fmt.Sprintf("Entity %v of type %v not found",
+		expectedMsg := fmt.Sprintf("entity %v of type %v not found",
 			dl.Name,
 			registry.DistributionListType,
 		)
@@ -638,7 +638,7 @@ func testGetDistributionListRescipients(t *testing.T, e *gin.Engine, mock mk.Moc
 			t.Fatal(err)
 		}
 
-		expectedMsg := fmt.Sprintf("Entity %v of type %v not found",
+		expectedMsg := fmt.Sprintf("entity %v of type %v not found",
 			dlName,
 			registry.DistributionListType,
 		)
