@@ -25,5 +25,5 @@ func (e DistributionListAlreadyExists) Error() string {
 }
 
 func (e InvalidNotificationStatus) Error() string {
-	return fmt.Sprintf("Notification %v has status %v", e.Id, e.Status)
+	return fmt.Sprintf("notification %v has status %v", e.Id, e.Status)
 }
