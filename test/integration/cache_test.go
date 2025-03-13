@@ -57,4 +57,43 @@ func TestCache(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, dto.Created, *status)
 	})
+
+	t.Run("Returns false when notification hash does not exist", func(t *testing.T) {
+		hash := uuid.NewString()
+		exists, err := redisCache.NotificationExists(ctx, hash)
+
+		assert.Nil(t, err)
+		assert.False(t, exists)
+	})
+
+	t.Run("Can set and retrieve notification hash", func(t *testing.T) {
+		hash := uuid.NewString()
+
+		err := redisCache.SetNotificationHash(ctx, hash)
+		assert.Nil(t, err)
+
+		exists, err := redisCache.NotificationExists(ctx, hash)
+		assert.Nil(t, err)
+		assert.True(t, exists)
+	})
+
+	t.Run("Can delete notification hash", func(t *testing.T) {
+		hash := uuid.NewString()
+
+		err := redisCache.SetNotificationHash(ctx, hash)
+		assert.Nil(t, err)
+
+		err = redisCache.DeleteNotificationHash(ctx, hash)
+		assert.Nil(t, err)
+
+		exists, err := redisCache.NotificationExists(ctx, hash)
+		assert.Nil(t, err)
+		assert.False(t, exists)
+	})
+
+	t.Run("No error when deleting non-existent notification hash", func(t *testing.T) {
+		hash := uuid.NewString()
+		err := redisCache.DeleteNotificationHash(ctx, hash)
+		assert.Nil(t, err)
+	})
 }

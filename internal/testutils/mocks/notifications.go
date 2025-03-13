@@ -170,7 +170,7 @@ func (m *MockNotificationPublisher) EXPECT() *MockNotificationPublisherMockRecor
 }
 
 // Publish mocks base method.
-func (m *MockNotificationPublisher) Publish(ctx context.Context, notification controllers.Notification) error {
+func (m *MockNotificationPublisher) Publish(ctx context.Context, notification controllers.NotificationMsg) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Publish", ctx, notification)
 	ret0, _ := ret[0].(error)
@@ -207,6 +207,20 @@ func (m *MockNotificationCache) EXPECT() *MockNotificationCacheMockRecorder {
 	return m.recorder
 }
 
+// DeleteNotificationHash mocks base method.
+func (m *MockNotificationCache) DeleteNotificationHash(ctx context.Context, hash string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteNotificationHash", ctx, hash)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteNotificationHash indicates an expected call of DeleteNotificationHash.
+func (mr *MockNotificationCacheMockRecorder) DeleteNotificationHash(ctx, hash any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNotificationHash", reflect.TypeOf((*MockNotificationCache)(nil).DeleteNotificationHash), ctx, hash)
+}
+
 // GetNotificationStatus mocks base method.
 func (m *MockNotificationCache) GetNotificationStatus(ctx context.Context, notificationId string) (*dto.NotificationStatus, error) {
 	m.ctrl.T.Helper()
@@ -220,6 +234,35 @@ func (m *MockNotificationCache) GetNotificationStatus(ctx context.Context, notif
 func (mr *MockNotificationCacheMockRecorder) GetNotificationStatus(ctx, notificationId any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNotificationStatus", reflect.TypeOf((*MockNotificationCache)(nil).GetNotificationStatus), ctx, notificationId)
+}
+
+// NotificationExists mocks base method.
+func (m *MockNotificationCache) NotificationExists(ctx context.Context, hash string) (bool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NotificationExists", ctx, hash)
+	ret0, _ := ret[0].(bool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// NotificationExists indicates an expected call of NotificationExists.
+func (mr *MockNotificationCacheMockRecorder) NotificationExists(ctx, hash any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NotificationExists", reflect.TypeOf((*MockNotificationCache)(nil).NotificationExists), ctx, hash)
+}
+
+// SetNotificationHash mocks base method.
+func (m *MockNotificationCache) SetNotificationHash(ctx context.Context, hash string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetNotificationHash", ctx, hash)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetNotificationHash indicates an expected call of SetNotificationHash.
+func (mr *MockNotificationCacheMockRecorder) SetNotificationHash(ctx, hash any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNotificationHash", reflect.TypeOf((*MockNotificationCache)(nil).SetNotificationHash), ctx, hash)
 }
 
 // UpdateNotificationStatus mocks base method.

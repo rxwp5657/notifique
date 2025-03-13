@@ -53,6 +53,11 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 		Return(nil).
 		Times(2)
 
+	mock.Cache.
+		EXPECT().SetNotificationHash(gomock.Any(), gomock.Any()).
+		Return(nil).
+		AnyTimes()
+
 	registryMock := mock.Registry.MockNotificationRegistry
 	userId := "1234"
 
@@ -81,6 +86,11 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 				registryMock.EXPECT().
 					SaveNotification(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(uuid.NewString(), nil)
+
+				mock.Cache.
+					EXPECT().NotificationExists(gomock.Any(), gomock.Any()).
+					Return(false, nil)
+
 			},
 			modifyRequest: func(req dto.NotificationReq) dto.NotificationReq {
 				req.RawContents = &dto.RawContents{
@@ -95,15 +105,21 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 		{
 			name: "Can create new notifications with template contents",
 			setupMock: func() {
+
 				registryMock.EXPECT().
 					GetTemplateVariables(gomock.Any(), gomock.Any()).
 					Return([]dto.TemplateVariable{
 						{Name: "{user}", Type: "STRING", Required: true},
 						{Name: "{date}", Type: "DATE", Required: true},
 					}, nil)
+
 				registryMock.EXPECT().
 					SaveNotification(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(uuid.NewString(), nil)
+
+				mock.Cache.
+					EXPECT().NotificationExists(gomock.Any(), gomock.Any()).
+					Return(false, nil)
 			},
 			modifyRequest: func(req dto.NotificationReq) dto.NotificationReq {
 				req.TemplateContents = &dto.TemplateContents{
@@ -127,6 +143,10 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 					Return(nil, internal.EntityNotFound{
 						Id: randomTemplateId, Type: registry.NotificationTemplateType,
 					})
+
+				mock.Cache.
+					EXPECT().NotificationExists(gomock.Any(), gomock.Any()).
+					Return(false, nil)
 			},
 			modifyRequest: func(req dto.NotificationReq) dto.NotificationReq {
 				req.TemplateContents = &dto.TemplateContents{
@@ -147,6 +167,10 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 					Return([]dto.TemplateVariable{
 						{Name: "{date}", Type: "DATE", Required: true},
 					}, nil)
+
+				mock.Cache.
+					EXPECT().NotificationExists(gomock.Any(), gomock.Any()).
+					Return(false, nil)
 			},
 			modifyRequest: func(req dto.NotificationReq) dto.NotificationReq {
 				req.TemplateContents = &dto.TemplateContents{
@@ -169,6 +193,10 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 					Return([]dto.TemplateVariable{
 						{Name: "{user}", Type: "STRING", Required: true},
 					}, nil)
+
+				mock.Cache.
+					EXPECT().NotificationExists(gomock.Any(), gomock.Any()).
+					Return(false, nil)
 			},
 			modifyRequest: func(req dto.NotificationReq) dto.NotificationReq {
 				req.TemplateContents = &dto.TemplateContents{
@@ -190,6 +218,10 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 						{Name: "{user}", Type: "STRING", Required: true},
 						{Name: "{date}", Type: "DATE", Required: true},
 					}, nil)
+
+				mock.Cache.
+					EXPECT().NotificationExists(gomock.Any(), gomock.Any()).
+					Return(false, nil)
 			},
 			modifyRequest: func(req dto.NotificationReq) dto.NotificationReq {
 				req.TemplateContents = &dto.TemplateContents{
@@ -211,6 +243,10 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 					Return([]dto.TemplateVariable{
 						{Name: "{user}", Type: "STRING", Required: true, Validation: &pattern},
 					}, nil)
+
+				mock.Cache.
+					EXPECT().NotificationExists(gomock.Any(), gomock.Any()).
+					Return(false, nil)
 			},
 			modifyRequest: func(req dto.NotificationReq) dto.NotificationReq {
 				req.TemplateContents = &dto.TemplateContents{
@@ -352,6 +388,32 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  "Key: 'NotificationReq.TemplateContents.Variables[0].Name' Error:Field validation for 'Name' failed on the 'templatevarname' tag",
+		},
+		{
+			name: "Should fail if notification duplication check fails",
+			modifyRequest: func(req dto.NotificationReq) dto.NotificationReq {
+				return req
+			},
+			setupMock: func() {
+				mock.Cache.
+					EXPECT().
+					NotificationExists(gomock.Any(), gomock.Any()).
+					Return(false, errors.New("cache error"))
+			},
+			expectedStatus: http.StatusInternalServerError,
+		},
+		{
+			name: "Should return no content if notification already exists",
+			modifyRequest: func(req dto.NotificationReq) dto.NotificationReq {
+				return req
+			},
+			setupMock: func() {
+				mock.Cache.
+					EXPECT().
+					NotificationExists(gomock.Any(), gomock.Any()).
+					Return(true, nil)
+			},
+			expectedStatus: http.StatusNoContent,
 		},
 	}
 

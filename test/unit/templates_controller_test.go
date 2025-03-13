@@ -355,7 +355,7 @@ func testGetNotificationTemplateDetails(t *testing.T, e *gin.Engine, mock di.Moc
 
 	missingTemplateId := uuid.NewString()
 
-	templateNotFound := fmt.Sprintf("Entity %v of type %v not found",
+	templateNotFound := fmt.Sprintf("entity %v of type %v not found",
 		missingTemplateId,
 		registry.NotificationTemplateType,
 	)

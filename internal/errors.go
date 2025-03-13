@@ -17,13 +17,13 @@ type EntityNotFound struct {
 }
 
 func (e EntityNotFound) Error() string {
-	return fmt.Sprintf("Entity %v of type %v not found", e.Id, e.Type)
+	return fmt.Sprintf("entity %v of type %v not found", e.Id, e.Type)
 }
 
 func (e DistributionListAlreadyExists) Error() string {
-	return fmt.Sprintf("Distribution list %v already exists", e.Name)
+	return fmt.Sprintf("distribution list %v already exists", e.Name)
 }
 
 func (e InvalidNotificationStatus) Error() string {
-	return fmt.Sprintf("Notification %v has status %v", e.Id, e.Status)
+	return fmt.Sprintf("notification %v has status %v", e.Id, e.Status)
 }

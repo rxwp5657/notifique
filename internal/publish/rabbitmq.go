@@ -32,7 +32,7 @@ type RabbitMQPriorityConfigurator interface {
 	PriorityQueueConfigurator
 }
 
-func (p *RabbitMQPublisher) Publish(ctx context.Context, queueName string, message []byte) error {
+func (p *RabbitMQPublisher) Publish(ctx context.Context, queueName, messageId string, message []byte) error {
 	return p.ch.PublishWithContext(
 		ctx,
 		"",
@@ -43,6 +43,7 @@ func (p *RabbitMQPublisher) Publish(ctx context.Context, queueName string, messa
 			DeliveryMode: amqp.Persistent,
 			ContentType:  "application/json",
 			Body:         message,
+			MessageId:    messageId,
 		},
 	)
 }
