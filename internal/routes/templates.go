@@ -1,24 +1,22 @@
 package routes
 
 import (
-	"errors"
-
-	"github.com/gin-gonic/gin"
 	c "github.com/notifique/internal/controllers"
 )
 
-func SetupNotificationTemplateRoutes(r *gin.Engine, version string, controller *c.NotificationTemplateController) error {
+type templatesRoutesCfg struct {
+	routeGroupCfg
+	Controller *c.NotificationTemplateController
+}
 
-	if controller == nil {
-		return errors.New("distribution lists controller is nil")
-	}
+func SetupNotificationTemplateRoutes(cfg templatesRoutesCfg) error {
 
-	g := r.Group(version)
+	g := cfg.Engine.Group(cfg.Version, cfg.Middlewares...)
 	{
-		g.POST("/notifications/templates", controller.CreateNotificationTemplate)
-		g.GET("/notifications/templates", controller.GetTemplates)
-		g.GET("/notifications/templates/:id", controller.GetTemplateDetails)
-		g.DELETE("/notifications/templates/:id", controller.DeleteTemplate)
+		g.POST("/notifications/templates", cfg.Controller.CreateNotificationTemplate)
+		g.GET("/notifications/templates", cfg.Controller.GetTemplates)
+		g.GET("/notifications/templates/:id", cfg.Controller.GetTemplateDetails)
+		g.DELETE("/notifications/templates/:id", cfg.Controller.DeleteTemplate)
 	}
 
 	return nil

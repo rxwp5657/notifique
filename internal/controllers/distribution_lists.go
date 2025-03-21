@@ -1,14 +1,15 @@
 package controllers
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
-	"golang.org/x/net/context"
-
 	"github.com/gin-gonic/gin"
 	"github.com/notifique/internal"
+	"github.com/notifique/internal/cache"
 	"github.com/notifique/internal/dto"
 )
 
@@ -23,6 +24,7 @@ type DistributionRegistry interface {
 
 type DistributionListController struct {
 	Registry DistributionRegistry
+	Cache    cache.Cache
 }
 
 type recipientsHandler func(context.Context, string, []string) (*dto.DistributionListSummary, error)
@@ -46,6 +48,15 @@ func (dc *DistributionListController) CreateDistributionList(c *gin.Context) {
 	}
 
 	c.Status(http.StatusCreated)
+
+	err := dc.Cache.DelWithPrefix(
+		c.Request.Context(),
+		cache.GetEndpointKeyWithPrefix(c.Request.URL.Path, nil))
+
+	if err != nil {
+		err = fmt.Errorf("failed to delete cached distribution list summaries - %w", err)
+		slog.Error(err.Error())
+	}
 }
 
 func (dc *DistributionListController) GetDistributionLists(c *gin.Context) {
@@ -116,6 +127,28 @@ func (dc *DistributionListController) DeleteDistributionList(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
+
+	// Delete cached distribution list recipients
+	recipientsPath := fmt.Sprintf("%s/recipients", c.Request.URL.Path)
+	err = dc.Cache.DelWithPrefix(
+		c.Request.Context(),
+		cache.GetEndpointKeyWithPrefix(recipientsPath, nil))
+
+	if err != nil {
+		err = fmt.Errorf("failed to delete cached distribution list recipients - %w", err)
+		slog.Error(err.Error())
+	}
+
+	// Delete cached distribution list summaries
+	cacheKey, _ := internal.GetBasePath(c.Request.URL.Path, ".*/distribution-lists")
+	err = dc.Cache.DelWithPrefix(
+		c.Request.Context(),
+		cache.GetEndpointKeyWithPrefix(cacheKey, nil))
+
+	if err != nil {
+		err = fmt.Errorf("failed to delete cached distribution list summaries - %w", err)
+		slog.Error(err.Error())
+	}
 }
 
 func (dc *DistributionListController) AddRecipients(c *gin.Context) {
@@ -155,4 +188,13 @@ func (dc *DistributionListController) handleRecipients(c *gin.Context, handler r
 	}
 
 	c.JSON(http.StatusOK, summary)
+
+	err = dc.Cache.DelWithPrefix(
+		c.Request.Context(),
+		cache.GetEndpointKeyWithPrefix(c.Request.URL.Path, nil))
+
+	if err != nil {
+		err = fmt.Errorf("failed to delete cached distribution list recipients - %w", err)
+		slog.Error(err.Error())
+	}
 }

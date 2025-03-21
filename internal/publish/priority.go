@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/notifique/internal/cache"
 	c "github.com/notifique/internal/controllers"
 	"github.com/notifique/internal/dto"
 )
@@ -26,14 +27,14 @@ type PriorityQueues struct {
 
 type PriorityPublisher struct {
 	publisher Publisher
-	cache     c.NotificationCache
+	cache     cache.Cache
 	registry  c.NotificationRegistry
 	queues    PriorityQueues
 }
 
 type PriorityPublisherCfg struct {
 	Publisher         Publisher
-	Cache             c.NotificationCache
+	Cache             cache.Cache
 	Registry          c.NotificationRegistry
 	QueueConfigurator PriorityQueueConfigurator
 }
@@ -84,7 +85,7 @@ func (p *PriorityPublisher) Publish(ctx context.Context, n c.NotificationMsg) er
 		ErrorMsg:       errorMsg,
 	}
 
-	if cacheErr := p.cache.UpdateNotificationStatus(ctx, statusLog); cacheErr != nil {
+	if cacheErr := c.UpdateNotificationStatus(ctx, p.cache, statusLog); cacheErr != nil {
 		errorsArr = append(errorsArr, fmt.Errorf("failed to update cache - %w", cacheErr))
 	}
 

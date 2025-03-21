@@ -14,6 +14,10 @@ func (cfg TestEngineConfigurator) GetRequestsPerSecond() (*int, error) {
 	return nil, nil
 }
 
+func (cfg TestEngineConfigurator) GetCacheTTL() (*int, error) {
+	return nil, nil
+}
+
 func NewTestVersionConfigurator() TestEngineConfigurator {
 	return TestEngineConfigurator{}
 }

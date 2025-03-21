@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/notifique/internal"
+	"github.com/notifique/internal/cache"
 	"github.com/notifique/internal/dto"
 )
 
@@ -41,18 +42,10 @@ type NotificationPublisher interface {
 	Publish(ctx context.Context, notification NotificationMsg) error
 }
 
-type NotificationCache interface {
-	GetNotificationStatus(ctx context.Context, notificationId string) (*dto.NotificationStatus, error)
-	UpdateNotificationStatus(ctx context.Context, statusLog NotificationStatusLog) error
-	NotificationExists(ctx context.Context, hash string) (bool, error)
-	SetNotificationHash(ctx context.Context, hash string) error
-	DeleteNotificationHash(ctx context.Context, hash string) error
-}
-
 type NotificationController struct {
 	Registry  NotificationRegistry
 	Publisher NotificationPublisher
-	Cache     NotificationCache
+	Cache     cache.Cache
 }
 
 const SendingNotificationMsg = "Notification is being sent"
@@ -61,6 +54,46 @@ const SentNotificationMsg = "Notification has been sent"
 func makeNotificationHash(body []byte) string {
 	hash := md5.Sum(body)
 	return hex.EncodeToString(hash[:])
+}
+
+func notificationExists(ctx context.Context, c cache.Cache, hash string) (bool, error) {
+	_, err, ok := c.Get(ctx, cache.GetHashKey(hash))
+
+	if err != nil {
+		return false, err
+	}
+
+	return ok, nil
+}
+
+func getNotificationStatus(ctx context.Context, c cache.Cache, notificationId string) (*dto.NotificationStatus, error) {
+	status, err, ok := c.Get(ctx, cache.GetNotificationStatusKey(notificationId))
+
+	if err != nil {
+		return nil, err
+	}
+
+	if !ok {
+		return nil, nil
+	}
+
+	s := dto.NotificationStatus(status)
+	return &s, nil
+}
+
+func setNotificationHash(ctx context.Context, c cache.Cache, hash string) error {
+	key := cache.GetHashKey(hash)
+	return c.Set(ctx, key, "1", NotificationHashTTL)
+}
+
+func deleteNotificationHash(ctx context.Context, c cache.Cache, hash string) error {
+	key := cache.GetHashKey(hash)
+	return c.Del(ctx, key)
+}
+
+func UpdateNotificationStatus(ctx context.Context, c cache.Cache, sl NotificationStatusLog) error {
+	key := cache.GetNotificationStatusKey(sl.NotificationId)
+	return c.Set(ctx, key, string(sl.Status), NotificationStatusTTL)
 }
 
 func (nc *NotificationController) CreateNotification(c *gin.Context) {
@@ -79,9 +112,9 @@ func (nc *NotificationController) CreateNotification(c *gin.Context) {
 		return
 	}
 
-	hash := makeNotificationHash(body)
+	hash := internal.GetMd5Hash(string(body))
 
-	if exists, err := nc.Cache.NotificationExists(c.Request.Context(), hash); err != nil {
+	if exists, err := notificationExists(c.Request.Context(), nc.Cache, hash); err != nil {
 		slog.Error(err.Error())
 		c.Status(http.StatusInternalServerError)
 		return
@@ -133,11 +166,11 @@ func (nc *NotificationController) CreateNotification(c *gin.Context) {
 		Status:         dto.Created,
 	}
 
-	if err := nc.Cache.UpdateNotificationStatus(context.TODO(), statusLog); err != nil {
+	if err := UpdateNotificationStatus(context.TODO(), nc.Cache, statusLog); err != nil {
 		slog.Error(err.Error())
 	}
 
-	if err := nc.Cache.SetNotificationHash(c.Request.Context(), hash); err != nil {
+	if err := setNotificationHash(c.Request.Context(), nc.Cache, hash); err != nil {
 		slog.Error("Failed to set notification hash",
 			"error", err.Error(),
 			"notificationId", notificationId)
@@ -156,7 +189,7 @@ func (nc *NotificationController) CreateNotification(c *gin.Context) {
 				"error", err.Error(),
 				"notificationId", notificationId)
 
-			if err := nc.Cache.DeleteNotificationHash(ctx, hash); err != nil {
+			if err := deleteNotificationHash(ctx, nc.Cache, hash); err != nil {
 				slog.Error("Failed to delete notification hash",
 					"error", err.Error(),
 					"notificationId", notificationId)
@@ -197,7 +230,7 @@ func (nc *NotificationController) CancelDelivery(c *gin.Context) {
 		dto.Sent:    SentNotificationMsg,
 	}
 
-	status, err := nc.Cache.GetNotificationStatus(c.Request.Context(), params.NotificationId)
+	status, err := getNotificationStatus(c.Request.Context(), nc.Cache, params.NotificationId)
 
 	if err != nil {
 		slog.Error(err.Error())
@@ -231,7 +264,7 @@ func (nc *NotificationController) CancelDelivery(c *gin.Context) {
 	}
 
 	// Update both cache and registry
-	if err := nc.Cache.UpdateNotificationStatus(context.TODO(), statusLog); err != nil {
+	if err := UpdateNotificationStatus(context.TODO(), nc.Cache, statusLog); err != nil {
 		slog.Error(err.Error())
 		c.Status(http.StatusInternalServerError)
 		return

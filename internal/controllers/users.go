@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,10 +9,9 @@ import (
 	"log/slog"
 	"net/http"
 
-	"golang.org/x/net/context"
-
 	"github.com/gin-gonic/gin"
 	"github.com/notifique/internal"
+	"github.com/notifique/internal/cache"
 	"github.com/notifique/internal/dto"
 )
 
@@ -31,6 +31,7 @@ type UserNotificationBroker interface {
 type UserController struct {
 	Registry UserRegistry
 	Broker   UserNotificationBroker
+	Cache    cache.Cache
 }
 
 func (nc *UserController) GetUserNotifications(c *gin.Context) {
@@ -77,18 +78,28 @@ func (nc *UserController) SetReadStatus(c *gin.Context) {
 	userId := c.GetHeader(UserIdHeaderKey)
 	err := nc.Registry.SetReadStatus(c, userId, n.NotificationId)
 
-	if err != nil {
-		if errors.As(err, &internal.EntityNotFound{}) {
-			c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-			return
-		} else {
-			slog.Error(err.Error())
-			c.Status(http.StatusInternalServerError)
-			return
-		}
+	if err != nil && errors.As(err, &internal.EntityNotFound{}) {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	} else if err != nil {
+		slog.Error(err.Error())
+		c.Status(http.StatusInternalServerError)
+		return
 	}
 
-	c.Status(http.StatusOK)
+	c.Status(http.StatusNoContent)
+
+	path, _ := internal.GetBasePath(c.Request.URL.Path, ".*/users/me/notifications")
+
+	// Delete cached user notifications
+	err = nc.Cache.DelWithPrefix(
+		c.Request.Context(),
+		cache.GetEndpointKeyWithPrefix(path, &userId))
+
+	if err != nil {
+		err = fmt.Errorf("error deleting cached user notifications: %w", err)
+		slog.Error(err.Error())
+	}
 }
 
 func (nc *UserController) UpdateUserConfig(c *gin.Context) {
@@ -109,6 +120,16 @@ func (nc *UserController) UpdateUserConfig(c *gin.Context) {
 	}
 
 	c.Status(http.StatusOK)
+
+	// Delete cached user notification config
+	err := nc.Cache.DelWithPrefix(
+		c.Request.Context(),
+		cache.GetEndpointKeyWithPrefix(c.Request.URL.Path, &userId))
+
+	if err != nil {
+		err = fmt.Errorf("error deleting cached user notification config: %w", err)
+		slog.Error(err.Error())
+	}
 }
 
 func (nc *UserController) GetLiveUserNotifications(c *gin.Context) {

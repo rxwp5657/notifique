@@ -1,16 +1,18 @@
 package controllers
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"golang.org/x/net/context"
 
 	"github.com/microcosm-cc/bluemonday"
 
 	"github.com/notifique/internal"
+	"github.com/notifique/internal/cache"
 	"github.com/notifique/internal/dto"
 )
 
@@ -23,6 +25,7 @@ type NotificationTemplateRegistry interface {
 
 type NotificationTemplateController struct {
 	Registry NotificationTemplateRegistry
+	Cache    cache.Cache
 }
 
 type Sanitizer func(s string) string
@@ -64,6 +67,15 @@ func (ntc *NotificationTemplateController) CreateNotificationTemplate(c *gin.Con
 	}
 
 	c.JSON(http.StatusCreated, resp)
+
+	err = ntc.Cache.DelWithPrefix(
+		c.Request.Context(),
+		cache.GetEndpointKeyWithPrefix(c.Request.URL.Path, nil))
+
+	if err != nil {
+		err = fmt.Errorf("error deleting templates cache: %w", err)
+		slog.Error(err.Error())
+	}
 }
 
 func (ntc *NotificationTemplateController) GetTemplates(c *gin.Context) {
@@ -124,4 +136,26 @@ func (ntc *NotificationTemplateController) DeleteTemplate(c *gin.Context) {
 	}
 
 	c.Status(http.StatusNoContent)
+
+	templatesPath, _ := internal.GetBasePath(c.Request.URL.Path, ".*/templates")
+
+	// Delete cache for templates
+	err = ntc.Cache.DelWithPrefix(
+		c.Request.Context(),
+		cache.GetEndpointKeyWithPrefix(templatesPath, nil))
+
+	if err != nil {
+		err = fmt.Errorf("error deleting templates cache: %w", err)
+		slog.Error(err.Error())
+	}
+
+	// Delete cache for template details
+	err = ntc.Cache.DelWithPrefix(
+		c.Request.Context(),
+		cache.GetEndpointKeyWithPrefix(c.Request.URL.Path, nil))
+
+	if err != nil {
+		err = fmt.Errorf("error deleting template details cache: %w", err)
+		slog.Error(err.Error())
+	}
 }
