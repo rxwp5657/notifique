@@ -26,6 +26,7 @@ const (
 	apiVersion          = "API_VERSION"
 	expectedHost        = "EXPECTED_HOST"
 	requestsPerSecond   = "REQUESTS_PER_SECOND"
+	cacheTTLInSeconds   = "CACHE_TTL_IN_SECONDS"
 )
 
 type EnvConfig struct{}
@@ -158,6 +159,23 @@ func (cfg EnvConfig) GetRequestsPerSecond() (*int, error) {
 	}
 
 	return &rpsInt, nil
+}
+
+func (cfg EnvConfig) GetCacheTTL() (*int, error) {
+
+	ttl, ok := os.LookupEnv(cacheTTLInSeconds)
+
+	if !ok {
+		return nil, nil
+	}
+
+	ttlInt, err := strconv.Atoi(ttl)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &ttlInt, nil
 }
 
 func NewEnvConfig(envFile *string) (*EnvConfig, error) {

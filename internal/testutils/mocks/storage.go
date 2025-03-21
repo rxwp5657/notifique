@@ -1,4 +1,4 @@
-package mock_controllers
+package mocks
 
 type MockedRegistry struct {
 	*MockDistributionRegistry

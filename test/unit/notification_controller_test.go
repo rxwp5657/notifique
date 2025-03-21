@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/notifique/internal"
+	"github.com/notifique/internal/cache"
 	"github.com/notifique/internal/controllers"
 	di "github.com/notifique/internal/di"
 	"github.com/notifique/internal/dto"
@@ -47,17 +48,6 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 		Return(nil).
 		AnyTimes()
 
-	mock.Cache.
-		EXPECT().
-		UpdateNotificationStatus(gomock.Any(), gomock.Any()).
-		Return(nil).
-		Times(2)
-
-	mock.Cache.
-		EXPECT().SetNotificationHash(gomock.Any(), gomock.Any()).
-		Return(nil).
-		AnyTimes()
-
 	registryMock := mock.Registry.MockNotificationRegistry
 	userId := "1234"
 
@@ -88,9 +78,13 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 					Return(uuid.NewString(), nil)
 
 				mock.Cache.
-					EXPECT().NotificationExists(gomock.Any(), gomock.Any()).
-					Return(false, nil)
+					EXPECT().Get(gomock.Any(), gomock.Any()).
+					Return("", nil, false)
 
+				mock.Cache.
+					EXPECT().Set(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil).
+					Times(2)
 			},
 			modifyRequest: func(req dto.NotificationReq) dto.NotificationReq {
 				req.RawContents = &dto.RawContents{
@@ -118,8 +112,13 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 					Return(uuid.NewString(), nil)
 
 				mock.Cache.
-					EXPECT().NotificationExists(gomock.Any(), gomock.Any()).
-					Return(false, nil)
+					EXPECT().Get(gomock.Any(), gomock.Any()).
+					Return("", nil, false)
+
+				mock.Cache.
+					EXPECT().Set(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil).
+					Times(2)
 			},
 			modifyRequest: func(req dto.NotificationReq) dto.NotificationReq {
 				req.TemplateContents = &dto.TemplateContents{
@@ -145,8 +144,8 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 					})
 
 				mock.Cache.
-					EXPECT().NotificationExists(gomock.Any(), gomock.Any()).
-					Return(false, nil)
+					EXPECT().Get(gomock.Any(), gomock.Any()).
+					Return("", nil, false)
 			},
 			modifyRequest: func(req dto.NotificationReq) dto.NotificationReq {
 				req.TemplateContents = &dto.TemplateContents{
@@ -169,8 +168,8 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 					}, nil)
 
 				mock.Cache.
-					EXPECT().NotificationExists(gomock.Any(), gomock.Any()).
-					Return(false, nil)
+					EXPECT().Get(gomock.Any(), gomock.Any()).
+					Return("", nil, false)
 			},
 			modifyRequest: func(req dto.NotificationReq) dto.NotificationReq {
 				req.TemplateContents = &dto.TemplateContents{
@@ -195,8 +194,8 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 					}, nil)
 
 				mock.Cache.
-					EXPECT().NotificationExists(gomock.Any(), gomock.Any()).
-					Return(false, nil)
+					EXPECT().Get(gomock.Any(), gomock.Any()).
+					Return("", nil, false)
 			},
 			modifyRequest: func(req dto.NotificationReq) dto.NotificationReq {
 				req.TemplateContents = &dto.TemplateContents{
@@ -220,8 +219,8 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 					}, nil)
 
 				mock.Cache.
-					EXPECT().NotificationExists(gomock.Any(), gomock.Any()).
-					Return(false, nil)
+					EXPECT().Get(gomock.Any(), gomock.Any()).
+					Return("", nil, false)
 			},
 			modifyRequest: func(req dto.NotificationReq) dto.NotificationReq {
 				req.TemplateContents = &dto.TemplateContents{
@@ -245,8 +244,8 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 					}, nil)
 
 				mock.Cache.
-					EXPECT().NotificationExists(gomock.Any(), gomock.Any()).
-					Return(false, nil)
+					EXPECT().Get(gomock.Any(), gomock.Any()).
+					Return("", nil, false)
 			},
 			modifyRequest: func(req dto.NotificationReq) dto.NotificationReq {
 				req.TemplateContents = &dto.TemplateContents{
@@ -396,9 +395,8 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 			},
 			setupMock: func() {
 				mock.Cache.
-					EXPECT().
-					NotificationExists(gomock.Any(), gomock.Any()).
-					Return(false, errors.New("cache error"))
+					EXPECT().Get(gomock.Any(), gomock.Any()).
+					Return("", errors.New("cache error"), false)
 			},
 			expectedStatus: http.StatusInternalServerError,
 		},
@@ -409,9 +407,8 @@ func testCreateNotification(t *testing.T, e *gin.Engine, mock di.MockedBackend) 
 			},
 			setupMock: func() {
 				mock.Cache.
-					EXPECT().
-					NotificationExists(gomock.Any(), gomock.Any()).
-					Return(true, nil)
+					EXPECT().Get(gomock.Any(), gomock.Any()).
+					Return("", nil, true)
 			},
 			expectedStatus: http.StatusNoContent,
 		},
@@ -533,15 +530,18 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 			notificationId: notificationId,
 			expectedStatus: 204,
 			setupMock: func() {
-				mock.Cache.
-					EXPECT().
-					GetNotificationStatus(gomock.Any(), notificationId).
-					Return(testutils.StatusPtr(createdStatus), nil).
-					Times(1)
 
 				mock.Cache.
 					EXPECT().
-					UpdateNotificationStatus(gomock.Any(), expectedStatusLog).
+					Get(gomock.Any(), cache.GetNotificationStatusKey(notificationId)).
+					Return(string(createdStatus), nil, true).
+					Times(1)
+
+				mock.Cache.EXPECT().
+					Set(gomock.Any(),
+						cache.GetNotificationStatusKey(expectedStatusLog.NotificationId),
+						string(expectedStatusLog.Status),
+						gomock.Any()).
 					Return(nil).
 					Times(1)
 
@@ -557,10 +557,11 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 			notificationId: notificationId,
 			expectedStatus: 204,
 			setupMock: func() {
+
 				mock.Cache.
 					EXPECT().
-					GetNotificationStatus(gomock.Any(), notificationId).
-					Return(nil, nil).
+					Get(gomock.Any(), cache.GetNotificationStatusKey(notificationId)).
+					Return("", nil, false).
 					Times(1)
 
 				mock.Registry.MockNotificationRegistry.
@@ -569,9 +570,11 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 					Return(createdStatus, nil).
 					Times(1)
 
-				mock.Cache.
-					EXPECT().
-					UpdateNotificationStatus(gomock.Any(), expectedStatusLog).
+				mock.Cache.EXPECT().
+					Set(gomock.Any(),
+						cache.GetNotificationStatusKey(expectedStatusLog.NotificationId),
+						string(expectedStatusLog.Status),
+						gomock.Any()).
 					Return(nil).
 					Times(1)
 
@@ -588,11 +591,10 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 			expectedStatus: 400,
 			expectedError:  "Notification is being sent",
 			setupMock: func() {
-				sendingStatus := testutils.StatusPtr(dto.Sending)
 				mock.Cache.
 					EXPECT().
-					GetNotificationStatus(gomock.Any(), notificationId).
-					Return(sendingStatus, nil).
+					Get(gomock.Any(), cache.GetNotificationStatusKey(notificationId)).
+					Return(string(dto.Sending), nil, true).
 					Times(1)
 			},
 		},
@@ -602,11 +604,10 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 			expectedStatus: 400,
 			expectedError:  "Notification has been sent",
 			setupMock: func() {
-				sentStatus := testutils.StatusPtr(dto.Sent)
 				mock.Cache.
 					EXPECT().
-					GetNotificationStatus(gomock.Any(), notificationId).
-					Return(sentStatus, nil).
+					Get(gomock.Any(), cache.GetNotificationStatusKey(notificationId)).
+					Return(string(dto.Sent), nil, true).
 					Times(1)
 			},
 		},
@@ -619,8 +620,8 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 				sendingStatus := dto.Sending
 				mock.Cache.
 					EXPECT().
-					GetNotificationStatus(gomock.Any(), notificationId).
-					Return(nil, nil).
+					Get(gomock.Any(), cache.GetNotificationStatusKey(notificationId)).
+					Return("", nil, false).
 					Times(1)
 
 				mock.Registry.MockNotificationRegistry.
@@ -639,8 +640,8 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 				sentStatus := dto.Sent
 				mock.Cache.
 					EXPECT().
-					GetNotificationStatus(gomock.Any(), notificationId).
-					Return(nil, nil).
+					Get(gomock.Any(), cache.GetNotificationStatusKey(notificationId)).
+					Return("", nil, false).
 					Times(1)
 
 				mock.Registry.MockNotificationRegistry.
@@ -657,13 +658,15 @@ func testCancelNotificationDelivery(t *testing.T, e *gin.Engine, mock di.MockedB
 			setupMock: func() {
 				mock.Cache.
 					EXPECT().
-					GetNotificationStatus(gomock.Any(), notificationId).
-					Return(testutils.StatusPtr(createdStatus), nil).
+					Get(gomock.Any(), cache.GetNotificationStatusKey(notificationId)).
+					Return(string(dto.Created), nil, true).
 					Times(1)
 
-				mock.Cache.
-					EXPECT().
-					UpdateNotificationStatus(gomock.Any(), expectedStatusLog).
+				mock.Cache.EXPECT().
+					Set(gomock.Any(),
+						cache.GetNotificationStatusKey(expectedStatusLog.NotificationId),
+						string(expectedStatusLog.Status),
+						gomock.Any()).
 					Return(errors.New("some failure")).
 					Times(1)
 			},

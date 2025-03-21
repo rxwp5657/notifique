@@ -4,23 +4,30 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/notifique/internal"
+	"github.com/notifique/internal/cache"
 	"github.com/notifique/internal/dto"
+	"github.com/notifique/internal/registry"
 	"github.com/notifique/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 
 	di "github.com/notifique/internal/di"
-	mk "github.com/notifique/internal/testutils/mocks"
 )
 
 const userNotificationsUrl string = "/users/me/notifications"
 const userConfigUrl string = "/users/me/notifications/config"
+const userConfigKey = "notifications:endpoint:a2ec7c69d00e4549c50802368fe1c047:/users/1234/notifications/config*"
+const userNotificationsKey = "notifications:endpoint:db31c468fd68d7f5824526c3acb4087e:/users/1234/notifications*"
 
 func TestUserController(t *testing.T) {
 	controller := gomock.NewController(t)
@@ -32,12 +39,13 @@ func TestUserController(t *testing.T) {
 		t.Fatalf("failed to create mocked backend - %v", err)
 	}
 
-	testGetUserNotifications(t, testApp.Engine, *testApp.Registry.MockUserRegistry)
-	testGetUserConfig(t, testApp.Engine, *testApp.Registry.MockUserRegistry)
-	testUpdateUserConfig(t, testApp.Engine, *testApp.Registry.MockUserRegistry)
+	testGetUserNotifications(t, testApp.Engine, testApp)
+	testGetUserConfig(t, testApp.Engine, testApp)
+	testUpdateUserConfig(t, testApp.Engine, testApp)
+	testSetReadStatus(t, testApp.Engine, testApp)
 }
 
-func testGetUserNotifications(t *testing.T, e *gin.Engine, mock mk.MockUserRegistry) {
+func testGetUserNotifications(t *testing.T, e *gin.Engine, mock *di.MockedBackend) {
 
 	testNotifications, err := testutils.MakeTestUserNotifications(3, testUserId)
 
@@ -59,7 +67,7 @@ func testGetUserNotifications(t *testing.T, e *gin.Engine, mock mk.MockUserRegis
 	}
 
 	t.Run("Should be able to retrieve notifications page", func(t *testing.T) {
-		mock.
+		mock.Registry.MockUserRegistry.
 			EXPECT().
 			GetUserNotifications(gomock.Any(), gomock.Any()).
 			Return(dto.Page[dto.UserNotification]{
@@ -106,7 +114,7 @@ func testGetUserNotifications(t *testing.T, e *gin.Engine, mock mk.MockUserRegis
 	})
 }
 
-func testGetUserConfig(t *testing.T, e *gin.Engine, mock mk.MockUserRegistry) {
+func testGetUserConfig(t *testing.T, e *gin.Engine, mock *di.MockedBackend) {
 
 	cfg := testutils.MakeTestUserConfig(testUserId)
 
@@ -123,7 +131,7 @@ func testGetUserConfig(t *testing.T, e *gin.Engine, mock mk.MockUserRegistry) {
 	}
 
 	t.Run("Can get the user's configuration", func(t *testing.T) {
-		mock.
+		mock.Registry.MockUserRegistry.
 			EXPECT().
 			GetUserConfig(gomock.Any(), gomock.Any()).
 			Return(cfg, nil)
@@ -141,7 +149,7 @@ func testGetUserConfig(t *testing.T, e *gin.Engine, mock mk.MockUserRegistry) {
 	})
 }
 
-func testUpdateUserConfig(t *testing.T, e *gin.Engine, mock mk.MockUserRegistry) {
+func testUpdateUserConfig(t *testing.T, e *gin.Engine, mock *di.MockedBackend) {
 
 	updateUserConfig := func(cfg dto.UserConfig) *httptest.ResponseRecorder {
 
@@ -163,9 +171,14 @@ func testUpdateUserConfig(t *testing.T, e *gin.Engine, mock mk.MockUserRegistry)
 		userConfig.EmailConfig = dto.ChannelConfig{OptIn: false, SnoozeUntil: nil}
 		userConfig.SMSConfig = dto.ChannelConfig{OptIn: true, SnoozeUntil: nil}
 
-		mock.
+		mock.Registry.MockUserRegistry.
 			EXPECT().
 			UpdateUserConfig(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(nil)
+
+		mock.Cache.
+			EXPECT().
+			DelWithPrefix(gomock.Any(), cache.Key(userConfigKey)).
 			Return(nil)
 
 		w := updateUserConfig(userConfig)
@@ -193,5 +206,61 @@ func testUpdateUserConfig(t *testing.T, e *gin.Engine, mock mk.MockUserRegistry)
 
 		assert.Equal(t, w.Code, http.StatusBadRequest)
 		assert.Contains(t, resp["error"], expectedMsg)
+	})
+}
+
+func testSetReadStatus(t *testing.T, e *gin.Engine, mock *di.MockedBackend) {
+	notificationId := uuid.NewString()
+	readStatusUrl := fmt.Sprintf("%s/%s", userNotificationsUrl, notificationId)
+
+	setReadStatus := func() *httptest.ResponseRecorder {
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodPatch, readStatusUrl, nil)
+		req.Header.Add("userId", testUserId)
+		e.ServeHTTP(w, req)
+		return w
+	}
+
+	t.Run("Should be able to mark notification as read", func(t *testing.T) {
+		mock.Registry.MockUserRegistry.
+			EXPECT().
+			SetReadStatus(gomock.Any(), testUserId, notificationId).
+			Return(nil)
+
+		mock.Cache.
+			EXPECT().
+			DelWithPrefix(gomock.Any(), cache.Key(userNotificationsKey)).
+			Return(nil)
+
+		w := setReadStatus()
+		assert.Equal(t, http.StatusNoContent, w.Code)
+	})
+
+	t.Run("Should return 404 if notification not found", func(t *testing.T) {
+		mock.Registry.MockUserRegistry.
+			EXPECT().
+			SetReadStatus(gomock.Any(), testUserId, notificationId).
+			Return(internal.EntityNotFound{Id: notificationId, Type: registry.NotificationType})
+
+		w := setReadStatus()
+
+		resp := make(map[string]string)
+
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatal(err)
+		}
+
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.Contains(t, resp["error"], "Notification not found")
+	})
+
+	t.Run("Should return 500 on unexpected errors", func(t *testing.T) {
+		mock.Registry.MockUserRegistry.
+			EXPECT().
+			SetReadStatus(gomock.Any(), testUserId, notificationId).
+			Return(errors.New("unexpected error"))
+
+		w := setReadStatus()
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
 	})
 }

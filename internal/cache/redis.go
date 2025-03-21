@@ -3,13 +3,17 @@ package cache
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 
+	"github.com/notifique/internal"
 	redis "github.com/redis/go-redis/v9"
-
-	c "github.com/notifique/internal/controllers"
-	dto "github.com/notifique/internal/dto"
 )
+
+const endpointKey string = "notifications:endpoint"
+
+type Key string
 
 type RedisConfigurator interface {
 	GetRedisUrl() (string, error)
@@ -19,85 +23,126 @@ type CacheRedisApi interface {
 	Get(ctx context.Context, key string) *redis.StringCmd
 	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.StatusCmd
 	Del(ctx context.Context, keys ...string) *redis.IntCmd
+	Scan(ctx context.Context, cursor uint64, match string, count int64) *redis.ScanCmd
+}
+
+type Cache interface {
+	Set(ctx context.Context, k Key, value string, ttl time.Duration) error
+	Get(ctx context.Context, k Key) (string, error, bool)
+	Del(ctx context.Context, k Key) error
+	DelWithPrefix(ctx context.Context, prefix Key) error
 }
 
 type RedisCache struct {
 	client CacheRedisApi
 }
 
-func getNotificationStatusKey(notificationId string) string {
-	return fmt.Sprintf("notifications:%s:status", notificationId)
+func GetNotificationStatusKey(notificationId string) Key {
+	return Key(fmt.Sprintf("notifications:%s:status", notificationId))
 }
 
-func getHashKey(hash string) string {
-	return fmt.Sprintf("notifications:hash:%s", hash)
+func GetHashKey(hash string) Key {
+	return Key(fmt.Sprintf("notifications:hash:%s", hash))
 }
 
-func (rc *RedisCache) GetNotificationStatus(ctx context.Context, notificationId string) (*dto.NotificationStatus, error) {
-	status, err := rc.client.Get(ctx, getNotificationStatusKey(notificationId)).Result()
+func prepareEndpointPath(path string, userId *string) string {
 
-	if err == redis.Nil {
-		return nil, nil
-	} else if err != nil {
-		return nil, fmt.Errorf("failed to retrieve notification status - %w", err)
+	if userId == nil {
+		empty := ""
+		userId = &empty
 	}
 
-	return (*dto.NotificationStatus)(&status), nil
+	return strings.Replace(path, "me", *userId, 1)
 }
 
-func (rc *RedisCache) UpdateNotificationStatus(ctx context.Context, statusLog c.NotificationStatusLog) error {
+func GetEntpointKey(url *url.URL, userId *string) Key {
 
-	key := getNotificationStatusKey(statusLog.NotificationId)
+	path := prepareEndpointPath(url.Path, userId)
+	key := fmt.Sprintf("%s:%s", internal.GetMd5Hash(url.Path), path)
+
+	if url.RawQuery != "" {
+		key = fmt.Sprintf("%s?%s", key, url.RawQuery)
+	}
+
+	return Key(fmt.Sprintf("%s:%s", endpointKey, key))
+}
+
+func GetEndpointKeyWithPrefix(path string, userId *string) Key {
+
+	path = prepareEndpointPath(path, userId)
+	path = fmt.Sprintf("%s*", path)
+
+	key := fmt.Sprintf("%s:%s", internal.GetMd5Hash(path), path)
+
+	return Key(fmt.Sprintf("%s:%s", endpointKey, key))
+}
+
+func (rc *RedisCache) Set(ctx context.Context, k Key, value string, ttl time.Duration) error {
 
 	_, err := rc.client.
-		Set(ctx, key, string(statusLog.Status), time.Duration(1*time.Hour)).
+		Set(context.Background(), string(k), value, ttl).
 		Result()
 
 	if err != nil {
-		return fmt.Errorf("failed to set notification status - %w", err)
+		return fmt.Errorf("failed to set key - %w", err)
 	}
 
 	return nil
 }
 
-func (rc *RedisCache) NotificationExists(ctx context.Context, hash string) (bool, error) {
+func (rc *RedisCache) Get(ctx context.Context, k Key) (string, error, bool) {
 
-	_, err := rc.client.Get(ctx, getHashKey(hash)).Result()
+	data, err := rc.client.Get(ctx, string(k)).Result()
 
 	if err == redis.Nil {
-		return false, nil
+		return "", nil, false
 	} else if err != nil {
-		return false, fmt.Errorf("failed to retrieve notification hash - %w", err)
+		return "", fmt.Errorf("failed to get key - %w", err), false
 	}
 
-	return true, nil
+	return data, nil, true
 }
 
-func (rc *RedisCache) SetNotificationHash(ctx context.Context, hash string) error {
+func (rc *RedisCache) Del(ctx context.Context, k Key) error {
 
-	key := getHashKey(hash)
-
-	_, err := rc.client.
-		Set(ctx, key, "1", time.Duration(5*time.Minute)).
-		Result()
-
-	if err != nil {
-		return fmt.Errorf("failed to set notification hash - %w", err)
-	}
-
-	return nil
-}
-
-func (rc *RedisCache) DeleteNotificationHash(ctx context.Context, hash string) error {
-
-	key := getHashKey(hash)
-
-	_, err := rc.client.Del(ctx, key).Result()
+	_, err := rc.client.Del(ctx, string(k)).Result()
 
 	if err == redis.Nil {
 		return nil
-	} else if err != nil {
-		return fmt.Errorf("failed to delete the notification hash - %w", err)
+	}
+
+	return err
+}
+
+func (rc *RedisCache) DelWithPrefix(ctx context.Context, prefix Key) error {
+	var cursor uint64
+	var keys []string
+
+	for {
+		var scanKeys []string
+		var err error
+
+		scanKeys, cursor, err = rc.client.Scan(ctx, cursor, string(prefix)+"*", 100).Result()
+
+		if err != nil {
+			return fmt.Errorf("failed to scan keys - %w", err)
+		}
+
+		keys = append(keys, scanKeys...)
+
+		if cursor == 0 {
+			break
+		}
+	}
+
+	if len(keys) == 0 {
+		return nil
+	}
+
+	_, err := rc.client.Del(ctx, keys...).Result()
+
+	if err != nil {
+		return fmt.Errorf("failed to delete keys - %w", err)
 	}
 
 	return nil

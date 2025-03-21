@@ -16,6 +16,7 @@ import (
 	"go.uber.org/mock/gomock"
 
 	"github.com/notifique/internal"
+	"github.com/notifique/internal/cache"
 	di "github.com/notifique/internal/di"
 	"github.com/notifique/internal/dto"
 	"github.com/notifique/internal/registry"
@@ -23,6 +24,8 @@ import (
 )
 
 const notificationsTemplateUrl = "/notifications/templates"
+const notificationsTemplatesKey = "notifications:endpoint:396a2870a0833ec039098f9632504c99:/notifications/templates*"
+const notificationTemplateKeyFmt = "notifications:endpoint:%s:/notifications/templates/%s*"
 
 func TestNotificationTemplateController(t *testing.T) {
 
@@ -80,6 +83,11 @@ func testCreateNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 				registryMock.EXPECT().
 					SaveTemplate(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(expectedResp, nil)
+
+				mock.Cache.
+					EXPECT().
+					DelWithPrefix(gomock.Any(), cache.Key(notificationsTemplatesKey)).
+					Return(nil)
 			},
 			modifyRequest:  echoRequest,
 			expectedStatus: http.StatusCreated,
@@ -450,27 +458,42 @@ func testDeleteNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 		return w
 	}
 
+	validId := uuid.NewString()
+
 	tests := []struct {
 		name           string
 		setupMock      func()
-		modifyId       func(templateId string) string
+		templateId     string
 		expectedStatus int
 		expectedError  *string
 	}{
 		{
 			name:           "should be able to delete a template",
-			modifyId:       testutils.Echo[string],
+			templateId:     validId,
 			expectedStatus: http.StatusNoContent,
 			setupMock: func() {
 				mock.Registry.MockNotificationTemplateRegistry.
 					EXPECT().
 					DeleteTemplate(gomock.Any(), gomock.Any()).
 					Return(nil)
+
+				path := fmt.Sprintf("/notifications/templates/%s", validId)
+				expectedKey := cache.GetEndpointKeyWithPrefix(path, nil)
+
+				mock.Cache.
+					EXPECT().
+					DelWithPrefix(gomock.Any(), cache.Key(expectedKey)).
+					Return(nil)
+
+				mock.Cache.
+					EXPECT().
+					DelWithPrefix(gomock.Any(), cache.Key(notificationsTemplatesKey)).
+					Return(nil)
 			},
 		},
 		{
 			name:           "should fail of the template id is not an uuid",
-			modifyId:       func(templateId string) string { return "not an uuid" },
+			templateId:     "not an uuid",
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  testutils.StrPtr(`Key: 'NotificationTemplateUriParams.Id' Error:Field validation for 'Id' failed on the 'uuid' tag`),
 		},
@@ -482,7 +505,7 @@ func testDeleteNotificationTemplate(t *testing.T, e *gin.Engine, mock di.MockedB
 				tt.setupMock()
 			}
 
-			w := deleteTemplate(tt.modifyId(uuid.NewString()))
+			w := deleteTemplate(tt.templateId)
 
 			assert.Equal(t, tt.expectedStatus, w.Code)
 

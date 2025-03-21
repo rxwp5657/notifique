@@ -81,7 +81,7 @@ type MockedBackend struct {
 	Registry  *mk.MockedRegistry
 	Publisher *mk.MockNotificationPublisher
 	Broker    *mk.MockUserNotificationBroker
-	Cache     *mk.MockNotificationCache
+	Cache     *mk.MockCache
 	Engine    *gin.Engine
 }
 
@@ -125,8 +125,7 @@ var RedisSet = wire.NewSet(
 
 var RedisCacheSet = wire.NewSet(
 	cache.NewRedisCache,
-	wire.Bind(new(controllers.NotificationCache), new(*cache.RedisCache)),
-	wire.Bind(new(routes.Cache), new(*cache.RedisCache)),
+	wire.Bind(new(cache.Cache), new(*cache.RedisCache)),
 )
 
 var RedisUserNotificationBrokerSet = wire.NewSet(
@@ -226,9 +225,9 @@ var EnvConfigSet = wire.NewSet(
 	wire.Bind(new(routes.EngineConfigurator), new(*cfg.EnvConfig)),
 )
 
-var MockedNotificationCacheSet = wire.NewSet(
-	mk.NewMockNotificationCache,
-	wire.Bind(new(routes.Cache), new(*mk.MockNotificationCache)),
+var MockedCacheSet = wire.NewSet(
+	mk.NewMockCache,
+	wire.Bind(new(cache.Cache), new(*mk.MockCache)),
 )
 
 var EngineConfigSet = wire.NewSet(
@@ -344,7 +343,7 @@ func InjectMockedBackend(ctx context.Context, mockController *gomock.Controller)
 		MockedRegistrySet,
 		MockedPublihserSet,
 		MockedUserNotificationBroker,
-		MockedNotificationCacheSet,
+		MockedCacheSet,
 		EngineConfigSet,
 		wire.Value((*redis.Client)(nil)),
 		routes.NewEngine,

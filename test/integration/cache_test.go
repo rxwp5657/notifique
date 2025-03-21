@@ -3,12 +3,9 @@ package integration_test
 import (
 	"context"
 	"testing"
+	"time"
 
-	"github.com/google/uuid"
 	"github.com/notifique/internal/cache"
-	"github.com/notifique/internal/controllers"
-	"github.com/notifique/internal/dto"
-	"github.com/notifique/internal/testutils"
 	"github.com/notifique/internal/testutils/containers"
 	"github.com/stretchr/testify/assert"
 )
@@ -39,61 +36,74 @@ func TestCache(t *testing.T) {
 		return
 	}
 
-	notificationId := uuid.NewString()
+	t.Run("Can set/get value", func(t *testing.T) {
+		key := cache.Key("test-key")
+		value := "test-value"
 
-	t.Run("Can set/retrieve the notification status", func(t *testing.T) {
-
-		status := testutils.StatusPtr(dto.Created)
-
-		err := redisCache.UpdateNotificationStatus(ctx, controllers.NotificationStatusLog{
-			NotificationId: notificationId,
-			Status:         *status,
-		})
-
+		err := redisCache.Set(ctx, key, value, time.Hour)
 		assert.Nil(t, err)
 
-		status, err = redisCache.GetNotificationStatus(ctx, notificationId)
-
-		assert.Nil(t, err)
-		assert.Equal(t, dto.Created, *status)
-	})
-
-	t.Run("Returns false when notification hash does not exist", func(t *testing.T) {
-		hash := uuid.NewString()
-		exists, err := redisCache.NotificationExists(ctx, hash)
-
-		assert.Nil(t, err)
-		assert.False(t, exists)
-	})
-
-	t.Run("Can set and retrieve notification hash", func(t *testing.T) {
-		hash := uuid.NewString()
-
-		err := redisCache.SetNotificationHash(ctx, hash)
-		assert.Nil(t, err)
-
-		exists, err := redisCache.NotificationExists(ctx, hash)
+		got, err, exists := redisCache.Get(ctx, key)
 		assert.Nil(t, err)
 		assert.True(t, exists)
+		assert.Equal(t, value, got)
 	})
 
-	t.Run("Can delete notification hash", func(t *testing.T) {
-		hash := uuid.NewString()
+	t.Run("Get non-existent key returns no error", func(t *testing.T) {
+		key := cache.Key("non-existent-key")
 
-		err := redisCache.SetNotificationHash(ctx, hash)
+		got, err, exists := redisCache.Get(ctx, key)
+		assert.Nil(t, err)
+		assert.False(t, exists)
+		assert.Equal(t, "", got)
+	})
+
+	t.Run("Can delete value", func(t *testing.T) {
+		key := cache.Key("test-key-delete")
+		value := "test-value"
+
+		err := redisCache.Set(ctx, key, value, time.Hour)
 		assert.Nil(t, err)
 
-		err = redisCache.DeleteNotificationHash(ctx, hash)
+		err = redisCache.Del(ctx, key)
 		assert.Nil(t, err)
 
-		exists, err := redisCache.NotificationExists(ctx, hash)
+		_, err, exists := redisCache.Get(ctx, key)
 		assert.Nil(t, err)
 		assert.False(t, exists)
 	})
 
-	t.Run("No error when deleting non-existent notification hash", func(t *testing.T) {
-		hash := uuid.NewString()
-		err := redisCache.DeleteNotificationHash(ctx, hash)
+	t.Run("Can delete values with prefix", func(t *testing.T) {
+		prefix := cache.Key("test-prefix")
+		key1 := cache.Key("test-prefix:key1")
+		key2 := cache.Key("test-prefix:key2")
+		otherKey := cache.Key("other-key")
+
+		// Set multiple keys
+		err := redisCache.Set(ctx, key1, "value1", time.Hour)
 		assert.Nil(t, err)
+		err = redisCache.Set(ctx, key2, "value2", time.Hour)
+		assert.Nil(t, err)
+		err = redisCache.Set(ctx, otherKey, "other", time.Hour)
+		assert.Nil(t, err)
+
+		// Delete keys with prefix
+		err = redisCache.DelWithPrefix(ctx, prefix)
+		assert.Nil(t, err)
+
+		// Verify prefixed keys are deleted
+		_, err, exists := redisCache.Get(ctx, key1)
+		assert.Nil(t, err)
+		assert.False(t, exists)
+
+		_, err, exists = redisCache.Get(ctx, key2)
+		assert.Nil(t, err)
+		assert.False(t, exists)
+
+		// Verify other key still exists
+		value, err, exists := redisCache.Get(ctx, otherKey)
+		assert.Nil(t, err)
+		assert.True(t, exists)
+		assert.Equal(t, "other", value)
 	})
 }

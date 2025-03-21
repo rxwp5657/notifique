@@ -27,19 +27,28 @@ test: vet
 gen-mocks: vet
 	go run go.uber.org/mock/mockgen \
 		-source=./internal/controllers/users.go \
-		-destination=./internal/testutils/mocks/users.go
+		-destination=./internal/testutils/mocks/users.go \
+		-package=mocks
 
 	go run go.uber.org/mock/mockgen \
 		-source=./internal/controllers/distribution_lists.go \
-		-destination=./internal/testutils/mocks/distribution_lists.go
+		-destination=./internal/testutils/mocks/distribution_lists.go \
+		-package=mocks
 
 	go run go.uber.org/mock/mockgen \
 		-source=./internal/controllers/notifications.go \
-		-destination=./internal/testutils/mocks/notifications.go
+		-destination=./internal/testutils/mocks/notifications.go \
+		-package=mocks
 
 	go run go.uber.org/mock/mockgen \
 		-source=./internal/controllers/templates.go \
-		-destination=./internal/testutils/mocks/templates.go
+		-destination=./internal/testutils/mocks/templates.go \
+		-package=mocks
+	
+	go run go.uber.org/mock/mockgen \
+		-source=./internal/cache/redis.go \
+		-destination=./internal/testutils/mocks/cache.go \
+		-package=mocks
 
 .PHONY:gen-mocks
 

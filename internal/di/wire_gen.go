@@ -370,20 +370,20 @@ func InjectPgRabbitMQPriorityIntegrationTest(ctx context.Context) (*PgRabbitMQPr
 }
 
 func InjectMockedBackend(ctx context.Context, mockController *gomock.Controller) (*MockedBackend, error) {
-	mockDistributionRegistry := mock_controllers.NewMockDistributionRegistry(mockController)
-	mockUserRegistry := mock_controllers.NewMockUserRegistry(mockController)
-	mockNotificationRegistry := mock_controllers.NewMockNotificationRegistry(mockController)
-	mockNotificationTemplateRegistry := mock_controllers.NewMockNotificationTemplateRegistry(mockController)
-	mockedRegistry := mock_controllers.NewMockedRegistry(mockDistributionRegistry, mockUserRegistry, mockNotificationRegistry, mockNotificationTemplateRegistry)
-	mockNotificationPublisher := mock_controllers.NewMockNotificationPublisher(mockController)
-	mockUserNotificationBroker := mock_controllers.NewMockUserNotificationBroker(mockController)
-	mockNotificationCache := mock_controllers.NewMockNotificationCache(mockController)
+	mockDistributionRegistry := mocks.NewMockDistributionRegistry(mockController)
+	mockUserRegistry := mocks.NewMockUserRegistry(mockController)
+	mockNotificationRegistry := mocks.NewMockNotificationRegistry(mockController)
+	mockNotificationTemplateRegistry := mocks.NewMockNotificationTemplateRegistry(mockController)
+	mockedRegistry := mocks.NewMockedRegistry(mockDistributionRegistry, mockUserRegistry, mockNotificationRegistry, mockNotificationTemplateRegistry)
+	mockNotificationPublisher := mocks.NewMockNotificationPublisher(mockController)
+	mockUserNotificationBroker := mocks.NewMockUserNotificationBroker(mockController)
+	mockCache := mocks.NewMockCache(mockController)
 	client := _wireClientValue
 	testEngineConfigurator := config_test.NewTestVersionConfigurator()
 	engineConfig := routes.EngineConfig{
 		RedisClient:        client,
 		Registry:           mockedRegistry,
-		Cache:              mockNotificationCache,
+		Cache:              mockCache,
 		Publisher:          mockNotificationPublisher,
 		Broker:             mockUserNotificationBroker,
 		EngineConfigurator: testEngineConfigurator,
@@ -396,7 +396,7 @@ func InjectMockedBackend(ctx context.Context, mockController *gomock.Controller)
 		Registry:  mockedRegistry,
 		Publisher: mockNotificationPublisher,
 		Broker:    mockUserNotificationBroker,
-		Cache:     mockNotificationCache,
+		Cache:     mockCache,
 		Engine:    engine,
 	}
 	return mockedBackend, nil
@@ -439,7 +439,7 @@ type PostgresMockedPubIntegrationTest struct {
 	PostgresContainer *containers.PostgresContainer
 	RedisContainer    *containers.RedisContainer
 	Registry          *postgresresgistry.Registry
-	Publisher         *mock_controllers.MockNotificationPublisher
+	Publisher         *mocks.MockNotificationPublisher
 	Broker            *broker.Redis
 	Engine            *gin.Engine
 }
@@ -448,7 +448,7 @@ type DynamoMockedPubIntegrationTest struct {
 	DynamoContainer *containers.DynamoContainer
 	RedisContainer  *containers.RedisContainer
 	Registry        *dynamoregistry.Registry
-	Publisher       *mock_controllers.MockNotificationPublisher
+	Publisher       *mocks.MockNotificationPublisher
 	Broker          *broker.Redis
 	Engine          *gin.Engine
 }
@@ -486,10 +486,10 @@ type DynamoRabbitMQPriorityIntegrationTest struct {
 }
 
 type MockedBackend struct {
-	Registry  *mock_controllers.MockedRegistry
-	Publisher *mock_controllers.MockNotificationPublisher
-	Broker    *mock_controllers.MockUserNotificationBroker
-	Cache     *mock_controllers.MockNotificationCache
+	Registry  *mocks.MockedRegistry
+	Publisher *mocks.MockNotificationPublisher
+	Broker    *mocks.MockUserNotificationBroker
+	Cache     *mocks.MockCache
 	Engine    *gin.Engine
 }
 
@@ -505,7 +505,7 @@ var PriorityPublisherCfgSet = wire.NewSet(wire.Struct(new(publish.PriorityPublis
 
 var RedisSet = wire.NewSet(cache.NewRedisClient, wire.Bind(new(cache.CacheRedisApi), new(*redis.Client)), wire.Bind(new(broker.BrokerRedisApi), new(*redis.Client)))
 
-var RedisCacheSet = wire.NewSet(cache.NewRedisCache, wire.Bind(new(controllers.NotificationCache), new(*cache.RedisCache)), wire.Bind(new(routes.Cache), new(*cache.RedisCache)))
+var RedisCacheSet = wire.NewSet(cache.NewRedisCache, wire.Bind(new(cache.Cache), new(*cache.RedisCache)))
 
 var RedisUserNotificationBrokerSet = wire.NewSet(broker.NewRedisBroker, wire.Bind(new(controllers.UserNotificationBroker), new(*broker.Redis)))
 
@@ -523,29 +523,29 @@ var DynamoContainerSet = wire.NewSet(containers.NewDynamoContainer, wire.Bind(ne
 
 var RedisContainerSet = wire.NewSet(containers.NewRedisContainer, wire.Bind(new(cache.RedisConfigurator), new(*containers.RedisContainer)), wire.Bind(new(broker.BrokerConfigurator), new(*containers.RedisContainer)))
 
-var MockedPublihserSet = wire.NewSet(mock_controllers.NewMockNotificationPublisher, wire.Bind(new(controllers.NotificationPublisher), new(*mock_controllers.MockNotificationPublisher)))
+var MockedPublihserSet = wire.NewSet(mocks.NewMockNotificationPublisher, wire.Bind(new(controllers.NotificationPublisher), new(*mocks.MockNotificationPublisher)))
 
-var MockedDistributionRegistrySet = wire.NewSet(mock_controllers.NewMockDistributionRegistry, wire.Bind(new(controllers.DistributionRegistry), new(*mock_controllers.MockDistributionRegistry)))
+var MockedDistributionRegistrySet = wire.NewSet(mocks.NewMockDistributionRegistry, wire.Bind(new(controllers.DistributionRegistry), new(*mocks.MockDistributionRegistry)))
 
-var MockedUserRegistrySet = wire.NewSet(mock_controllers.NewMockUserRegistry, wire.Bind(new(controllers.UserRegistry), new(*mock_controllers.MockUserRegistry)))
+var MockedUserRegistrySet = wire.NewSet(mocks.NewMockUserRegistry, wire.Bind(new(controllers.UserRegistry), new(*mocks.MockUserRegistry)))
 
-var MockedNotificationRegistrySet = wire.NewSet(mock_controllers.NewMockNotificationRegistry, wire.Bind(new(controllers.NotificationRegistry), new(*mock_controllers.MockNotificationRegistry)))
+var MockedNotificationRegistrySet = wire.NewSet(mocks.NewMockNotificationRegistry, wire.Bind(new(controllers.NotificationRegistry), new(*mocks.MockNotificationRegistry)))
 
-var MockedNotificationTemplateRegistrySet = wire.NewSet(mock_controllers.NewMockNotificationTemplateRegistry, wire.Bind(new(controllers.NotificationTemplateRegistry), new(*mock_controllers.MockNotificationTemplateRegistry)))
+var MockedNotificationTemplateRegistrySet = wire.NewSet(mocks.NewMockNotificationTemplateRegistry, wire.Bind(new(controllers.NotificationTemplateRegistry), new(*mocks.MockNotificationTemplateRegistry)))
 
-var MockedUserNotificationBroker = wire.NewSet(mock_controllers.NewMockUserNotificationBroker, wire.Bind(new(controllers.UserNotificationBroker), new(*mock_controllers.MockUserNotificationBroker)))
+var MockedUserNotificationBroker = wire.NewSet(mocks.NewMockUserNotificationBroker, wire.Bind(new(controllers.UserNotificationBroker), new(*mocks.MockUserNotificationBroker)))
 
 var MockedRegistrySet = wire.NewSet(
 	MockedDistributionRegistrySet,
 	MockedUserRegistrySet,
 	MockedNotificationRegistrySet,
-	MockedNotificationTemplateRegistrySet, mock_controllers.NewMockedRegistry, wire.Bind(new(routes.Registry), new(*mock_controllers.MockedRegistry)),
+	MockedNotificationTemplateRegistrySet, mocks.NewMockedRegistry, wire.Bind(new(routes.Registry), new(*mocks.MockedRegistry)),
 )
 
 var TestVersionConfiguratorSet = wire.NewSet(config_test.NewTestVersionConfigurator, wire.Bind(new(routes.EngineConfigurator), new(config_test.TestEngineConfigurator)))
 
 var EnvConfigSet = wire.NewSet(config.NewEnvConfig, wire.Bind(new(postgresresgistry.PostgresConfigurator), new(*config.EnvConfig)), wire.Bind(new(dynamoregistry.DynamoConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.PriorityQueueConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.SQSConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.RabbitMQConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.RabbitMQPriorityConfigurator), new(*config.EnvConfig)), wire.Bind(new(publish.SQSPriorityConfigurator), new(*config.EnvConfig)), wire.Bind(new(cache.RedisConfigurator), new(*config.EnvConfig)), wire.Bind(new(broker.BrokerConfigurator), new(*config.EnvConfig)), wire.Bind(new(routes.EngineConfigurator), new(*config.EnvConfig)))
 
-var MockedNotificationCacheSet = wire.NewSet(mock_controllers.NewMockNotificationCache, wire.Bind(new(routes.Cache), new(*mock_controllers.MockNotificationCache)))
+var MockedCacheSet = wire.NewSet(mocks.NewMockCache, wire.Bind(new(cache.Cache), new(*mocks.MockCache)))
 
 var EngineConfigSet = wire.NewSet(wire.Struct(new(routes.EngineConfig), "*"))

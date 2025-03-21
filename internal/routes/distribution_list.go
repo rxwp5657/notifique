@@ -1,28 +1,25 @@
 package routes
 
 import (
-	"errors"
-
-	"github.com/gin-gonic/gin"
-
 	c "github.com/notifique/internal/controllers"
 )
 
-func SetupDistributionListRoutes(r *gin.Engine, version string, controller *c.DistributionListController) error {
+type distributionListsRoutesCfg struct {
+	routeGroupCfg
+	Controller *c.DistributionListController
+}
 
-	if controller == nil {
-		return errors.New("distribution lists controller is nil")
-	}
+func SetupDistributionListRoutes(cfg distributionListsRoutesCfg) error {
 
-	g := r.Group(version)
+	g := cfg.Engine.Group(cfg.Version, cfg.Middlewares...)
 	{
-		g.GET("/distribution-lists", controller.GetDistributionLists)
-		g.POST("/distribution-lists", controller.CreateDistributionList)
-		g.DELETE("/distribution-lists/:name", controller.DeleteDistributionList)
+		g.GET("/distribution-lists", cfg.Controller.GetDistributionLists)
+		g.POST("/distribution-lists", cfg.Controller.CreateDistributionList)
 
-		g.GET("/distribution-lists/:name/recipients", controller.GetRecipients)
-		g.PATCH("/distribution-lists/:name/recipients", controller.AddRecipients)
-		g.DELETE("/distribution-lists/:name/recipients", controller.DeleteRecipients)
+		g.GET("/distribution-lists/:name/recipients", cfg.Controller.GetRecipients)
+		g.PATCH("/distribution-lists/:name/recipients", cfg.Controller.AddRecipients)
+		g.DELETE("/distribution-lists/:name/recipients", cfg.Controller.DeleteRecipients)
+		g.DELETE("/distribution-lists/:name", cfg.Controller.DeleteDistributionList)
 	}
 
 	return nil
