@@ -1,0 +1,15 @@
+volumes
+compose.yml
+.vscode
+node_modules
+npm-debug.log
+*.env
+.git
+.gitignore
+.npm
+.DS_Store
+*.log
+coverage
+dist
+build
+README.md
