@@ -1,6 +1,20 @@
 services:
+  localstack:
+    container_name: "${LOCALSTACK_DOCKER_NAME:-localstack-main}"
+    image: localstack/localstack-pro
+    ports:
+      - "127.0.0.1:4566:4566"            # LocalStack Gateway
+      - "127.0.0.1:4510-4559:4510-4559"  # external services port range
+    environment:
+      # LocalStack configuration: https://docs.localstack.cloud/references/configuration/
+      - DEBUG=${DEBUG:-0}
+      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN}
+    volumes:
+      - "${LOCALSTACK_VOLUME_DIR:-./volume}:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+
   notifique:
-    image: notifique:v0
+    image: notifique:v0-service
     environment:
       - GIN_MODE=release
       - LOW_PRIORITY_QUEUE=notifique-low
@@ -13,6 +27,7 @@ services:
       - API_VERSION=/v0
       - REQUESTS_PER_SECOND=100
       - CACHE_TTL_IN_SECONDS=60
+      - JWKS_URL=https://cognito-idp.localhost.localstack.cloud:4566/us-east-1_2c9d52698930409287c7bae7a1649d2a/.well-known/jwks.json
     ports:
       - 8080:8080
     depends_on:
@@ -22,6 +37,36 @@ services:
         condition: service_started
       redis:
         condition: service_started
+      localstack:
+        condition: service_healthy
+
+  worker:
+    image: notifique:v0-worker
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://rabbitmq:5672/
+      - M2M_TOKEN_URL=https://cognito-idp.localhost.localstack.cloud:4566/us-east-1_2c9d52698930409287c7bae7a1649d2a/.well-known/jwks.json
+      - M2M_CLIENT_ID=notifique
+      - M2M_CLIENT_SECRET=notifique
+      - NOTIFICATION_SERVICE_URL=http://notifique:8080/v0
+      - NOTIFICATION_SERVICE_NUM_RETRIES=3
+      - NOTIFICATION_SERVICE_BASE_DELAY_IN_SECONDS=2
+      - NOTIFICATION_SERVICE_MAX_DELAY_IN_SECONDS=10
+      - SMTP_HOST=localhost
+      - SMTP_PORT=1025
+      - SMTP_USERNAME=notifique
+      - SMTP_PASSWORD=notifique
+      - SMTP_FROM=noreply@notifique
+      - USER_POOL_ID=us-east-1_2c9d52698930409287c7bae7a1649d2a
+      - COGNITO_BASE_ENDPOINT=https://cognito-idp.localhost.localstack.cloud:4566
+      - COGNITO_REGION=us-east-1
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      localstack:
+        condition: service_healthy
 
   # dynamodb-local:
   #   image: amazon/dynamodb-local:2.4.0
@@ -30,24 +75,17 @@ services:
   #   ports:
   #     - 8000:8000
   #   volumes:
-  #     - ./volumes/dynamodb:/home/dynamodblocal/data
+  #     - ./volume/dynamodb:/home/dynamodblocal/data
 
   postgres:
     image: postgres:16.3
     ports:
       - 5432:5432
     volumes:
-      - ./volumes/postgres:/var/lib/postgresql/data
+      - ./volume/postgres:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=notifique
       - POSTGRES_PASSWORD=postgres
-
-  # local-stack:
-  #   image: localstack/localstack:3.4
-  #   ports:
-  #     - 4566:4566
-  #   environment:
-  #     - SERVICES=sqs
 
   rabbitmq:
     image: rabbitmq:3.13.3

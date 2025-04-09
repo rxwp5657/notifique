@@ -1,0 +1,1668 @@
+openapi: 3.0.3
+
+info:
+  title: Notifique API
+  description: A simple notification system.
+  version: 0.1.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+paths:
+
+  /notifications:
+    get:
+      tags:
+        - notifications
+      summary: Retrieve a page of notifications
+      parameters:
+        - $ref: "#/components/parameters/nextTokenParam"
+        - $ref: "#/components/parameters/maxResultsParam"
+      security:
+        - OAuth2:
+          - notifications/admin
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: A page of notifications has been retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseModel"
+                properties:
+                  data:
+                    items:
+                      $ref: "#/components/schemas/NotificationSummaryModel"
+    post:
+      tags:
+        - notifications
+      summary: Create a new notification
+      security:
+        - OAuth2:
+          - notifications/publisher
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationRequestModel"
+      responses:
+        "204":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Notification created successfully and queued for delivery
+        "400":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error
+
+  /notifications/{id}:
+    get:
+      tags:
+        - notifications
+      summary: Get notification details
+      security:
+        - OAuth2:
+          - notifications/admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Notification details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationModel"
+
+    delete:
+      tags:
+        - notifications
+      summary: Delete a notification record.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - OAuth2:
+          - notifications/admin
+      responses:
+        "204":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Notification deleted successfully
+        "400":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: 
+            The notification can't be deleted as its queued or sending.
+        "500":
+          description: Internal server error
+
+  /notifications/{id}/cancel:
+    post:
+      tags:
+        - notifications
+      summary: Cancel a notification if its not being sent or sending.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - OAuth2:
+          - notifications/admin
+          - notifications/publisher
+      responses:
+        "204":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Notification cancelled successfully
+        "400":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: 
+            The notification can't be cancelend as its already sent or sending.
+        "500":
+          description: Internal server error
+
+  /notifications/{id}/status:
+    get:
+      tags:
+        - notifications
+      summary: Get notification status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - OAuth2:
+          - notifications/publisher
+          - notifications/admin
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Notification status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    $ref: "#/components/schemas/NotificationStatus"
+        "404":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Notification not found
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error
+
+    patch:
+      tags:
+        - notifications
+      summary: Update notification status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      security:
+        - OAuth2:
+          - notifications/publisher
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  $ref: "#/components/schemas/NotificationStatus"
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Notification status updated successfully
+        "404":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Notification not found
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error
+
+  /notifications/:id/recipients/statuses:
+    get:
+      tags:
+        - notifications
+      summary: Get notification recipients statuses
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: "#/components/parameters/nextTokenParam"
+        - $ref: "#/components/parameters/maxResultsParam"
+        - in: query
+          name: channel
+          required: false
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/NotificationChannels"
+          description: filter by delivery channels
+          explode: true
+          style: form
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/NotificationStatus"
+          description: filter by notification statuses
+          explode: true
+          style: form
+      security:
+        - OAuth2:
+          - notifications/publisher
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Recipients statuses retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseModel"
+                properties:
+                  data:
+                    items:
+                      $ref: "#/components/schemas/RecipientNotificationStatusModel"
+
+    post:
+      tags:
+        - notifications
+      summary: Update notification recipients statuses
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PageResponseModel"
+              properties:
+                data:
+                  items:
+                    $ref: "#/components/schemas/RecipientNotificationStatusModel"
+      security:
+        - OAuth2:
+          - notifications/publisher
+      responses:
+        "204":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Recipients statuses updated successfully
+        "400":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Invalid request payload
+        "404":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Notification not found
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error
+
+  /notifications/templates:
+    post:
+      tags:
+        - notifications
+      summary: Create a notification template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationTemplateRequestModel"
+      security:
+        - OAuth2:
+          - notifications/admin
+      responses:
+        "201":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Template created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationTemplateCreatedRespModel"
+        "400":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Invalid template format
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error
+
+    get:
+      tags:
+        - notifications
+      summary: List notification templates
+      parameters:
+        - $ref: "#/components/parameters/nextTokenParam"
+        - $ref: "#/components/parameters/maxResultsParam"
+        - in: query
+          name: templateName
+          required: false
+          schema:
+            $ref: "#/components/schemas/NotificationTemplateName"
+          description: filter templates based on name
+      security:
+        - OAuth2:
+          - notifications/admin
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Templates retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseModel"
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NotificationTemplateModel"
+
+  /notifications/templates/{id}:
+    get:
+      tags:
+        - notifications
+      summary: Get notification template details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            nullable: false
+      security:
+        - OAuth2:
+          - notifications/admin
+          - notifications/publisher
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Template details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationTemplateDetailsModel"
+        "404":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Template not found
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error"
+
+    delete:
+      tags:
+        - notifications
+      summary: Delete a notification template
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            nullable: false
+      security:
+        - OAuth2:
+          - notifications/admin
+      responses:
+        "204":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Template deleted successfully
+        "404":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Template not found
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error
+
+    put:
+      tags:
+        - notifications
+      summary: Update an existing notification template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+            nullable: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationTemplateRequestModel"
+      security:
+        - OAuth2:
+          - notifications/admin
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Template updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationTemplateModel"
+        "400":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Invalid template format
+        "404":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Template not found
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error
+
+  /users/me/notifications:
+    get:
+      tags:
+        - users
+      summary: Retrieve a page of user notifications.
+      parameters:
+        - $ref: "#/components/parameters/nextTokenParam"
+        - $ref: "#/components/parameters/maxResultsParam"
+        - in: query
+          name: topic
+          required: false
+          description: filter notifications based on topic
+          schema:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          explode: true
+          style: form
+      security:
+        - OAuth2:
+          - notifications/user
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: A page of notifications has been generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseModel"
+                properties:
+                  data:
+                    items:
+                      $ref: "#/components/schemas/UserNotificationModel"
+
+  /users/me/notifications/{id}:
+    patch:
+      tags:
+        - users
+      summary: Update notification read status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Notification identifier
+      security:
+        - OAuth2:
+          - notifications/user
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Notification read status updated
+        "404":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Notification not found
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error
+
+  /users/me/notifications/config:
+    get:
+      tags:
+        - users
+      summary: Get user notification preferences
+      security:
+        - OAuth2:
+          - notifications/user
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: User notification config retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserConfigModel" 
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error
+          
+    put:
+      tags:
+        - users
+      summary: Update user notification preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserConfigModel"
+      security:
+        - OAuth2:
+          - notifications/user
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: User config updated successfully
+        "400":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Invalid request payload
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error
+
+  /users/me/notifications/live:
+    get:
+      tags:
+        - users
+      summary: Subscribe to live user notifications stream
+      security:
+        - OAuth2:
+          - notifications/user
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Server sent events stream established
+          content:
+            text/event-stream:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/UserNotificationModel"
+
+  /users/notifications:
+    post:
+      tags:
+        - users
+      summary: Add new notifications for multiple users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: "#/components/schemas/UserNotificationRequestModel"
+      security:
+        - OAuth2:
+          - user_notifications/publisher
+      responses:
+        "204":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: User notifications created successfully
+        "400":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Invalid request payload
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error
+
+  /distribution-lists:
+    get:
+      tags:
+        - distribution-lists
+      summary: Retrieve a page of distribution lists
+      parameters:
+        - $ref: "#/components/parameters/nextTokenParam" 
+        - $ref: "#/components/parameters/maxResultsParam"
+      security:
+        - OAuth2:
+          - notifications/admin
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: A page of distribution lists has been retrieved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseModel"
+                properties:
+                  data:
+                    items:
+                      $ref: "#/components/schemas/DistributionListSummaryModel"
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error
+
+    post:
+      tags:
+        - distribution-lists
+      summary: Create a new distribution list
+      security:
+        - OAuth2:
+          - notifications/admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DistributionListModel"
+      responses:
+        "201":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Distribution list created successfully
+        "400":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Invalid request payload or distribution list already exists
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error
+
+  /distribution-lists/{name}:
+    delete:
+      tags:
+        - distribution-lists
+      summary: Delete a distribution list
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            $ref: "#/components/schemas/DistributionListName"
+          description: Name of the distribution list
+      security:
+        - OAuth2:
+          - notifications/admin
+      responses:
+        "204":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Distribution list deleted successfully
+        "400":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Invalid distribution list name
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error
+
+  /distribution-lists/{name}/recipients:
+    get:
+      tags:
+        - distribution-lists
+      summary: Get recipients of a distribution list
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            $ref: "#/components/schemas/DistributionListName"
+        - $ref: "#/components/parameters/nextTokenParam"
+        - $ref: "#/components/parameters/maxResultsParam"
+      security:
+        - OAuth2:
+          - notifications/admin
+          - notifications/publisher
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Recipients retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseModel"
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: string
+        "404":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Distribution list not found
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error
+
+    patch:
+      tags:
+        - distribution-lists
+      summary: Add recipients to a distribution list
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 120
+      security:
+        - OAuth2:
+          - notifications/admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecipientsModel"
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Recipients added successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DistributionListSummaryModel"
+        "400":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Invalid request or distribution list not found
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error
+
+    delete:
+      tags:
+        - distribution-lists
+      summary: Remove recipients from a distribution list
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 120
+      security:
+        - OAuth2:
+          - notifications/admin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecipientsModel"
+      responses:
+        "200":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Recipients removed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DistributionListSummaryModel"
+        "400":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Invalid request or distribution list not found
+        "500":
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/schemas/RateLimitLimit'
+            X-RateLimit-Remaining:  
+              $ref: '#/components/schemas/RateLimitRemaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/schemas/RateLimitReset'
+          description: Internal server error
+
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    OAuth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://your-auth-server.com/oauth2/token
+          scopes:
+            user_notifications/publisher: Can publish user notifications
+            notifications/publisher: Can publish notifications, update notification recipients statuses,
+              update notification status
+        authorizationCode:
+          authorizationUrl: https://your-auth-server.com/auth
+          tokenUrl: https://your-auth-server.com/token
+          scopes:
+            notifications/user: Can retrieve user notifications, set the read at status, 
+              get the user notification config, and update the user notification config
+            notifications/admin: Can retrieve notifications, get notification recipients statuses,
+              cancel notifications, create/update/delete notification templates,
+              create/update/delete distribution lists, and get distribution lists, add/remove recipients from distribution lists
+
+  parameters:
+
+    nextTokenParam:
+      in: query
+      name: nextToken
+      required: false
+      schema:
+        $ref: "#/components/schemas/TokenModel"
+      description: the key of the last evaluated item of the page.
+
+    maxResultsParam:
+      in: query
+      name: maxResults
+      required: false
+      schema:
+        $ref: "#/components/schemas/MaxResultsModel"
+      description: the maximum number of items to return on the page.
+
+  schemas:
+
+    RateLimitLimit:
+      type: integer
+      description: The maximum number of requests allowed in the time window
+    RateLimitRemaining:
+      type: integer
+      description: The number of requests remaining in the current time window
+    RateLimitReset:
+      type: integer
+      format: unix-timestamp
+      description: The time at which the rate limit resets
+
+    TokenModel:
+      type: string
+      format: byte
+      nullable: true
+
+    MaxResultsModel:
+      type: integer
+      minimum: 0
+
+    PageResponseModel:
+      type: object
+      properties:
+        nextToken:
+          $ref: "#/components/schemas/TokenModel"
+        prevToken:
+          $ref: "#/components/schemas/TokenModel"
+        resultCount:
+          type: integer
+          minimum: 0
+          nullable: false
+        data:
+          type: array
+          items:
+            # This is a placeholder for the actual item type, which
+            # will be replaced by `$ref` in the endpoints
+            type: object
+      required:
+        - nextToken
+        - prevToken
+        - resultCount
+        - data
+
+    NotificationStatus:
+      type: string
+      enum: [CREATED, QUEUED, FAILED, SENDING, SENT, CANCELED]
+
+    NotificationPriority:
+      type: string
+      enum: [HIGH, MEDIUM, LOW]
+
+    NotificationChannels:
+      type: array
+      uniqueItems: true
+      description: Delivery channels to use
+      items:
+        type: string
+        enum: [e-mail, in-app]
+
+    NotificationContents:
+      oneOf:
+        - type: object
+          description: Raw notification contents
+          required:
+            - title
+            - contents
+          properties:
+            title:
+              type: string
+              minLength: 1
+              maxLength: 120
+            contents:
+              type: string
+              minLength: 1
+              maxLength: 1024
+        - type: object
+          description: Template-based notification
+          required:
+            - templateId
+            - variables
+          properties:
+            templateId:
+              type: string
+              format: uuid
+              description: Id of the notification template
+            variables:
+              type: array
+              description: Template variables to substitute
+              items:
+                type: object
+                properties:
+                  name:
+                    $ref: "#/components/schemas/NotificationTemplateVariableName"
+                  value:
+                    type: string
+
+    NotificationBase:
+      type: object
+      properties:
+        topic:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Topic category for the notification
+        priority:
+          $ref: "#/components/schemas/NotificationPriority"
+        image:
+          type: string
+          format: uri
+          nullable: true
+          description: Optional URL to an image to include with the notification
+        distributionList:
+          $ref: "#/components/schemas/DistributionListName"
+        recipients:
+          type: array
+          maxItems: 256
+          uniqueItems: true
+          description: List of recipient identifiers
+          items:
+            type: string
+            minLength: 1
+        channels:
+          $ref: "#/components/schemas/NotificationChannels"
+
+    NotificationModel:
+      allOf:
+      - $ref: "#/components/schemas/NotificationBase"
+      required:
+      - id
+      - topic
+      - status
+      - createdAt
+      - createdBy
+      properties:
+        id:
+          type: string
+          format: uuid
+          nullable: false
+        status:
+          $ref: "#/components/schemas/NotificationStatus"
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the notification was created
+        createdBy:
+          type: string
+          description: Identifier of the user who created the notification
+        contents:
+          $ref: "#/components/schemas/NotificationContents"
+
+    RecipientNotificationStatusModel:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+          nullable: false
+        channel:
+          $ref: "#/components/schemas/NotificationChannels"
+        status:
+          $ref: "#/components/schemas/NotificationStatus"
+        errMsg:
+          type: string
+          maxLength: 256
+          description: Error message if the notification failed to send
+      required:
+        - userId
+        - channel
+        - status
+
+    NotificationSummaryModel:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          nullable: false
+        topic:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Topic category for the notification
+        createdAt:
+          type: string
+          format: date-time
+          description: Timestamp when the notification was created
+        createdBy:
+          type: string
+          description: Identifier of the user who created the notification
+        contentsType:
+          type: string
+          enum: [TEMPLATE, DIRECT]
+        priority:
+          $ref: "#/components/schemas/NotificationPriority"
+        status:
+          $ref: "#/components/schemas/NotificationStatus"
+
+    NotificationRequestModel:
+      allOf:
+        - $ref: "#/components/schemas/NotificationBase"
+        - type: object
+          properties:
+            contents:
+              $ref: "#/components/schemas/NotificationContents"
+          required:
+            - topic
+            - priority
+            - contents
+            - channels
+
+    UserNotificationModel:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          nullable: false
+        title:
+          type: string
+          nullable: false
+          minLength: 1
+        contents:
+          type: string
+          nullable: false
+          minLength: 1
+        createdAt:
+          type: string
+          format: date-time
+          nullable: false
+        image:
+          type: string
+          format: uri
+          nullable: true
+        readAt:
+          type: string
+          format: date-time
+          nullable: true
+        topic:
+          type: string
+          nullable: false
+          minLength: 1
+
+    ChannelConfig:
+      type: object
+      properties:
+        optIn:
+          type: boolean
+          description: Whether the user has opted in for this notification channel
+        snoozeUntil:
+          type: string
+          format: date-time
+          nullable: true
+          description: Timestamp until which notifications are snoozed
+        optedOutTopics:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 0
+            description: List of topics the user does not want to receive notifications from
+
+    UserConfigModel:
+      type: object
+      properties:
+        emailConfig:
+          $ref: "#/components/schemas/ChannelConfig"
+        smsConfig:
+          $ref: "#/components/schemas/ChannelConfig"
+        pushConfig:
+          $ref: "#/components/schemas/ChannelConfig"
+
+    DistributionListName:
+      type: string
+      minLength: 3
+      maxLength: 120
+      pattern: "^[A-Za-z0-9$#@-_]+$"
+
+    DistributionListModel:
+      type: object
+      properties:
+        name:
+          $ref: "#/components/schemas/DistributionListName"
+        recipients:
+          type: array
+          maxItems: 256
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+      required:
+        - name
+        - recipients
+
+    DistributionListSummaryModel:
+      type: object
+      properties:
+        name:
+          type: string
+        numberOfRecipients:
+          type: integer
+      required:
+        - name
+        - numberOfRecipients
+
+    RecipientsModel:
+      type: object
+      properties:
+        recipients:
+          type: array
+          maxItems: 256
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+      required:
+        - recipients
+    
+    NotificationTemplateName:
+      type: string
+      minLength: 1
+      maxLength: 120
+
+    NotificationTemplateBase:
+      type: object
+      required:
+        - name
+        - titleTemplate
+        - contentTemplate
+      properties:
+        name:
+          $ref: "#/components/schemas/NotificationTemplateName"
+        titleTemplate:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Title template with variables
+        contentTemplate:
+          type: string
+          minLength: 1
+          maxLength: 4096
+          description: Content template, supports HTML
+        variables:
+          type: array
+          items:
+            $ref: "#/components/schemas/TemplateVariable"
+
+    NotificationTemplateRequestModel:
+      allOf:
+        - $ref: "#/components/schemas/NotificationTemplateBase"
+        - type: object
+          properties:
+            description:
+              type: string
+              maxLength: 256
+
+    NotificationTemplateModel:
+      type: object
+      required:
+        - id
+        - name
+        - description
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          $ref: "#/components/schemas/NotificationTemplateName"
+        description:
+          type: string
+          maxLength: 256
+          nullable: true
+
+    NotificationTemplateCreatedRespModel:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          $ref: "#/components/schemas/NotificationTemplateName"
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - createdAt
+
+    NotificationTemplateDetailsModel:
+      allOf:
+        - $ref: "#/components/schemas/NotificationTemplateBase"
+        - $ref: "#/components/schemas/NotificationTemplateModel"
+
+    NotificationTemplateVariableName:
+      type: string
+      description: Variable name that must appear in the template
+      maxLength: 120
+      pattern: "^[^~]+$"
+
+    TemplateVariable:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          $ref: "#/components/schemas/NotificationTemplateVariableName"
+        type:
+          type: string
+          enum: [string, date, time, number]
+        required:
+          type: boolean
+          default: true
+        validation:
+          type: string
+          description: Optional regex pattern
+
+    UserNotificationRequestModel:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+          nullable: false
+        title:
+          type: string
+          maxLength: 120
+        contents:
+          type: string
+          maxLength: 1024
+        topic:
+          type: string
+          minLength: 1
+          maxLength: 120
+        image:
+          type: string
+          format: uri
+          nullable: true
+      required:
+        - userId
+        - title
+        - contents
+        - topic
