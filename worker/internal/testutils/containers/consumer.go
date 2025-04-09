@@ -15,7 +15,7 @@ const testQueue = "notifique-test"
 
 type RabbitMQConsumerContainer struct {
 	container *sc.RabbitMQ
-	Queue     string
+	Queue     consumers.RabbitMQQueue
 	Client    *clients.RabbitMQ
 }
 

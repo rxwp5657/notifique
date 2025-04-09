@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
 	"github.com/notifique/shared/cache"
 )
+
+type UserPoolID string
 
 type UserInfo struct {
 	UserId string `json:"user_id"`
@@ -17,20 +20,32 @@ type UserInfo struct {
 	Phone  string `json:"phone"`
 }
 
-type cognitoUserInfo struct {
+type CognitoIdentityProviderConfig struct {
+	BaseEndpoint *string
+	Region       *string
+}
+
+type CognitoIdentityProviderConfigurator interface {
+	GetCognitoIdentityProviderConfig() CognitoIdentityProviderConfig
+}
+
+type CognitoUserInfoConfigurator interface {
+	GetUserPoolId() (UserPoolID, error)
+}
+
+type CognitoUserInfoCfg struct {
+	UserPoolID UserPoolID
+	Cache      cache.Cache
+	Client     *cognitoidentityprovider.Client
+}
+
+type CognitoUserInfo struct {
 	client     *cognitoidentityprovider.Client
 	userPoolID string
 	cache      cache.Cache
 }
 
-func NewCognitoUserInfoProvider(client *cognitoidentityprovider.Client, userPoolID string) *cognitoUserInfo {
-	return &cognitoUserInfo{
-		client:     client,
-		userPoolID: userPoolID,
-	}
-}
-
-func (c *cognitoUserInfo) getInfoFromCache(ctx context.Context, userID string) (UserInfo, error, bool) {
+func (c *CognitoUserInfo) getInfoFromCache(ctx context.Context, userID string) (UserInfo, error, bool) {
 
 	info := UserInfo{}
 	userInfo, err, ok := c.cache.Get(ctx, cache.Key(userID))
@@ -52,7 +67,7 @@ func (c *cognitoUserInfo) getInfoFromCache(ctx context.Context, userID string) (
 	return info, nil, true
 }
 
-func (c *cognitoUserInfo) getInfoFromCognitoPool(ctx context.Context, userID string) (UserInfo, error) {
+func (c *CognitoUserInfo) getInfoFromCognitoPool(ctx context.Context, userID string) (UserInfo, error) {
 
 	info := UserInfo{UserId: userID}
 
@@ -81,7 +96,7 @@ func (c *cognitoUserInfo) getInfoFromCognitoPool(ctx context.Context, userID str
 	return info, nil
 }
 
-func (c *cognitoUserInfo) GetUserInfo(ctx context.Context, userID string) (UserInfo, error) {
+func (c *CognitoUserInfo) GetUserInfo(ctx context.Context, userID string) (UserInfo, error) {
 
 	userInfo, err, ok := c.getInfoFromCache(ctx, userID)
 
@@ -108,4 +123,34 @@ func (c *cognitoUserInfo) GetUserInfo(ctx context.Context, userID string) (UserI
 	}
 
 	return userInfo, nil
+}
+
+func NewCognitoIdentityProvider(c CognitoIdentityProviderConfigurator) (*cognitoidentityprovider.Client, error) {
+	clientCfg := c.GetCognitoIdentityProviderConfig()
+
+	cfg, err := config.LoadDefaultConfig(context.TODO())
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to load default config: %w", err)
+	}
+
+	client := cognitoidentityprovider.NewFromConfig(cfg, func(o *cognitoidentityprovider.Options) {
+		if clientCfg.BaseEndpoint != nil {
+			o.BaseEndpoint = clientCfg.BaseEndpoint
+		}
+
+		if clientCfg.Region != nil {
+			o.Region = *clientCfg.Region
+		}
+	})
+
+	return client, nil
+}
+
+func NewCognitoUserInfoProvider(cfg CognitoUserInfoCfg) *CognitoUserInfo {
+	return &CognitoUserInfo{
+		client:     cfg.Client,
+		userPoolID: string(cfg.UserPoolID),
+		cache:      cfg.Cache,
+	}
 }

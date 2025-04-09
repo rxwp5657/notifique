@@ -14,8 +14,10 @@ type SMTPConfig struct {
 	Username string
 	Password string
 	From     string
-	// Optional: set if using TLS
-	UseTLS bool
+}
+
+type SMTPConfigurator interface {
+	GetSMTPConfig() (SMTPConfig, error)
 }
 
 type SMTP struct {

@@ -63,6 +63,10 @@ type CognitoAuthProviderCfg struct {
 	ClientSecret string
 }
 
+type CognitoAuthConfigurator interface {
+	GetCognitoAuthCfg() (CognitoAuthProviderCfg, error)
+}
+
 type CognitoAuthProvider struct {
 	tokenUrl     string
 	clientID     string
@@ -72,12 +76,20 @@ type CognitoAuthProvider struct {
 	mutex        sync.RWMutex
 }
 
-func NewCognitoAuthProvider(cfg CognitoAuthProviderCfg) *CognitoAuthProvider {
-	return &CognitoAuthProvider{
+func NewCognitoAuthProvider(c CognitoAuthConfigurator) (*CognitoAuthProvider, error) {
+	cfg, err := c.GetCognitoAuthCfg()
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Cognito auth config: %w", err)
+	}
+
+	p := &CognitoAuthProvider{
 		tokenUrl:     cfg.TokenUrl,
 		clientID:     cfg.ClientID,
 		clientSecret: cfg.ClientSecret,
 	}
+
+	return p, nil
 }
 
 func (p *CognitoAuthProvider) AddAuth(req *http.Request) error {

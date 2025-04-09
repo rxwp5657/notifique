@@ -57,7 +57,7 @@ func TestNotificationServiceProvider(t *testing.T) {
 
 		provider := providers.NewNotificationServiceProvider(clients.NotificationServiceClient{
 			AuthProvider:           clients.NoAuth,
-			NotificationServiceUrl: server.URL,
+			NotificationServiceUrl: clients.NotificationServiceUrl(server.URL),
 			NumRetries:             0,
 			BaseDelay:              0,
 			MaxDelay:               0,

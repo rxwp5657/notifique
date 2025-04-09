@@ -97,7 +97,7 @@ func NewRabbitMQConsumerTest(ctx context.Context, cfg RabbitMQCfg) (*RabbitMQ, e
 	ct := &RabbitMQ{
 		RabbitMQ: c,
 		ch:       cfg.Client,
-		queue:    cfg.Queue,
+		queue:    string(cfg.Queue),
 	}
 
 	return ct, nil

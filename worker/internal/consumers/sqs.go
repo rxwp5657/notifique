@@ -21,6 +21,10 @@ type SQSQueueCfg struct {
 	WaitTimeSeconds     int32
 }
 
+type SQSQueueConfigurator interface {
+	GetSQSQueueCfg() (SQSQueueCfg, error)
+}
+
 type SQSCfg struct {
 	QueueCfg    SQSQueueCfg
 	Client      SQSAPI

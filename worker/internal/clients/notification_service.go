@@ -24,12 +24,27 @@ const (
 	RateLimitReset                       string   = "X-RateLimit-Reset"
 )
 
+type BaseDelay time.Duration
+type MaxDelay time.Duration
+type NotificationServiceUrl string
+
 type NotificationServiceClient struct {
 	AuthProvider           AuthProvider
-	NotificationServiceUrl string
+	NotificationServiceUrl NotificationServiceUrl
 	NumRetries             int
-	BaseDelay              time.Duration
-	MaxDelay               time.Duration
+	BaseDelay              BaseDelay
+	MaxDelay               MaxDelay
+}
+
+type NotificationServiceClientCfg struct {
+	NotificationServiceUrl NotificationServiceUrl
+	NumRetries             int
+	BaseDelay              BaseDelay
+	MaxDelay               MaxDelay
+}
+
+type NotificationServiceClientConfigurator interface {
+	GetNotificationServiceClientCfg() (NotificationServiceClientCfg, error)
 }
 
 func exponentialBackoffWithJitter(attempt int, baseDelay, maxDelay time.Duration) time.Duration {
@@ -69,8 +84,8 @@ func (p *NotificationServiceClient) DoRequestWithBackoff(req *http.Request, retr
 	if res.StatusCode >= 500 && retry < p.NumRetries {
 		sleep := exponentialBackoffWithJitter(
 			retry,
-			p.BaseDelay,
-			p.MaxDelay)
+			time.Duration(p.BaseDelay),
+			time.Duration(p.MaxDelay))
 
 		time.Sleep(sleep)
 		return p.DoRequestWithBackoff(req, retry+1)

@@ -19,6 +19,12 @@ type RabbitMQAPI interface {
 	Consume(queue string, consumer string, autoAck bool, exclusive bool, noLocal bool, noWait bool, args amqp.Table) (<-chan amqp.Delivery, error)
 }
 
+type RabbitMQQueue string
+
+type RabbitMQConfigurator interface {
+	GetQueue() (RabbitMQQueue, error)
+}
+
 type RabbitMQ struct {
 	id               string
 	ch               RabbitMQAPI
@@ -28,7 +34,7 @@ type RabbitMQ struct {
 
 type RabbitMQCfg struct {
 	Client           RabbitMQAPI
-	Queue            string
+	Queue            RabbitMQQueue
 	NotificationChan chan<- dto.NotificationMsg
 }
 
@@ -80,7 +86,7 @@ func NewRabbitMQConsumer(cfg RabbitMQCfg) (*RabbitMQ, error) {
 	consumerId := uuid.NewString()
 
 	messageChan, err := cfg.Client.Consume(
-		cfg.Queue,
+		string(cfg.Queue),
 		consumerId,
 		false,
 		false,

@@ -21,10 +21,10 @@ func TestNotificationServiceSender(t *testing.T) {
 
 		senderClient := sender.NewNotificationServiceSender(clients.NotificationServiceClient{
 			AuthProvider:           clients.NoAuth,
-			NotificationServiceUrl: server.URL,
+			NotificationServiceUrl: clients.NotificationServiceUrl(server.URL),
 			NumRetries:             1,
-			BaseDelay:              1 * time.Second,
-			MaxDelay:               5 * time.Second,
+			BaseDelay:              clients.BaseDelay(1 * time.Second),
+			MaxDelay:               clients.MaxDelay(5 * time.Second),
 		})
 
 		return server, senderClient

@@ -40,6 +40,34 @@ services:
       localstack:
         condition: service_healthy
 
+  worker:
+    image: notifique:v0-worker
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - RABBITMQ_URL=amqp://rabbitmq:5672/
+      - M2M_TOKEN_URL=https://cognito-idp.localhost.localstack.cloud:4566/us-east-1_2c9d52698930409287c7bae7a1649d2a/.well-known/jwks.json
+      - M2M_CLIENT_ID=notifique
+      - M2M_CLIENT_SECRET=notifique
+      - NOTIFICATION_SERVICE_URL=http://notifique:8080/v0
+      - NOTIFICATION_SERVICE_NUM_RETRIES=3
+      - NOTIFICATION_SERVICE_BASE_DELAY_IN_SECONDS=2
+      - NOTIFICATION_SERVICE_MAX_DELAY_IN_SECONDS=10
+      - SMTP_HOST=localhost
+      - SMTP_PORT=1025
+      - SMTP_USERNAME=notifique
+      - SMTP_PASSWORD=notifique
+      - SMTP_FROM=noreply@notifique
+      - USER_POOL_ID=us-east-1_2c9d52698930409287c7bae7a1649d2a
+      - COGNITO_BASE_ENDPOINT=https://cognito-idp.localhost.localstack.cloud:4566
+      - COGNITO_REGION=us-east-1
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      localstack:
+        condition: service_healthy
+
   # dynamodb-local:
   #   image: amazon/dynamodb-local:2.4.0
   #   environment:

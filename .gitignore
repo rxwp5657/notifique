@@ -27,3 +27,6 @@ volumes
 .vscode
 
 volume
+
+test_auth.go
+test_chan.Go

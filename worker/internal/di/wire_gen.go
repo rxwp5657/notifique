@@ -8,13 +8,22 @@ package di
 
 import (
 	"context"
+	"fmt"
+	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/google/wire"
+	"github.com/notifique/shared/cache"
+	clients2 "github.com/notifique/shared/clients"
 	"github.com/notifique/shared/dto"
+	"github.com/notifique/worker/internal/clients"
+	"github.com/notifique/worker/internal/config"
 	"github.com/notifique/worker/internal/consumers"
+	"github.com/notifique/worker/internal/providers"
+	"github.com/notifique/worker/internal/sender"
 	"github.com/notifique/worker/internal/testutils/consumers"
 	"github.com/notifique/worker/internal/testutils/containers"
 	"github.com/notifique/worker/internal/testutils/mocks"
 	"github.com/notifique/worker/internal/worker"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/mock/gomock"
 )
 
@@ -26,10 +35,10 @@ func InjectRabbitMQConsumerIntegrationTest(ctx context.Context, notificationChan
 		return nil, nil, err
 	}
 	rabbitMQ := rabbitMQConsumerContainer.Client
-	string2 := rabbitMQConsumerContainer.Queue
+	rabbitMQQueue := rabbitMQConsumerContainer.Queue
 	rabbitMQCfg := consumers.RabbitMQCfg{
 		Client:           rabbitMQ,
-		Queue:            string2,
+		Queue:            rabbitMQQueue,
 		NotificationChan: notificationChan,
 	}
 	consumers_testRabbitMQCfg := consumers_test.RabbitMQCfg{
@@ -101,9 +110,255 @@ func InjectMockedWorkerIntegrationTest(ctx context.Context, mockController *gomo
 	return mockedWorkerScenario
 }
 
+func InjectRabbitMQWorker(ctx context.Context, envfile *string, notificationChan chan dto.NotificationMsg) (*worker.Worker, func(), error) {
+	envConfig, err := config.NewEnvConfig(envfile)
+	if err != nil {
+		return nil, nil, err
+	}
+	userPoolID, err := ProviderUserPoolId(envConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	client, err := cache.NewRedisClient(envConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	redis, err := cache.NewRedisCache(client)
+	if err != nil {
+		return nil, nil, err
+	}
+	cognitoidentityproviderClient, err := providers.NewCognitoIdentityProvider(envConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	cognitoUserInfoCfg := providers.CognitoUserInfoCfg{
+		UserPoolID: userPoolID,
+		Cache:      redis,
+		Client:     cognitoidentityproviderClient,
+	}
+	cognitoUserInfo := providers.NewCognitoUserInfoProvider(cognitoUserInfoCfg)
+	cognitoAuthProvider, err := clients.NewCognitoAuthProvider(envConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	notificationServiceClientCfg, err := ProvideNotificationServiceClientConfigurator(envConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	notificationServiceUrl := notificationServiceClientCfg.NotificationServiceUrl
+	int2 := notificationServiceClientCfg.NumRetries
+	baseDelay := notificationServiceClientCfg.BaseDelay
+	maxDelay := notificationServiceClientCfg.MaxDelay
+	notificationServiceClient := clients.NotificationServiceClient{
+		AuthProvider:           cognitoAuthProvider,
+		NotificationServiceUrl: notificationServiceUrl,
+		NumRetries:             int2,
+		BaseDelay:              baseDelay,
+		MaxDelay:               maxDelay,
+	}
+	notificationServiceProvider := providers.NewNotificationServiceProvider(notificationServiceClient)
+	notificationServiceSender := sender.NewNotificationServiceSender(notificationServiceClient)
+	rabbitMQ, cleanup, err := clients2.NewRabbitMQClient(envConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	rabbitMQQueue, err := ProvideRabbitMQQueue(envConfig)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	v, err := ProvideNotificationMsgChanWriter(notificationChan)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	rabbitMQCfg := consumers.RabbitMQCfg{
+		Client:           rabbitMQ,
+		Queue:            rabbitMQQueue,
+		NotificationChan: v,
+	}
+	consumersRabbitMQ, err := consumers.NewRabbitMQConsumer(rabbitMQCfg)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	smtpConfig, err := ProvideSMTPConfigurator(envConfig)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	smtp := sender.NewSMTP(smtpConfig)
+	v2, err := ProvideNotificationMsgChanReader(notificationChan)
+	if err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	workerCfg := worker.WorkerCfg{
+		UserInfoProvider:         cognitoUserInfo,
+		NotificationInfoProvider: notificationServiceProvider,
+		NotificationInfoUpdater:  notificationServiceSender,
+		Queue:                    consumersRabbitMQ,
+		InAppSender:              notificationServiceSender,
+		EmailSender:              smtp,
+		NotificationChan:         v2,
+	}
+	workerWorker := worker.NewWorker(workerCfg)
+	return workerWorker, func() {
+		cleanup()
+	}, nil
+}
+
+func InjectSQSWorker(ctx context.Context, envfile *string, notificationChan chan dto.NotificationMsg) (*worker.Worker, func(), error) {
+	envConfig, err := config.NewEnvConfig(envfile)
+	if err != nil {
+		return nil, nil, err
+	}
+	userPoolID, err := ProviderUserPoolId(envConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	client, err := cache.NewRedisClient(envConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	redis, err := cache.NewRedisCache(client)
+	if err != nil {
+		return nil, nil, err
+	}
+	cognitoidentityproviderClient, err := providers.NewCognitoIdentityProvider(envConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	cognitoUserInfoCfg := providers.CognitoUserInfoCfg{
+		UserPoolID: userPoolID,
+		Cache:      redis,
+		Client:     cognitoidentityproviderClient,
+	}
+	cognitoUserInfo := providers.NewCognitoUserInfoProvider(cognitoUserInfoCfg)
+	cognitoAuthProvider, err := clients.NewCognitoAuthProvider(envConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	notificationServiceClientCfg, err := ProvideNotificationServiceClientConfigurator(envConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	notificationServiceUrl := notificationServiceClientCfg.NotificationServiceUrl
+	int2 := notificationServiceClientCfg.NumRetries
+	baseDelay := notificationServiceClientCfg.BaseDelay
+	maxDelay := notificationServiceClientCfg.MaxDelay
+	notificationServiceClient := clients.NotificationServiceClient{
+		AuthProvider:           cognitoAuthProvider,
+		NotificationServiceUrl: notificationServiceUrl,
+		NumRetries:             int2,
+		BaseDelay:              baseDelay,
+		MaxDelay:               maxDelay,
+	}
+	notificationServiceProvider := providers.NewNotificationServiceProvider(notificationServiceClient)
+	notificationServiceSender := sender.NewNotificationServiceSender(notificationServiceClient)
+	sqsQueueCfg, err := ProvideSQSQueueCfg(envConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	sqsClient, err := clients2.NewSQSClient(envConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	v, err := ProvideNotificationMsgChanWriter(notificationChan)
+	if err != nil {
+		return nil, nil, err
+	}
+	sqsCfg := consumers.SQSCfg{
+		QueueCfg:    sqsQueueCfg,
+		Client:      sqsClient,
+		MessageChan: v,
+	}
+	sqs, err := consumers.NewSQSConsumer(sqsCfg)
+	if err != nil {
+		return nil, nil, err
+	}
+	smtpConfig, err := ProvideSMTPConfigurator(envConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	smtp := sender.NewSMTP(smtpConfig)
+	v2, err := ProvideNotificationMsgChanReader(notificationChan)
+	if err != nil {
+		return nil, nil, err
+	}
+	workerCfg := worker.WorkerCfg{
+		UserInfoProvider:         cognitoUserInfo,
+		NotificationInfoProvider: notificationServiceProvider,
+		NotificationInfoUpdater:  notificationServiceSender,
+		Queue:                    sqs,
+		InAppSender:              notificationServiceSender,
+		EmailSender:              smtp,
+		NotificationChan:         v2,
+	}
+	workerWorker := worker.NewWorker(workerCfg)
+	return workerWorker, func() {
+	}, nil
+}
+
 // wire.go:
 
-var RabbitMQConsumerSet = wire.NewSet(consumers.NewRabbitMQConsumer)
+func ProvideSQSQueueCfg(c consumers.SQSQueueConfigurator) (consumers.SQSQueueCfg, error) {
+	cfg, err := c.GetSQSQueueCfg()
+
+	if err != nil {
+		return consumers.SQSQueueCfg{}, fmt.Errorf("failed to get SQS queue config - %w", err)
+	}
+
+	return cfg, nil
+}
+
+func ProvideRabbitMQQueue(c consumers.RabbitMQConfigurator) (consumers.RabbitMQQueue, error) {
+	queue, err := c.GetQueue()
+
+	if err != nil {
+		return "", fmt.Errorf("failed to get RabbitMQ queue - %w", err)
+	}
+
+	return queue, nil
+}
+
+func ProvideNotificationServiceClientConfigurator(c clients.NotificationServiceClientConfigurator) (*clients.NotificationServiceClientCfg, error) {
+	cfg, err := c.GetNotificationServiceClientCfg()
+
+	if err != nil {
+		return &cfg, fmt.Errorf("failed to get Notification Service client config - %w", err)
+	}
+
+	return &cfg, nil
+}
+
+func ProvideSMTPConfigurator(c sender.SMTPConfigurator) (sender.SMTPConfig, error) {
+	cfg, err := c.GetSMTPConfig()
+
+	if err != nil {
+		return sender.SMTPConfig{}, fmt.Errorf("failed to get SMTP config - %w", err)
+	}
+
+	return cfg, nil
+}
+
+func ProviderUserPoolId(c providers.CognitoUserInfoConfigurator) (providers.UserPoolID, error) {
+	userPoolId, err := c.GetUserPoolId()
+
+	if err != nil {
+		return "", fmt.Errorf("failed to get User Pool ID - %w", err)
+	}
+
+	return userPoolId, nil
+}
+
+func ProvideNotificationMsgChanWriter(notificationChan chan dto.NotificationMsg) (chan<- dto.NotificationMsg, error) {
+	return notificationChan, nil
+}
+
+func ProvideNotificationMsgChanReader(notificationChan chan dto.NotificationMsg) (<-chan dto.NotificationMsg, error) {
+	return notificationChan, nil
+}
 
 var MockedUserInfoProviderSet = wire.NewSet(mocks.NewMockUserInfoProvider, wire.Bind(new(worker.UserInfoProvider), new(*mocks.MockUserInfoProvider)))
 
@@ -126,3 +381,33 @@ type MockedWorkerScenario struct {
 	EmailSender              *mocks.MockEmailSender
 	Worker                   *worker.Worker
 }
+
+var SQSConsumerSet = wire.NewSet(
+	ProvideSQSQueueCfg, clients2.NewSQSClient, wire.Struct(new(consumers.SQSCfg), "*"), consumers.NewSQSConsumer, wire.Bind(new(consumers.SQSAPI), new(*sqs.Client)), wire.Bind(new(worker.QueueConsumer), new(*consumers.SQS)),
+)
+
+var RabbitMQConsumerSet = wire.NewSet(
+	ProvideRabbitMQQueue, clients2.NewRabbitMQClient, wire.Struct(new(consumers.RabbitMQCfg), "*"), consumers.NewRabbitMQConsumer, wire.Bind(new(consumers.RabbitMQAPI), new(*clients2.RabbitMQ)), wire.Bind(new(worker.QueueConsumer), new(*consumers.RabbitMQ)),
+)
+
+var CognitoAuthProviderSet = wire.NewSet(clients.NewCognitoAuthProvider, wire.Bind(new(clients.AuthProvider), new(*clients.CognitoAuthProvider)))
+
+var NotificationServiceClientSet = wire.NewSet(
+	ProvideNotificationServiceClientConfigurator, wire.FieldsOf(new(*clients.NotificationServiceClientCfg), "NotificationServiceUrl"), wire.FieldsOf(new(*clients.NotificationServiceClientCfg), "NumRetries"), wire.FieldsOf(new(*clients.NotificationServiceClientCfg), "BaseDelay"), wire.FieldsOf(new(*clients.NotificationServiceClientCfg), "MaxDelay"), wire.Struct(new(clients.NotificationServiceClient), "*"),
+)
+
+var NotificationServiceProviderSet = wire.NewSet(providers.NewNotificationServiceProvider, wire.Bind(new(worker.NotificationInfoProvider), new(*providers.NotificationServiceProvider)))
+
+var NotificationServiceSenderSet = wire.NewSet(sender.NewNotificationServiceSender, wire.Bind(new(worker.NotificationInfoUpdater), new(*sender.NotificationServiceSender)), wire.Bind(new(worker.InAppSender), new(*sender.NotificationServiceSender)))
+
+var SMTPSenderSet = wire.NewSet(
+	ProvideSMTPConfigurator, sender.NewSMTP, wire.Bind(new(worker.EmailSender), new(*sender.SMTP)),
+)
+
+var CognitoUserInfoProviderSet = wire.NewSet(providers.NewCognitoIdentityProvider, ProviderUserPoolId, wire.Struct(new(providers.CognitoUserInfoCfg), "*"), providers.NewCognitoUserInfoProvider, wire.Bind(new(worker.UserInfoProvider), new(*providers.CognitoUserInfo)))
+
+var RedisSet = wire.NewSet(cache.NewRedisClient, wire.Bind(new(cache.CacheRedisApi), new(*redis.Client)))
+
+var RedisCacheSet = wire.NewSet(cache.NewRedisCache, wire.Bind(new(cache.Cache), new(*cache.Redis)))
+
+var EnvConfigSet = wire.NewSet(config.NewEnvConfig, wire.Bind(new(clients.CognitoAuthConfigurator), new(*config.EnvConfig)), wire.Bind(new(clients.NotificationServiceClientConfigurator), new(*config.EnvConfig)), wire.Bind(new(providers.CognitoIdentityProviderConfigurator), new(*config.EnvConfig)), wire.Bind(new(providers.CognitoUserInfoConfigurator), new(*config.EnvConfig)), wire.Bind(new(sender.SMTPConfigurator), new(*config.EnvConfig)), wire.Bind(new(cache.RedisConfigurator), new(*config.EnvConfig)), wire.Bind(new(clients2.SQSConfigurator), new(*config.EnvConfig)), wire.Bind(new(clients2.RabbitMQConfigurator), new(*config.EnvConfig)), wire.Bind(new(consumers.RabbitMQConfigurator), new(*config.EnvConfig)), wire.Bind(new(consumers.SQSQueueConfigurator), new(*config.EnvConfig)))
